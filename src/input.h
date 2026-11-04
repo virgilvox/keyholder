@@ -14,7 +14,7 @@
  *   talk, use           X                  E
  *   sprint (held)       L3, or stick full  Left Alt
  *   pause               START              Esc, P
- *   menus: stick, d-pad or arrows; A or Enter picks, B or Esc backs out. */
+ *   menus: stick, d-pad or arrows; A, RT, a click or Enter picks, B or Esc backs out. */
 #ifndef DS_INPUT_H
 #define DS_INPUT_H
 #include <stdbool.h>

@@ -82,7 +82,7 @@ void input_frame(const wc_pad_t *pads, const uint8_t *keys) {
     o->interact |= (pr & WC_BTN_X) != 0;
     o->sprint |= (b & WC_BTN_L3) != 0;
     o->pause |= (pr & WC_BTN_START) != 0;
-    o->ok |= (pr & (WC_BTN_A | WC_BTN_START)) != 0; o->back |= (pr & WC_BTN_B) != 0;
+    o->ok |= (pr & (WC_BTN_A | WC_BTN_START)) != 0 || (rt && !prt);   /* the web page's left click is RT */ o->back |= (pr & WC_BTN_B) != 0;
     int px = ((b & WC_BTN_RIGHT) || n->left_x > 16000) - ((b & WC_BTN_LEFT) || n->left_x < -16000);
     int py = ((b & WC_BTN_DOWN) || n->left_y > 16000) - ((b & WC_BTN_UP) || n->left_y < -16000);
     if (px) dx = px;

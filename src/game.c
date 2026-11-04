@@ -100,6 +100,9 @@ void game_frame(float dt) {
 void game_draw(void) {
   render_scene(scene, cam);
   render_target();
+#ifdef KH_NOHUD
+  return;   /* clean frames for the web page's backdrop */
+#endif
   switch (mode) {
     case G_TITLE: hud_title_draw(mode_t, 0, who, story_has_save(), NAMES, BLURB); break;
     case G_PLAY:
