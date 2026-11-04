@@ -1,0 +1,52 @@
+/* world.h: the walkable world. Downtown Mesa at real scale around HeatSync Labs, the
+ * lab itself (HSL-108 model) and the fight arenas. Units are metres, y is up.
+ *
+ * World axes: +x is east, -z is north. The origin is on the lab's front wall at its door,
+ * on the sidewalk's level. West Main Street runs along x south of the origin; the lab runs
+ * north from it (its back wall near z = -40). OpenStreetMap is the source for where
+ * everything is: even numbers on the north side of Main, odd on the south. */
+#ifndef KH_WORLD_H
+#define KH_WORLD_H
+#include "ds.h"
+#include "three.h"
+
+typedef enum {
+  STAGE_TOWN,          /* the city and the lab, one continuous space */
+  STAGE_ARENA_BENCH,   /* "The Long Bench": the lab's hall opened out, benches around a wide floor */
+  STAGE_ARENA_LASER,   /* "Laser Corner": a ring under an oversized laser gantry */
+  STAGE_ARENA_FRIDGE,  /* "The Fridge": the kitchen, grown, tiled and frosted */
+  STAGE_ARENA_SHOP,    /* "Machine Shop": lathes and mills as pillars around a steel floor */
+  STAGE_ARENA_UNFOLD,  /* "The Whole Lab, Unfolded": every room of the lab around a huge disc, night sky */
+  STAGE_COUNT
+} world_stage;
+
+void world_init(t3_scene *scene);
+void world_set_stage(world_stage s);
+world_stage world_get_stage(void);
+/* per frame: which chunks draw (focus: the camera or the player) */
+void world_update(float dt, v3 focus);
+/* lab clock, in hours (9.0 opening .. 24.0 lock up): sun, sky, fog, street lamps, neon, the lab's lights */
+void world_set_time(float hours);
+/* a stage's fighting floor: centre on the floor and a safe radius */
+void world_stage_floor(world_stage s, v3 *center, float *radius);
+
+/* a standing cylinder (feet at p->y) moved by vel*dt: slides along walls and furniture, lands on
+ * floors and tops (*grounded, zeroes vel->y), steps up ledges under WORLD_STEP */
+#define WORLD_STEP 0.32f
+void world_move(v3 *p, v3 *vel, float r, float h, float dt, bool *grounded);
+bool world_raycast(v3 origin, v3 dir, float max_dist, float *t, v3 *normal);
+bool world_visible(v3 a, v3 b);
+float world_floor_y(v3 p);                     /* the first surface at or below p, or -1e9 */
+bool world_in_lab(v3 p);
+
+/* the HSL-108 plan (metres: x from the street to the back, z across from the west wall) to world */
+v3 world_lab(float plan_x, float plan_z);
+/* lab plan yaw (degrees, 0 faces plan +z, 90 faces plan +x, as DOLLY's marks) to world yaw (radians) */
+float world_lab_yaw(float plan_deg);
+
+/* named places: "lab_door", "nile", "worth", "proof", "level1", "center_main_station", ... see
+ * docs/DESIGN.md. Standing point on the sidewalk in front, and the yaw that faces the place. */
+bool world_place(const char *name, v3 *pos, float *yaw);
+/* the door's open amount, 0..1, driven by the director */
+void world_door(float open);
+#endif

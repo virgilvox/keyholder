@@ -1,0 +1,2 @@
+{ "name": "keyholder-tools", "private": true, "type": "module",
+  "dependencies": { "sharp": "^0.33.5", "meshoptimizer": "^0.22.0" } }

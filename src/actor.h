@@ -1,0 +1,61 @@
+/* actor.h: one anime character. A VRoid sample avatar baked by tools/prep-vrm.mjs,
+ * driven by the mocap clips (anim.c) with cel lit materials, an inverted hull
+ * outline, expression morphs, a procedural head look, spring bones for hair and
+ * skirts, and a palette swap so one model can play several people.
+ * Units are metres; an actor stands at about 1.6 m. yaw 0 faces +z. */
+#ifndef KH_ACTOR_H
+#define KH_ACTOR_H
+#include "ds.h"
+#include "three.h"
+
+typedef enum { AM_B, AM_C, AM_D, AM_S, AM_F, AM_COUNT } actor_model;   /* cast_meta order */
+typedef enum { EX_BLINK, EX_A, EX_I, EX_U, EX_E, EX_O, EX_JOY, EX_ANGRY, EX_SORROW, EX_FUN, EX_COUNT } actor_expr;
+
+/* a palette swap: a hue turn (degrees) and saturation and value scales per part */
+typedef struct { float hue, sat, val; } actor_swatch;
+typedef struct { actor_swatch hair, top, bottom, shoes; } actor_palette;
+extern const actor_palette ACTOR_PAL_NONE;
+
+typedef struct actor actor_t;
+
+actor_t *actor_new(actor_model model, const actor_palette *pal, float scale, t3_scene *scene);
+void actor_place(actor_t *a, v3 pos, float yaw);     /* a jump: the spring bones reset */
+void actor_move(actor_t *a, v3 pos, float yaw);      /* a step: the spring bones follow */
+v3 actor_pos(const actor_t *a);
+float actor_yaw(const actor_t *a);
+void actor_visible(actor_t *a, bool on);
+bool actor_is_visible(const actor_t *a);
+float actor_height(const actor_t *a);
+float actor_hips_height(const actor_t *a);
+
+/* crossfade to a clip by name (tools/prep-vrm.mjs CLIPS); replaying the current clip only
+ * changes its speed unless restart is set */
+void actor_play(actor_t *a, const char *clip, float speed, bool loop, float fade);
+void actor_replay(actor_t *a, const char *clip, float speed, bool loop, float fade);
+bool actor_clip_done(const actor_t *a);              /* a one shot reached its end */
+float actor_clip_time(const actor_t *a);             /* seconds into the current clip */
+float actor_clip_len(const actor_t *a);
+float actor_clip_ground_speed(const actor_t *a);     /* metres a second the clip's feet travel at speed 1 */
+
+/* look at a world point (head and neck turn, clamped); amount 0 lets go */
+void actor_look(actor_t *a, v3 target, float amount);
+/* expressions ease to these amounts, 0..1; blink runs on its own */
+void actor_expr_set(actor_t *a, actor_expr e, float amount);
+void actor_expr_clear(actor_t *a);
+/* lip sync: mouth open 0..1, shape chooses the vowel; 0 closes */
+void actor_mouth(actor_t *a, float open, float shape);
+
+void actor_update(actor_t *a, float dt);             /* after actor_move / actor_play, every frame */
+
+/* attach points: a group that follows the bone, in the bone's frame, x along the fingers
+ * for the right hand; add a prop with t3_object_add. */
+t3_object *actor_socket_rhand(actor_t *a);
+t3_object *actor_socket_lhand(actor_t *a);
+v3 actor_bone_pos(actor_t *a, const char *bone);     /* world position, after actor_update */
+v3 actor_head_pos(actor_t *a);
+/* a flat colour flash over the whole model (hit flash): colour multiplier 0..n, 1 = normal */
+void actor_flash(actor_t *a, float r, float g, float b);
+/* the blob shadow is drawn by the actor at floor_y */
+void actor_set_floor(actor_t *a, float floor_y);
+
+#endif

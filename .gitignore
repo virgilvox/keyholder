@@ -1,0 +1,10 @@
+build/
+build-*/
+node_modules/
+web/keyholder.html
+.DS_Store
+*.log
+compile_flags.txt
+_ref/
+tools/node_modules/
+source/wav/

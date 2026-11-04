@@ -1,0 +1,6 @@
+basic+fog2
+lambert+fog+l1001
+lambert+map+fog+skin+atest+ds+l1001
+lambert+map+fog+skin+morph+atest+ds+l1001
+basic+fog+skin
+basic+map+trans
