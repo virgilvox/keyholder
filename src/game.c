@@ -19,20 +19,20 @@ static float mode_t;
 static int who, pause_sel; static bool music_on = true;
 static actor_t *T_A[3];
 static const char *const NAMES[3] = {"VEE", "DEX", "RUTH"};
-static const char *const BLURB[3] = {"First to look up. Runs the 3D printers and most of the conversation.", "Electronics bench. Fixes it, then tells you how it broke.", "Laser corner. Certified on everything. Has read the manual."};
+static const char *const BLURB[3] = {"First to look up. Runs the printers.", "Electronics bench. Tells you how it broke.", "Laser corner. Has actually read the manual."};
 static const actor_model TITLE_M[3] = {AM_C, AM_D, AM_B};
 
 static void title_enter(void) {
   mode = G_TITLE; mode_t = 0;
   story_stop();
-  world_set_stage(STAGE_TOWN); world_set_time(17.9f);
+  world_set_stage(STAGE_TOWN); world_set_time(16.6f);
   music_mood(MOOD_TITLE);
   v3 p; float y;
   if (!world_place("lab_door", &p, &y)) { p = v3_(0, 0, 3); y = 0; }
   for (int i = 0; i < 3; i++) {
     if (!T_A[i]) T_A[i] = actor_new(TITLE_M[i], &ACTOR_PAL_NONE, 1, scene);
     actor_visible(T_A[i], true);
-    actor_place(T_A[i], v3_(p.x + (i - 1) * 1.15f, p.y, p.z + 3.2f + (i == 1 ? -.2f : 0)), 0);
+    actor_place(T_A[i], v3_(p.x + (i - 1) * 1.15f, p.y, p.z + 5.6f + (i == 1 ? -.3f : 0)), 0);
     actor_play(T_A[i], "Idle_Loop", 1, true, 0);
   }
 }
@@ -63,8 +63,8 @@ void game_frame(float dt) {
       }
       v3 c = actor_pos(T_A[1]);
       float sway = sinf(mode_t * .25f) * .4f;
-      t3_object_set_position(cam, c.x + sway + (who - 1) * .3f, c.y + 1.15f, c.z + 4.3f);
-      t3_object_look_at(cam, c.x + (who - 1) * .25f, c.y + 1.0f, c.z);
+      t3_object_set_position(cam, c.x + sway + (who - 1) * .3f, c.y + 1.2f, c.z + 6.2f);
+      t3_object_look_at(cam, c.x + (who - 1) * .25f, c.y + 1.15f, c.z);
       if (cam->fov != 38) { cam->fov = 38; t3_camera_update_projection_matrix(cam); }
       world_update(dt, v3_(c.x, c.y + 1, c.z + 4));
       const bool cont = story_has_save() && (input_key_down(0x06) || in->heavy);   /* C or Y */
