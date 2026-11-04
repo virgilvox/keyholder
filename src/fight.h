@@ -29,6 +29,9 @@ typedef struct {
   float power;         /* damage scale, 1 = normal */
   float speed;         /* move and attack speed, 1 = normal */
   float place_x, place_z;   /* start, relative to the fight's centre */
+  actor_t *actor;      /* optional: a story actor to use as it stands (palette, place, any weapon already
+                        * equipped). NULL takes one from the fight's pool. A story actor is left visible, on
+                        * one knee, after the fight: fight_end neither hides nor frees it. */
 } fighter_def;
 
 typedef enum { FIGHT_RUNNING, FIGHT_WON, FIGHT_LOST } fight_state;
@@ -41,6 +44,9 @@ typedef struct {
   float foe_scale;             /* difficulty: hp and power scale from the story's stats, 1 = normal */
   unsigned weapons;            /* bit per weapon_id: what the player owns */
   int start_weapon;
+  bool tutorial;               /* show the controls helper; the player stops at 1 hp, and the fight ends as won
+                                * when the foes' hp or the player's hp runs out */
+  bool easy;                   /* foes' hp and power scaled by 0.8 */
 } fight_def;
 
 /* the player's actor comes from game.c. Takes over the camera and the player until it ends. */

@@ -1,7 +1,7 @@
 /* audio.c: the synth. No samples. A voice pool for effects (oscillator or
  * noise, an exponential pitch glide, a decay curve, a swept one pole filter,
- * a little FM and an echo send), two continuous voices that follow the game
- * (the jetpack's motors, the coilgun's charge), a stereo echo bus, and a 16
+ * a little FM and an echo send), a continuous voice that follows the game
+ * (the staff's charge), a stereo echo bus, and a 16
  * step tracker for the music moods (bass, pad, arp, lead, kick, snare, hat).
  * The synth runs at whatever rate the host asks for, so there is nothing to
  * resample. */
@@ -30,7 +30,7 @@ static float osc(int w, float ph, float duty) {
   }
 }
 
-/* ── effect voices ── */
+/* effect voices */
 typedef struct {
   bool on; int wave, curve, id;
   float f, mult, dur, age, delay, atk, vol, gl, gr, noise, duty, send;
@@ -58,11 +58,11 @@ static voice *vx(int id, int wave, float f0, float f1, float dur, float vol, flo
   return v;
 }
 
-/* ── echo bus ── */
+/* echo bus */
 #define ECH 32768
 static float eb[2][ECH]; static int ew; static float elp[2];
 
-/* ── music ── */
+/* music */
 typedef struct {
   float bpm; int root, nch; const char *chords;   /* chord roots as semitone letters 'a'+n, then quality in quals */
   const char *quals;
@@ -262,7 +262,7 @@ static void music_sample(const song *s, float *mL, float *mR, float *snd) {
   *mL = L; *mR = R; *snd = sd;
 }
 
-/* ── api ── */
+/* api */
 static float sfx_vol = 0.9f, mus_vol = 0.5f;
 
 void audio_init(uint32_t rate) {
@@ -275,14 +275,12 @@ void audio_init(uint32_t rate) {
 void music_mood(mood_t m) { want = (int)m; }
 void audio_set_music(int on) { music_on = on ? 1.f : 0.f; }
 
-/* ── continuous voices ──
- * The jetpack's motors and the coilgun's charge are called every frame while
- * they last, so they are not pool voices that stack: each call refreshes a
- * slot's gain and time to live, and the render loop runs one oscillator set
- * per slot, fading in and out around the calls. Two jet slots, so the buddy's
- * motors (heard from their side) sit beside the player's. */
+/* continuous voice
+ * The staff's charge is called every frame while it lasts, so it is not a pool
+ * voice that stacks: each call refreshes its gain and time to live, and the
+ * render loop runs one oscillator set, fading in and out around the calls. */
 typedef struct { float ttl, gain, pan, level, lpan, ph[3], z[3], t; } cont;
-static cont jets[2], coil_c;
+static cont coil_c;
 
 static cont *cont_slot(cont *arr, int n, float pan) {
   cont *free_ = NULL, *weak = &arr[0];
@@ -299,25 +297,7 @@ static void cont_call(cont *arr, int n, float pan, float gain) {
   c->ttl = 0.09f; c->gain = gain; c->pan = pan;
 }
 
-/* one sample of a drone motor: two detuned saws that beat, a harmonic, and air through the props; pitch climbs with thrust */
-static float jet_sample(cont *c, float dt, int idx, float sd_[1]) {
-  float lv = c->level;
-  float f = (300.f + 320.f * lv) * (idx ? 1.07f : 1.f);
-  c->ph[0] = sgn_frac(c->ph[0] + f * dt);
-  c->ph[1] = sgn_frac(c->ph[1] + f * 1.013f * dt);
-  c->ph[2] = sgn_frac(c->ph[2] + f * 2.01f * dt);
-  float x = osc(W_SAW, c->ph[0], 0) * 0.45f + osc(W_SAW, c->ph[1], 0) * 0.45f + osc(W_TRI, c->ph[2], 0) * 0.25f;
-  c->z[0] += (x - c->z[0]) * fminf(1.f, (1500.f + 2400.f * lv) * TAU * dt);
-  float n = rnd();
-  c->z[1] += (n - c->z[1]) * fminf(1.f, 2400.f * TAU * dt);
-  c->t += dt;
-  float am = 1.f + 0.12f * sinf(c->t * TAU * 86.f);   /* blade flutter */
-  float y = (c->z[0] * 0.55f + c->z[1] * (0.35f + 0.4f * lv)) * am * lv * 0.34f;
-  sd_[0] += y * 0.1f;
-  return y;
-}
-
-/* the coilgun charging: a capacitor whine climbing with the charge, a mains hum under it, crackle near the top */
+/* the staff charging: a capacitor whine climbing with the charge, a mains hum under it, crackle near the top */
 static float coil_sample(cont *c, float dt, float sd_[1]) {
   float k = c->gain;   /* the charge itself: call gain is 0..1 */
   float f = 180.f + 2700.f * powf(k, 1.6f);
@@ -335,7 +315,7 @@ static float coil_sample(cont *c, float dt, float sd_[1]) {
   return y;
 }
 
-/* ── effects ── */
+/* effects */
 void sfx(sfx_t s, float pan, float gain) {
   if (s < 0 || s >= SFX_COUNT) return;
   float g = gain <= 0 ? 0 : gain > 1 ? 1 : gain, p = pan;
@@ -343,121 +323,129 @@ void sfx(sfx_t s, float pan, float gain) {
   float j = 1.f + rnd() * 0.08f;   /* a little pitch jitter so repeats do not machine gun */
 #define V(w, f0, f1, d, vol) vx((int)s, w, f0, f1, d, (vol) * g, p)
   switch (s) {
-    case SFX_JET: cont_call(jets, 2, pan, g); break;
-    case SFX_COIL_CHARGE: cont_call(&coil_c, 1, pan, g); break;
-    case SFX_BAND: {   /* a rubber band repeater: the band's twang over a plywood thock and a snap */
-      v = V(W_SINE, 620 * j, 330 * j, 0.2f, 0.5f); v->fm_r = 1.5f; v->fm_i = 2.4f; v->curve = 2; v->wob = 70.f; v->send = 0.15f;
-      v = V(W_TRI, 310 * j, 300 * j, 0.14f, 0.3f); v->curve = 2; v->wob = 45.f;
-      v = V(W_NOISE, 0, 0, 0.018f, 0.55f); v->hp = 2200; v->lp = 9000; v->curve = 2;
-      v = V(W_SINE, 150, 70, 0.07f, 0.55f); v->curve = 2;
+    case SFX_CHARGE: cont_call(&coil_c, 1, pan, g); break;
+    case SFX_SWING_ARC: {   /* plasma: a hiss with a buzz inside it, rising then gone */
+      v = V(W_NOISE, 0, 0, 0.2f * 1.f, 0.7f); v->lp = 1800; v->lp1 = 7000; v->hp = 700; v->atk = 0.03f; v->curve = 2;
+      v = V(W_SAW, 150 * j, 420 * j, 0.16f, 0.22f); v->lp = 2400; v->curve = 2; v->atk = 0.02f;
+      v = V(W_SINE, 900 * j, 1900 * j, 0.14f, 0.12f); v->fm_r = 3.1f; v->fm_i = 3.f; v->curve = 2; v->send = 0.15f;
       break; }
-    case SFX_GLUE: {   /* a wet pop out of the nozzle and a small bubble burst after it */
-      v = V(W_SINE, 340 * j, 80, 0.1f, 0.7f); v->curve = 2; v->wob = 40.f;
-      v = V(W_NOISE, 0, 0, 0.07f, 0.4f); v->lp = 2600; v->lp1 = 500; v->curve = 3;
-      v = V(W_TRI, 260, 1100, 0.06f, 0.35f); v->delay = 0.045f; v->curve = 1;
-      v = V(W_NOISE, 0, 0, 0.16f, 0.14f); v->hp = 3500; v->lp = 8000; v->atk = 0.03f; v->curve = 2;
+    case SFX_SWING_MAUL: {   /* a great weight moves air */
+      v = V(W_NOISE, 0, 0, 0.42f, 0.95f); v->lp = 240; v->lp1 = 1300; v->atk = 0.14f; v->curve = 2;
+      v = V(W_SINE, 70 * j, 130 * j, 0.36f, 0.6f); v->atk = 0.12f; v->curve = 2;
+      v = V(W_TRI, 210, 340, 0.2f, 0.14f); v->delay = 0.1f; v->curve = 3;
       break; }
-    case SFX_COIL: {   /* crack, chest thump, a ringing rail and a long roll of tail */
-      v = V(W_NOISE, 0, 0, 0.05f, 0.9f); v->lp = 14000; v->lp1 = 3500; v->curve = 3;
-      v = V(W_SINE, 150, 32, 0.55f, 1.0f); v->curve = 2; v->drive = 2.f;
-      v = V(W_SAW, 1100, 90, 0.14f, 0.4f); v->lp = 5000; v->lp1 = 400; v->curve = 3;
-      v = V(W_NOISE, 0, 0, 1.4f, 0.4f); v->lp = 3200; v->lp1 = 180; v->curve = 3; v->atk = 0.03f; v->send = 0.7f;
-      v = V(W_SINE, 2100, 2100, 0.7f, 0.1f); v->fm_r = 1.5f; v->fm_i = 3.f; v->send = 0.7f; v->curve = 3;
+    case SFX_SWING_TWIN: {   /* a quick thin whip */
+      v = V(W_NOISE, 0, 0, 0.11f, 0.6f); v->lp = 3000; v->lp1 = 9500; v->hp = 1800; v->atk = 0.02f; v->curve = 2;
+      v = V(W_SINE, 2300 * j, 3400 * j, 0.06f, 0.1f); v->curve = 2;
       break; }
-    case SFX_IRON: {   /* the iron through the air: a hot hiss over a low whoosh */
-      v = V(W_NOISE, 0, 0, 0.3f, 0.45f); v->hp = 2600; v->lp = 9500; v->atk = 0.07f; v->curve = 2;
-      v = V(W_NOISE, 0, 0, 0.26f, 0.4f); v->lp = 500; v->lp1 = 2200; v->hp = 150; v->atk = 0.09f; v->curve = 2;
-      v = V(W_TRI, 210, 120, 0.2f, 0.25f); v->curve = 2;
+    case SFX_SWING_SPEAR: {   /* a long airy sweep */
+      v = V(W_NOISE, 0, 0, 0.3f, 0.85f); v->lp = 500; v->lp1 = 3600; v->hp = 240; v->atk = 0.1f; v->curve = 2;
+      v = V(W_TRI, 180 * j, 420 * j, 0.24f, 0.2f); v->atk = 0.08f; v->curve = 2;
       break; }
-    case SFX_MELT: {   /* plastic meets the iron: a sizzle of tiny crackles and a drip */
-      v = V(W_NOISE, 0, 0, 0.55f, 0.3f); v->hp = 4200; v->lp = 11000; v->atk = 0.02f; v->curve = 2; v->wob = 0;
-      for (int i = 0; i < 6; i++) { v = V(W_NOISE, 0, 0, 0.008f, 0.55f); v->hp = 1500; v->lp = 7000; v->delay = 0.02f + (float)i * 0.07f + (rnd() + 1.f) * 0.02f; v->curve = 1; }
-      v = V(W_SINE, 950, 300, 0.12f, 0.3f); v->delay = 0.22f; v->curve = 2; v->send = 0.2f;
-      v = V(W_SINE, 140, 90, 0.18f, 0.4f); v->curve = 2; v->wob = 30.f;
+    case SFX_BOLT: {   /* a laser cracking off */
+      v = V(W_SQ, 1500 * j, 240, 0.14f, 0.4f); v->duty = 0.3f; v->lp = 5200; v->curve = 2; v->send = 0.25f;
+      v = V(W_SINE, 2400 * j, 700, 0.1f, 0.3f); v->fm_r = 2.f; v->fm_i = 2.f; v->curve = 2;
       break; }
-    case SFX_LIPO_THROW: {   /* a pouch tossed: a soft whoosh and a flump */
-      v = V(W_NOISE, 0, 0, 0.22f, 0.4f); v->lp = 600; v->lp1 = 2400; v->hp = 200; v->atk = 0.06f; v->curve = 2;
-      v = V(W_TRI, 330, 520, 0.1f, 0.35f); v->curve = 2;
-      v = V(W_SQ, 1400, 1400, 0.03f, 0.3f); v->duty = 0.2f; v->lp = 3500; v->delay = 0.16f; v->curve = 1;   /* the pack's beep */
+    case SFX_LANCE: {   /* a crack, a chest thump, a tearing beam, a ringing tail */
+      v = V(W_NOISE, 0, 0, 0.09f, 1.1f); v->hp = 1800; v->curve = 2;
+      v = V(W_SINE, 130, 34, 0.4f, 1.1f); v->drive = 1.4f; v->curve = 2;
+      v = V(W_SAW, 1100, 180, 0.5f, 0.32f); v->lp = 4200; v->lp1 = 800; v->curve = 2; v->send = 0.4f;
+      v = V(W_SINE, 1760, 1720, 0.8f, 0.14f); v->fm_r = 1.41f; v->fm_i = 2.f; v->curve = 3; v->send = 0.5f;
       break; }
-    case SFX_LIPO_PUFF: {   /* the pack swelling: a rising pressurised hiss with a creak */
-      v = V(W_NOISE, 0, 0, 0.7f, 0.45f); v->lp = 700; v->lp1 = 4200; v->hp = 300; v->atk = 0.05f; v->curve = 1; v->send = 0.15f;
-      v = V(W_SAW, 70, 130, 0.6f, 0.2f); v->lp = 700; v->wob = 18.f; v->curve = 1;
-      v = V(W_SINE, 90, 50, 0.12f, 0.5f); v->curve = 2;
+    case SFX_GLINT: {   /* a small bright ting */
+      v = V(W_SINE, 3700 * j, 3650 * j, 0.32f, 0.26f); v->fm_r = 2.76f; v->fm_i = 1.2f; v->curve = 3; v->send = 0.4f;
+      v = V(W_SINE, 5200 * j, 5100 * j, 0.14f, 0.1f); v->curve = 2; v->delay = 0.02f;
       break; }
-    case SFX_BOOM: {
-      v = V(W_SINE, 90, 22, 1.2f, 1.0f); v->curve = 2; v->drive = 1.5f;
-      v = V(W_SAW, 170, 40, 0.8f, 0.4f); v->lp = 600; v->curve = 2; v->drive = 1.f;
-      v = V(W_NOISE, 0, 0, 1.3f, 0.7f); v->lp = 3000; v->lp1 = 90; v->curve = 3; v->atk = 0.004f; v->send = 0.4f;
-      v = V(W_NOISE, 0, 0, 0.08f, 0.8f); v->hp = 2000; v->lp = 9000; v->curve = 3;
+    case SFX_HIT_LIGHT: {   /* a slap and a thud, with a slice on top */
+      v = V(W_NOISE, 0, 0, 0.06f, 0.95f); v->lp = 7800; v->lp1 = 1500; v->curve = 2;
+      v = V(W_SINE, 240 * j, 70, 0.13f, 1.0f); v->drive = 1.3f; v->curve = 2;
+      v = V(W_SQ, 780 * j, 300, 0.05f, 0.18f); v->lp = 3200; v->curve = 2;
       break; }
-    case SFX_PELLET: {   /* an army rifle: a tiny plastic click and pop */
-      v = V(W_NOISE, 0, 0, 0.014f, 0.5f); v->hp = 2800; v->lp = 10000; v->curve = 2;
-      v = V(W_SINE, 1900 * j, 650, 0.025f, 0.4f); v->curve = 2;
-      v = V(W_SQ, 1250 * j, 420, 0.018f, 0.2f); v->duty = 0.3f; v->curve = 1; v->lp = 4000;
+    case SFX_HIT_HEAVY: {   /* a body blow you feel */
+      v = V(W_SINE, 170 * j, 38, 0.32f, 1.25f); v->drive = 2.2f; v->curve = 2;
+      v = V(W_NOISE, 0, 0, 0.13f, 1.05f); v->lp = 5200; v->lp1 = 480; v->curve = 2; v->send = 0.15f;
+      v = V(W_SQ, 460 * j, 110, 0.1f, 0.3f); v->lp = 1800; v->curve = 2;
       break; }
-    case SFX_MG: {   /* the gunner's rattle, one shot of it: lower and snappier than a rifle */
-      v = V(W_NOISE, 0, 0, 0.035f, 0.5f); v->lp = 6000; v->lp1 = 1400; v->curve = 3;
-      v = V(W_SQ, 280 * j, 110, 0.04f, 0.4f); v->duty = 0.3f; v->curve = 2; v->lp = 2200;
-      v = V(W_SINE, 1500 * j, 500, 0.02f, 0.25f); v->curve = 2;
+    case SFX_CLASH: {   /* steel on steel: inharmonic rings and a chip of noise */
+      v = V(W_NOISE, 0, 0, 0.04f, 0.8f); v->hp = 2600; v->curve = 2;
+      v = V(W_SINE, 1560 * j, 1520 * j, 0.3f, 0.36f); v->fm_r = 1.47f; v->fm_i = 3.2f; v->curve = 3; v->send = 0.28f;
+      v = V(W_SINE, 2630 * j, 2590 * j, 0.2f, 0.22f); v->fm_r = 2.31f; v->fm_i = 2.f; v->curve = 3;
       break; }
-    case SFX_PLINK: {   /* a hit on plastic: a bright tick and a short ring */
-      v = V(W_SINE, 2300 * j, 1900, 0.09f, 0.4f); v->fm_r = 3.1f; v->fm_i = 1.6f; v->curve = 2; v->send = 0.15f;
-      v = V(W_NOISE, 0, 0, 0.01f, 0.5f); v->hp = 3000; v->lp = 11000; v->curve = 2;
-      v = V(W_SINE, 880 * j, 700, 0.05f, 0.3f); v->curve = 2;
+    case SFX_PARRY: {   /* a struck bell with a rising sparkle */
+      v = V(W_NOISE, 0, 0, 0.05f, 0.9f); v->hp = 2000; v->curve = 2;
+      v = V(W_SINE, 1180, 1170, 0.9f, 0.5f); v->fm_r = 2.41f; v->fm_i = 3.8f; v->curve = 3; v->send = 0.55f;
+      v = V(W_SINE, 2360, 2340, 0.6f, 0.26f); v->fm_r = 1.47f; v->fm_i = 2.2f; v->curve = 3; v->send = 0.45f;
+      v = V(W_TRI, 1320, 2640, 0.18f, 0.2f); v->delay = 0.05f; v->curve = 2; v->send = 0.4f;
       break; }
-    case SFX_TOPPLE: {   /* a hollow figure falls: three clacks, each smaller than the last, then a rattle */
-      static const float f0[3] = {760, 640, 560}, vl[3] = {0.7f, 0.45f, 0.28f}, dl[3] = {0, 0.1f, 0.19f};
-      for (int i = 0; i < 3; i++) {
-        v = V(W_SINE, f0[i] * j, f0[i] * 0.4f, 0.08f, vl[i]); v->delay = dl[i]; v->curve = 2; v->fm_r = 1.9f; v->fm_i = 0.8f; v->send = 0.12f;
-        v = V(W_NOISE, 0, 0, 0.02f, vl[i] * 0.8f); v->delay = dl[i]; v->lp = 4500; v->lp1 = 900; v->curve = 3;
-      }
-      v = V(W_NOISE, 0, 0, 0.22f, 0.1f); v->delay = 0.2f; v->hp = 1800; v->lp = 6000; v->wob = 0; v->curve = 3; v->atk = 0.01f;
+    case SFX_GUARD_BREAK: {   /* a guard shatters */
+      v = V(W_NOISE, 0, 0, 0.2f, 1.1f); v->lp = 7200; v->lp1 = 600; v->curve = 2;
+      v = V(W_SINE, 300, 48, 0.36f, 1.1f); v->drive = 1.8f; v->curve = 2;
+      for (int i = 0; i < 3; i++) { v = V(W_SINE, 1900.f - i * 370.f, 1500.f - i * 300.f, 0.22f, 0.2f); v->delay = 0.03f + i * 0.045f; v->fm_r = 1.7f; v->fm_i = 2.f; v->curve = 3; v->send = 0.25f; }
       break; }
-    case SFX_HURT: {
-      v = V(W_SAW, 320, 80, 0.3f, 0.55f); v->lp = 2400; v->lp1 = 300; v->curve = 2;
-      v = V(W_SQ, 233, 100, 0.2f, 0.3f); v->duty = 0.3f; v->curve = 2;
-      v = V(W_NOISE, 0, 0, 0.18f, 0.5f); v->lp = 3500; v->lp1 = 400; v->curve = 2;
+    case SFX_BODY_FALL: {   /* a body meets the floor, then a smaller bounce */
+      v = V(W_SINE, 120 * j, 42, 0.24f, 1.1f); v->drive = 1.4f; v->curve = 2;
+      v = V(W_NOISE, 0, 0, 0.14f, 0.55f); v->lp = 1400; v->lp1 = 260; v->curve = 2;
+      v = V(W_SINE, 95, 40, 0.14f, 0.5f); v->delay = 0.17f; v->curve = 2;
       break; }
-    case SFX_JUMP: {   /* a hop and a puff of the motors */
-      v = V(W_TRI, 170, 520, 0.2f, 0.6f); v->curve = 2;
-      v = V(W_NOISE, 0, 0, 0.18f, 0.4f); v->lp = 700; v->lp1 = 3200; v->hp = 300; v->atk = 0.05f; v->curve = 2;
+    case SFX_SHOCK: {   /* a slam that lifts the floor */
+      v = V(W_SINE, 95, 28, 0.6f, 1.4f); v->drive = 2.4f; v->curve = 2;
+      v = V(W_NOISE, 0, 0, 0.4f, 1.0f); v->lp = 3600; v->lp1 = 180; v->curve = 2; v->send = 0.3f;
+      v = V(W_SQ, 210, 55, 0.2f, 0.3f); v->lp = 1300; v->curve = 2;
       break; }
-    case SFX_LAND: {
-      v = V(W_SINE, 110, 36, 0.28f, 1.0f); v->curve = 2;
-      v = V(W_NOISE, 0, 0, 0.14f, 0.5f); v->lp = 1200; v->lp1 = 200; v->curve = 3;
-      v = V(W_TRI, 220, 75, 0.16f, 0.6f); v->curve = 2;
+    case SFX_ROAR: {   /* a rising low growl and a wall of air */
+      v = V(W_SAW, 62, 190, 0.8f, 0.6f); v->lp = 400; v->lp1 = 2400; v->atk = 0.2f; v->curve = 2; v->drive = 1.6f; v->wob = 38; v->send = 0.25f;
+      v = V(W_NOISE, 0, 0, 0.75f, 0.7f); v->lp = 500; v->lp1 = 3600; v->atk = 0.25f; v->curve = 2;
       break; }
     case SFX_DODGE: {
-      v = V(W_NOISE, 0, 0, 0.32f, 0.9f); v->lp = 500; v->lp1 = 3000; v->hp = 200; v->atk = 0.08f; v->curve = 2;
-      v = V(W_TRI, 160, 80, 0.2f, 0.5f); v->curve = 2;
+      v = V(W_NOISE, 0, 0, 0.26f, 0.8f); v->lp = 500; v->lp1 = 3000; v->hp = 200; v->atk = 0.06f; v->curve = 2;
+      v = V(W_TRI, 170, 90, 0.16f, 0.35f); v->curve = 2;
       break; }
-    case SFX_JET_EMPTY: {   /* the battery gives out: a sputter and a sagging whine */
-      v = V(W_SAW, 520, 90, 0.5f, 0.4f); v->lp = 1800; v->lp1 = 300; v->wob = 34.f; v->curve = 1;
-      v = V(W_SQ, 640, 220, 0.25f, 0.25f); v->duty = 0.3f; v->lp = 2500; v->wob = 50.f; v->curve = 2;
-      for (int i = 0; i < 2; i++) { v = V(W_NOISE, 0, 0, 0.012f, 0.45f); v->lp = 3000; v->delay = 0.32f + (float)i * 0.09f; v->curve = 1; }
+    case SFX_PERFECT: {   /* the world drops away: a falling tone, a clear chime, a long echo */
+      v = V(W_SINE, 900, 170, 0.5f, 0.45f); v->curve = 2; v->send = 0.4f;
+      v = V(W_SINE, 1760, 1755, 0.8f, 0.36f); v->fm_r = 2.f; v->fm_i = 1.2f; v->curve = 3; v->send = 0.7f; v->delay = 0.04f;
+      v = V(W_SINE, 2637, 2630, 0.65f, 0.22f); v->curve = 3; v->send = 0.7f; v->delay = 0.1f;
+      break; }
+    case SFX_SUMMON: {   /* a blade of light drawn from nothing */
+      v = V(W_SAW, 200, 1700, 0.22f, 0.3f); v->lp = 900; v->lp1 = 6000; v->atk = 0.08f; v->curve = 1; v->send = 0.3f;
+      v = V(W_NOISE, 0, 0, 0.28f, 0.45f); v->lp = 1200; v->lp1 = 7600; v->hp = 600; v->atk = 0.1f; v->curve = 2;
+      v = V(W_SINE, 2093, 2093, 0.5f, 0.25f); v->delay = 0.18f; v->fm_r = 2.f; v->fm_i = 1.4f; v->curve = 3; v->send = 0.5f;
+      break; }
+    case SFX_SPECIAL_CHARGE: {   /* a half second climb to the break point, the world holding its breath */
+      v = V(W_SAW, 80, 1300, 0.52f, 0.5f); v->lp = 400; v->lp1 = 6800; v->atk = 0.02f; v->curve = 1; v->send = 0.35f; v->drive = 0.6f;
+      v = V(W_NOISE, 0, 0, 0.52f, 0.5f); v->lp = 500; v->lp1 = 9000; v->hp = 800; v->atk = 0.4f; v->curve = 1;
+      v = V(W_SINE, 55, 110, 0.5f, 0.7f); v->curve = 1;
+      break; }
+    case SFX_SPECIAL_RELEASE: {   /* everything at once */
+      v = V(W_SINE, 110, 24, 1.2f, 1.6f); v->drive = 3.f; v->curve = 2;
+      v = V(W_NOISE, 0, 0, 0.9f, 1.3f); v->lp = 9000; v->lp1 = 200; v->curve = 2; v->send = 0.5f;
+      v = V(W_SAW, 880, 110, 0.7f, 0.4f); v->lp = 5200; v->lp1 = 500; v->curve = 2; v->send = 0.5f;
+      v = V(W_SINE, 1318, 1310, 1.4f, 0.28f); v->fm_r = 1.41f; v->fm_i = 3.f; v->curve = 3; v->send = 0.8f;
+      break; }
+    case SFX_KO: {   /* the last blow: a low bell, cut short by silence */
+      v = V(W_SINE, 58, 34, 1.1f, 1.3f); v->drive = 2.f; v->curve = 2;
+      v = V(W_SINE, 620, 610, 1.3f, 0.36f); v->fm_r = 1.41f; v->fm_i = 4.2f; v->curve = 3; v->send = 0.9f;
+      v = V(W_NOISE, 0, 0, 0.14f, 0.9f); v->hp = 1500; v->curve = 2;
+      break; }
+    case SFX_JUMP: {
+      v = V(W_NOISE, 0, 0, 0.16f, 0.5f); v->lp = 700; v->lp1 = 3000; v->hp = 300; v->atk = 0.03f; v->curve = 2;
+      v = V(W_TRI, 130, 300, 0.12f, 0.24f); v->curve = 2;
+      break; }
+    case SFX_LAND: {
+      v = V(W_SINE, 110, 36, 0.24f, 0.95f); v->curve = 2;
+      v = V(W_NOISE, 0, 0, 0.12f, 0.45f); v->lp = 1200; v->lp1 = 200; v->curve = 3;
+      break; }
+    case SFX_STEP: {
+      v = V(W_NOISE, 0, 0, 0.05f, 0.5f); v->lp = 1200 * j; v->lp1 = 300; v->curve = 2;
+      v = V(W_SINE, 110 * j, 60, 0.05f, 0.5f); v->curve = 2;
       break; }
     case SFX_PICKUP: {
-      static const float n[3] = {880, 1108.7f, 1318.5f};
-      for (int i = 0; i < 3; i++) { v = V(W_SINE, n[i], n[i], 0.32f - i * 0.04f, 0.4f); v->delay = i * 0.06f; v->fm_r = 2.f; v->fm_i = 1.2f; v->send = 0.35f; v->curve = 2; v->atk = 0.004f; }
+      v = V(W_TRI, 880, 880, 0.08f, 0.4f); v->curve = 1;
+      v = V(W_TRI, 1320, 1320, 0.14f, 0.4f); v->delay = 0.07f; v->curve = 2; v->send = 0.3f;
       break; }
-    case SFX_WEAPON: {   /* a new tool on the bench: four square notes up, then a click of the latch */
-      static const float n[4] = {523.3f, 659.3f, 784.0f, 1046.5f};
-      for (int i = 0; i < 4; i++) { v = V(W_SQ, n[i], n[i], 0.16f + (i == 3 ? 0.25f : 0.f), 0.4f); v->delay = i * 0.07f; v->duty = 0.35f; v->lp = 4500; v->curve = 2; v->send = 0.3f; }
-      v = V(W_NOISE, 0, 0, 0.012f, 0.5f); v->delay = 0.32f; v->hp = 2000; v->curve = 2;
-      break; }
-    case SFX_PRINT_STOP: {   /* a print cancelled: the steppers wind down, two clunks and a long error tone */
-      v = V(W_SAW, 640, 70, 0.8f, 0.35f); v->lp = 1800; v->lp1 = 250; v->wob = 80.f; v->curve = 1;
-      v = V(W_SQ, 330, 60, 0.7f, 0.2f); v->duty = 0.25f; v->wob = 70.f; v->lp = 1500; v->curve = 1;
-      for (int i = 0; i < 2; i++) { v = V(W_SINE, 120, 45, 0.14f, 0.7f); v->delay = 0.5f + i * 0.14f; v->curve = 2; }
-      v = V(W_SQ, 440, 440, 0.5f, 0.3f); v->delay = 0.85f; v->duty = 0.5f; v->lp = 2800; v->curve = 1; v->atk = 0.01f; v->send = 0.3f;
-      break; }
-    case SFX_WHISTLE: {   /* a pea whistle: two blasts, a fast trill on the pea */
-      for (int i = 0; i < 2; i++) {
-        float d = i ? 0.5f : 0.34f, dl = i ? 0.42f : 0;
-        v = V(W_SINE, 2650, 2850, d, 0.38f); v->wob = 62.f; v->curve = 1; v->atk = 0.015f; v->delay = dl; v->send = 0.3f; v->fm_r = 3.f; v->fm_i = 0.3f;
-        v = V(W_NOISE, 0, 0, d, 0.12f); v->hp = 2400; v->lp = 7500; v->curve = 1; v->atk = 0.02f; v->delay = dl;
-      }
+    case SFX_WEAPON: {   /* a change of weapon: a quick rise and a latch */
+      v = V(W_NOISE, 0, 0, 0.14f, 0.5f); v->lp = 1200; v->lp1 = 6000; v->hp = 600; v->atk = 0.05f; v->curve = 2;
+      v = V(W_SQ, 880, 1760, 0.08f, 0.14f); v->duty = 0.3f; v->lp = 4000; v->curve = 1;
+      v = V(W_NOISE, 0, 0, 0.03f, 0.6f); v->hp = 1400; v->delay = 0.1f; v->curve = 2;
       break; }
     case SFX_UI: {
       v = V(W_SQ, 1900, 1500, 0.03f, 0.4f); v->duty = 0.3f; v->curve = 1; v->lp = 5000;
@@ -465,12 +453,6 @@ void sfx(sfx_t s, float pan, float gain) {
     case SFX_UI_OK: {
       v = V(W_TRI, 660, 660, 0.09f, 0.4f); v->curve = 1;
       v = V(W_TRI, 990, 990, 0.16f, 0.4f); v->delay = 0.07f; v->curve = 2; v->send = 0.25f;
-      break; }
-    case SFX_BOSS_HIT: {   /* a big hollow figure struck: a deep thunk, a plastic crack and a short ring */
-      v = V(W_SINE, 240, 65, 0.3f, 0.9f); v->curve = 2; v->drive = 1.2f;
-      v = V(W_SINE, 470, 470, 0.5f, 0.3f); v->fm_r = 1.41f; v->fm_i = 5.f; v->curve = 2; v->send = 0.3f;
-      v = V(W_NOISE, 0, 0, 0.05f, 0.7f); v->hp = 1500; v->lp = 9000; v->curve = 2;
-      v = V(W_SINE, 110, 45, 0.2f, 0.7f); v->curve = 2;
       break; }
     case SFX_ALARM: {
       for (int i = 0; i < 4; i++) { v = V(W_SQ, i & 1 ? 660 : 880, i & 1 ? 660 : 880, 0.17f, 0.6f); v->delay = i * 0.18f; v->duty = 0.4f; v->lp = 3200; v->curve = 1; v->atk = 0.006f; v->send = 0.2f; }
@@ -544,17 +526,6 @@ void audio_render(float *ring, uint32_t cap, uint32_t *cursor, uint32_t rate, do
     /* continuous voices: refreshed by calls, they fade in and out around them */
     {
       float sdv[1] = {0};
-      for (int q = 0; q < 2; q++) {
-        cont *c = &jets[q];
-        c->ttl -= dt;
-        float tg = c->ttl > 0 ? c->gain : 0.f;
-        c->level += (tg - c->level) * (tg > c->level ? 0.0012f : 0.0007f) * (48000.f / SR);
-        if (c->level < 0.0005f && tg <= 0) { c->level = 0; continue; }
-        c->lpan += (c->pan - c->lpan) * 0.002f;
-        float a = (pan_clamp(c->lpan) + 1.f) * 0.78539816f;
-        float y = jet_sample(c, dt, q, sdv);
-        L += y * cosf(a); R += y * sinf(a);
-      }
       cont *cc = &coil_c;
       cc->ttl -= dt;
       float tg = cc->ttl > 0 ? 1.f : 0.f;

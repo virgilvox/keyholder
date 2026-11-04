@@ -36,6 +36,7 @@ bool actor_clip_done(const actor_t *a);              /* a one shot reached its e
 float actor_clip_time(const actor_t *a);             /* seconds into the current clip */
 float actor_clip_len(const actor_t *a);
 float actor_clip_ground_speed(const actor_t *a);     /* metres a second the clip's feet travel at speed 1 */
+void actor_clip_seek(actor_t *a, float t);           /* jump the current clip to t seconds: sections of a long mocap take */
 
 /* look at a world point (head and neck turn, clamped); amount 0 lets go */
 void actor_look(actor_t *a, v3 target, float amount);
@@ -57,5 +58,9 @@ v3 actor_head_pos(actor_t *a);
 void actor_flash(actor_t *a, float r, float g, float b);
 /* the blob shadow is drawn by the actor at floor_y */
 void actor_set_floor(actor_t *a, float floor_y);
+/* a new palette on a model already made (reuses the actor, so no glTF parse); uploads the atlas again */
+void actor_repalette(actor_t *a, const actor_palette *pal);
+/* both forearms up, open handed, over whatever clip plays: 0..1, eases (a beaten fighter yielding) */
+void actor_hands_up(actor_t *a, float amount);
 
 #endif

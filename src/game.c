@@ -1,25 +1,117 @@
+/* game.c: the title, the day, the pause menu and the ending. */
+#if !defined(KH_TEST_WORLD) && !defined(KH_TEST_FIGHT)
 #include "game.h"
 #include "actor.h"
-static t3_scene *scene; static t3_camera *cam; static actor_t *A[5]; static float T;
-void game_init(void) {
-  scene = t3_scene_new();
-  scene->has_background = true; scene->background = t3_color_hex(0x6a9ad0);
-  scene->fog = t3_fog_linear(0x6a9ad0, 30, 200);
-  cam = t3_perspective_camera_new(38, 16.f/9.f, .05f, 500);
-  t3_light *h = t3_hemisphere_light_new(0xffffff, 0xb0a8b8, 2.4f); t3_object_add(&scene->base, h);
-  t3_light *d = t3_directional_light_new(0xfff4e0, 1.6f); t3_object_set_position(d, 2, 5, 4); t3_object_add(&scene->base, d);
-  t3_material *gm = t3_mesh_lambert_material_new(0x90887c);
-  t3_mesh *g = t3_mesh_new(t3_plane_geometry_new(100, 100, 1, 1), gm); t3_object_set_rotation(&g->base, -DS_PI/2, 0, 0); t3_object_add(&scene->base, &g->base);
-  const char *clips[5] = {"Idle_Talking_Loop","Idle_Loop","Sword_Idle","Idle_Loop","Idle_Loop"};
-  for (int i = 0; i < 5; i++) {
-    A[i] = actor_new((actor_model)i, &ACTOR_PAL_NONE, 1, scene);
-    actor_place(A[i], v3_((i - 2) * .75f, 0, 0), 0);
-    actor_play(A[i], clips[i], 1, true, 0);
+#include "audio.h"
+#include "fight.h"
+#include "fx.h"
+#include "input.h"
+#include "player.h"
+#include "story.h"
+#include "hud_vn.h"
+#include "world.h"
+#include "hud_int.h"
+#include <string.h>
+
+static t3_scene *scene; static t3_camera *cam;
+static enum { G_TITLE, G_PLAY, G_PAUSE, G_END } mode;
+static float mode_t;
+static int who, pause_sel; static bool music_on = true;
+static actor_t *T_A[3];
+static const char *const NAMES[3] = {"VEE", "DEX", "RUTH"};
+static const char *const BLURB[3] = {"First to look up. Runs the 3D printers and most of the conversation.", "Electronics bench. Fixes it, then tells you how it broke.", "Laser corner. Certified on everything. Has read the manual."};
+static const actor_model TITLE_M[3] = {AM_C, AM_D, AM_B};
+
+static void title_enter(void) {
+  mode = G_TITLE; mode_t = 0;
+  story_stop();
+  world_set_stage(STAGE_TOWN); world_set_time(17.9f);
+  music_mood(MOOD_TITLE);
+  v3 p; float y;
+  if (!world_place("lab_door", &p, &y)) { p = v3_(0, 0, 3); y = 0; }
+  for (int i = 0; i < 3; i++) {
+    if (!T_A[i]) T_A[i] = actor_new(TITLE_M[i], &ACTOR_PAL_NONE, 1, scene);
+    actor_visible(T_A[i], true);
+    actor_place(T_A[i], v3_(p.x + (i - 1) * 1.15f, p.y, p.z + 3.2f + (i == 1 ? -.2f : 0)), 0);
+    actor_play(T_A[i], "Idle_Loop", 1, true, 0);
   }
 }
-void game_frame(float dt) {
-  T += dt;
-  for (int i = 0; i < 5; i++) { actor_mouth(A[i], .5f + .5f * sinf(T * 8), fmodf(T, 1)); actor_expr_set(A[i], EX_JOY, i == 4); actor_update(A[i], dt); }
-  t3_object_set_position(cam, 0, 1.42f, 1.6f); t3_object_look_at(cam, -1.1f, 1.38f, 0);
+static void title_leave(void) { for (int i = 0; i < 3; i++) if (T_A[i]) actor_visible(T_A[i], false); }
+void game_init(void) {
+  scene = t3_scene_new();
+  cam = t3_perspective_camera_new(38, (float)DS_W / DS_H, .06f, 1600);
+  t3_object_add(&scene->base, cam);
+  hg_init();
+  world_init(scene);
+  player_init(cam);
+  fight_init(scene, cam);
+  story_init(scene, cam);
+  title_enter();
 }
-void game_draw(void) { render_scene(scene, cam); }
+void game_frame(float dt) {
+  const intent_t *in = input_get();
+  mode_t += dt;
+  switch (mode) {
+    case G_TITLE: {
+      if (in->nav_x) { int n = who + in->nav_x; if (n >= 0 && n < 3) { who = n; sfx(SFX_UI, 0, 1); } }
+      for (int i = 0; i < 3; i++) {
+        actor_expr_set(T_A[i], EX_JOY, i == who ? .7f : 0);
+        actor_play(T_A[i], i == who ? "Sword_Idle" : "Idle_Loop", 1, true, .3f);
+        v3 p = actor_pos(T_A[i]);
+        actor_look(T_A[i], v3_(p.x + (who - i) * .6f, p.y + 1.4f, p.z + 3), .8f);
+        actor_update(T_A[i], dt);
+      }
+      v3 c = actor_pos(T_A[1]);
+      float sway = sinf(mode_t * .25f) * .4f;
+      t3_object_set_position(cam, c.x + sway + (who - 1) * .3f, c.y + 1.15f, c.z + 4.3f);
+      t3_object_look_at(cam, c.x + (who - 1) * .25f, c.y + 1.0f, c.z);
+      if (cam->fov != 38) { cam->fov = 38; t3_camera_update_projection_matrix(cam); }
+      world_update(dt, v3_(c.x, c.y + 1, c.z + 4));
+      const bool cont = story_has_save() && (input_key_down(0x06) || in->heavy);   /* C or Y */
+      if (in->ok || cont) {
+        sfx(SFX_UI_OK, 0, 1);
+        title_leave();
+        if (cont) story_continue(); else story_new_game(who);
+        mode = G_PLAY; mode_t = 0;
+      }
+      break;
+    }
+    case G_PLAY:
+      if (in->pause) { mode = G_PAUSE; pause_sel = 0; mode_t = 0; sfx(SFX_UI, 0, 1); break; }
+      story_update(dt, in);
+      if (story_state() == SR_EPILOGUE) { mode = G_END; mode_t = 0; }
+      break;
+    case G_PAUSE:
+      if (in->pause || in->back) { mode = G_PLAY; break; }
+      if (in->nav_y) { int n = pause_sel + in->nav_y; if (n >= 0 && n < 3) { pause_sel = n; sfx(SFX_UI, 0, 1); } }
+      if (in->ok) {
+        sfx(SFX_UI_OK, 0, 1);
+        if (pause_sel == 0) mode = G_PLAY;
+        else if (pause_sel == 1) { music_on = !music_on; audio_set_music(music_on); }
+        else { fight_end(); title_enter(); }
+      }
+      break;
+    case G_END:
+      world_update(dt, v3_(0, 1, 5));
+      if (mode_t > 6 && in->ok) title_enter();
+      break;
+  }
+}
+void game_draw(void) {
+  render_scene(scene, cam);
+  render_target();
+  switch (mode) {
+    case G_TITLE: hud_title_draw(mode_t, 0, who, story_has_save(), NAMES, BLURB); break;
+    case G_PLAY:
+      if (story_state() == SR_FIGHT && !STORY_UI.retry) fight_draw_hud();
+      hud_vn_draw();
+      break;
+    case G_PAUSE: hud_vn_draw(); hud_pause_draw(pause_sel, music_on); break;
+    case G_END: {
+      const char *lines[16]; int n = story_end_lines(lines, 16);
+      hud_end_draw(mode_t, story_end_title(), lines, n, STORY_UI.stats);
+      break;
+    }
+  }
+}
+#endif

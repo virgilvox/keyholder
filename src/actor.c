@@ -43,9 +43,13 @@ struct actor {
   sp_joint j[MAX_JOINTS]; int nj;
   sp_collider c[MAX_COLLIDERS]; int nc;
   bool spring_reset;
+  /* hands up */
+  t3_object *b_arm[4], *b_trunk[7];
+  float hands_t, hands_w;
 };
 
 static ck_rig *RIG;
+static uint8_t *PRISTINE[AM_COUNT];   /* each model's body atlas before any palette: actor_repalette starts over from it */
 
 /* ---- small quaternion helpers on {x, y, z, w} ---- */
 static void qmul(float *o, const float *a, const float *b) {
@@ -251,13 +255,25 @@ actor_t *actor_new(actor_model model, const actor_palette *pal, float scale, t3_
   a->gltf_scene = a->gltf->scene;
   t3_object_add(a->root, a->gltf_scene);
   t3_object_traverse(a->gltf_scene, setup_mesh, a);
-  if (a->body && a->body->materials[0]) apply_palette(a->body->materials[0]->map, model, pal);
+  if (a->body && a->body->materials[0]) {
+    t3_texture *T = a->body->materials[0]->map;
+    if (T && T->pixels && !PRISTINE[model]) {
+      size_t sz = (size_t)T->width * T->height * 4;
+      PRISTINE[model] = malloc(sz);
+      memcpy(PRISTINE[model], T->pixels, sz);
+    }
+    apply_palette(T, model, pal);
+  }
   if (RIG) { mixer_init(&a->mixer, RIG, a->gltf_scene); a->mixer.hips_scale = CAST_META[model].hips_h; }
   a->b_neck = t3_object_get_by_name(a->gltf_scene, "neck");
   a->b_head = t3_object_get_by_name(a->gltf_scene, "head");
   a->b_chest = t3_object_get_by_name(a->gltf_scene, "upperChest");
   a->b_rhand = t3_object_get_by_name(a->gltf_scene, "rightHand");
   a->b_lhand = t3_object_get_by_name(a->gltf_scene, "leftHand");
+  { static const char *ARMS[4] = {"rightUpperArm", "rightLowerArm", "leftUpperArm", "leftLowerArm"};
+    for (int i = 0; i < 4; i++) a->b_arm[i] = t3_object_get_by_name(a->gltf_scene, ARMS[i]);
+    static const char *TRUNK[7] = {"spine", "chest", "upperChest", "neck", "head", "rightShoulder", "leftShoulder"};
+    for (int i = 0; i < 7; i++) a->b_trunk[i] = t3_object_get_by_name(a->gltf_scene, TRUNK[i]); }
   a->s_rhand = t3_object_new(); a->s_lhand = t3_object_new();
   if (a->b_rhand) t3_object_add(a->b_rhand, a->s_rhand);
   if (a->b_lhand) t3_object_add(a->b_lhand, a->s_lhand);
@@ -327,6 +343,7 @@ void actor_replay(actor_t *a, const char *clip, float speed, bool loop, float fa
 bool actor_clip_done(const actor_t *a) { return a->cur && a->cur->loop == LOOP_ONCE && a->cur->paused; }
 float actor_clip_time(const actor_t *a) { return a->cur ? a->cur->time : 0; }
 float actor_clip_len(const actor_t *a) { return a->cur ? action_duration(&a->mixer, a->cur) : 0; }
+void actor_clip_seek(actor_t *a, float t) { if (a->cur) { a->cur->time = t; a->cur->paused = false; a->cur->enabled = true; } }
 float actor_clip_ground_speed(const actor_t *a) { return a->cur_clip >= 0 && RIG ? RIG->clips[a->cur_clip].speed * actor_hips_height(a) : 0; }
 
 void actor_look(actor_t *a, v3 t, float amount) { a->look_at = t; a->look_tgt = amount; }
@@ -357,10 +374,33 @@ static void apply_look(actor_t *a, float dt) {
   }
 }
 
+void actor_repalette(actor_t *a, const actor_palette *pal) {
+  t3_texture *T = a->body && a->body->materials[0] ? a->body->materials[0]->map : NULL;
+  if (!T || !T->pixels || !PRISTINE[a->model]) return;
+  memcpy(T->pixels, PRISTINE[a->model], (size_t)T->width * T->height * 4);
+  apply_palette(T, a->model, pal);
+  T->version++;
+}
+void actor_hands_up(actor_t *a, float amount) { a->hands_t = amount; }
+static void apply_hands(actor_t *a, float dt) {
+  a->hands_w = ds_damp(a->hands_w, a->hands_t, 5, dt);
+  if (a->hands_w < 0.005f) return;
+  /* the back straightens over whatever the clip was doing */
+  for (int i = 0; i < 7; i++) if (a->b_trunk[i]) t3_object_set_quaternion(a->b_trunk[i], t3_quat_slerp(a->b_trunk[i]->quaternion, t3_quat_identity(), a->hands_w * .9f));
+  /* in the bone frames, T pose at identity: upper arms out and a little down, forearms straight up */
+  static const float ang[4][3] = { {.35f, .12f, 0}, {-1.5f, 0, 0}, {-.35f, -.12f, 0}, {1.5f, 0, 0} };
+  for (int i = 0; i < 4; i++) {
+    t3_object *b = a->b_arm[i]; if (!b) continue;
+    t3_quat tgt = t3_quat_multiply(t3_quat_from_axis_angle(t3_v3(0, 1, 0), ang[i][1]), t3_quat_from_axis_angle(t3_v3(0, 0, 1), ang[i][0]));
+    t3_object_set_quaternion(b, t3_quat_slerp(b->quaternion, tgt, a->hands_w));
+  }
+}
+
 void actor_update(actor_t *a, float dt) {
   if (!a->gltf || !a->root->visible) return;
   mixer_update(&a->mixer, dt);
   if (a->mixer.bound) {}
+  apply_hands(a, dt);
   apply_look(a, dt);
   /* the face */
   a->blink_t -= dt;

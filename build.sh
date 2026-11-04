@@ -18,7 +18,7 @@ TOBJ="$OUT/obj/three_core"
 GOBJ="$OUT/obj/game"
 JOBS="$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)"
 NAME=keyholder
-VERSION=0.1.0
+VERSION=1.0.0
 
 if ! command -v emcc >/dev/null; then
   [ -f "$HOME/emsdk/emsdk_env.sh" ] && source "$HOME/emsdk/emsdk_env.sh" >/dev/null 2>&1
@@ -62,7 +62,7 @@ if [ "${REGEN_STATES:-0}" = 1 ] || [ ! -f "$ROOT/src/gen/ds_gl.c" ]; then
 fi
 
 # KH_SRC: a subset of src/*.c (names) so one module can be built while another is mid change
-if [ -n "${KH_SRC:-}" ]; then SRCS=""; for f in $KH_SRC; do SRCS="$SRCS $ROOT/src/$f"; done; else SRCS="$ROOT/src/*.c"; fi
+if [ -n "${KH_SRC:-}" ]; then SRCS=""; for f in $KH_SRC; do SRCS="$SRCS $ROOT/src/$f"; done; else SRCS="$ROOT/src/*.c $ROOT/src/gen/script.c"; fi
 GAMEF="-DWC_USE_GL ${EXTRA_CFLAGS:-}"
 if [ ! -f "$GOBJ/cv.o" ] || [ "$ROOT/src/cv.cpp" -nt "$GOBJ/cv.o" ]; then
   em++ -c "$ROOT/src/cv.cpp" -o "$GOBJ/cv.o" $OPT -std=c++17 -fno-exceptions -fno-rtti -ffp-contract=off $GAMEF \

@@ -47,6 +47,10 @@ float world_lab_yaw(float plan_deg);
 /* named places: "lab_door", "nile", "worth", "proof", "level1", "center_main_station", ... see
  * docs/DESIGN.md. Standing point on the sidewalk in front, and the yaw that faces the place. */
 bool world_place(const char *name, v3 *pos, float *yaw);
-/* the door's open amount, 0..1, driven by the director */
+/* the door's open amount, 0..1, driven by the director. Calling it turns the automatic door off */
 void world_door(float open);
+/* the front door opens by itself when the focus comes within 3 m (the default until world_door is called) */
+void world_door_auto(bool on);
+/* chunks drawn and their triangles before frustum culling, for the debug overlay */
+void world_debug_counts(int *draws, int *tris);
 #endif

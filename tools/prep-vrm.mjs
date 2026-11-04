@@ -303,10 +303,14 @@ function rig() {
     str(name); f32(c.dur); u32(c.n);
     for (let i = 0; i < 8; i++) f32(0);
     const tr = {}; for (const [b, s] of Object.entries(c.bones)) tr[b] = Buffer.from(s, 'base64');
+    // a one shot's bake samples its last frame back at the first pose: hold the frame before it instead
+    const oneShot = !/Loop|Idle|Dance/.test(name);
+    if (oneShot && c.n > 2) for (const b of Object.keys(tr)) tr[b].copy(tr[b], (c.n - 1) * 8, (c.n - 2) * 8, (c.n - 1) * 8);
     const q = Buffer.alloc(c.n * names.length * 8);
     for (let f = 0; f < c.n; f++) names.forEach((b, i) => { const o = (f * names.length + i) * 8; if (tr[b]) tr[b].copy(q, o, f * 8, f * 8 + 8); else { q.writeInt16LE(32767, o + 6); } });
     chunks.push(q);
     const hp = Buffer.from(c.hips, 'base64'), h = Buffer.alloc(c.n * 12);
+    if (oneShot && c.n > 2) hp.copy(hp, (c.n - 1) * 6, (c.n - 2) * 6, (c.n - 1) * 6);
     for (let i = 0; i < c.n * 3; i++) h.writeFloatLE(hp.readInt16LE(i * 2) / 10000, i * 4);
     chunks.push(h);
     // clip speed: metres a second per unit of hip height, for foot-locked walking
@@ -321,6 +325,7 @@ mkdirSync(join(ROOT, 'assets/models'), { recursive: true });
 mkdirSync(join(ROOT, 'assets/anim'), { recursive: true });
 mkdirSync(join(ROOT, 'src/gen'), { recursive: true });
 rig();
+if (process.argv[2] === 'rig') process.exit(0);
 for (const f of process.argv[2] ? [process.argv[2]] : CAST) await bake(f);
 const kind = (n) => /hair/i.test(n) ? 0 : /tops/i.test(n) ? 1 : /bottoms/i.test(n) ? 2 : /shoes/i.test(n) ? 3 : /access/i.test(n) ? 1 : -1;
 let h = '/* made by tools/prep-vrm.mjs */\n#ifndef CAST_META_H\n#define CAST_META_H\ntypedef struct { int kind, x, y, w, h; } cast_rect;   /* kind: 0 hair, 1 top, 2 bottom, 3 shoes */\ntypedef struct { const char *glb, *spr; float hips_h, height; int nrect; cast_rect rect[24]; } cast_meta;\nstatic const cast_meta CAST_META[] = {\n';
