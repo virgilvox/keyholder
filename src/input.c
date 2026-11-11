@@ -52,6 +52,7 @@ void input_frame(const wc_pad_t *pads, const uint8_t *keys) {
   if (kp(WC_KEY_Q)) o->weapon_step = 1;
   for (int k = 0; k < 5; k++) if (kp(WC_KEY_1 + k)) o->weapon_pick = k;
   o->interact = kp(WC_KEY_E);
+  o->assist = kp(WC_KEY_R);
   o->sprint = DOWN(kcur, KEY_LALT);
   o->pause = kp(WC_KEY_ESCAPE) || kp(WC_KEY_P);
   o->ok = kp(WC_KEY_ENTER) || kp(WC_KEY_SPACE) || kp(WC_KEY_E) || kp(WC_KEY_J);
@@ -79,6 +80,7 @@ void input_frame(const wc_pad_t *pads, const uint8_t *keys) {
     o->lock |= (pr & (WC_BTN_L | WC_BTN_R3)) != 0;
     if (pr & WC_BTN_RIGHT) o->weapon_step = 1;
     if (pr & WC_BTN_LEFT) o->weapon_step = -1;
+    o->assist |= (pr & WC_BTN_UP) != 0;
     o->interact |= (pr & WC_BTN_X) != 0;
     o->sprint |= (b & WC_BTN_L3) != 0;
     o->pause |= (pr & WC_BTN_START) != 0;

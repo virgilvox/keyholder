@@ -57,3 +57,52 @@ Action game in the PS2 mould: third person, lock on, light combo, heavy, dodge w
 ## The day (lead)
 
 Chapters run on the lab clock from 9 am to midnight: open up, the first visitor, lunch run along Main, afternoon incidents, Arduino Night crowd, closing. Choices move four numbers (Trust, Safety, Vibe, Dues) and affinity with the cast, and decide which fights happen and how hard they are. Facts follow the HeatSync bylaws and handbook (the `heatsync` skill) and DOLLY's tour script.
+
+## v1.1 polish: owners and contracts
+
+The contracts are already in the headers (`fight.h`, `director.h`, `audio.h`, `input.h`, `world.h`, `script.h`) and in `tools/script/dsl.mjs` and `compile.mjs`. Read them before you start. Additive header changes are fine if you report them. Do not edit a file you do not own; ask the lead.
+
+| Owner | Files |
+|---|---|
+| writer | `tools/script/day.mjs`, `tools/script/cast.mjs` (names, voices, palettes, models) |
+| story runtime | `src/story.c`, `src/story.h`, `src/hud_vn.c` (all but `hud_title_draw`), hosting tasks and their minigames, banter, barks, extras and ambient life in the lab and on Main, actor pathing, the named lab places, fight glue (twists, barks, assists, checkpoints into `fight_def`), Battle Zone unlock calls |
+| director | `src/director.c`, `src/director.h` |
+| combat | `src/fight.c`, `src/fight_int.h`, `src/fight.h`, `src/weapon.c`, `src/weapon.h`, `src/player.c`, `src/fx.c`, `src/fx.h`, `src/hud_fight.c`, `src/test_fight.c`, the sfx list in `src/audio.c` (coordinate with audio) |
+| battle | new `src/battle.c`, `src/battle.h`, `src/hud_battle.c`, `src/game.c`, `hud_title_draw` in `src/hud_vn.c` |
+| audio | `src/audio.c` (music and sfx voices; the sfx enum is shared with combat) |
+| world | `src/world.c`, `src/city.c`, `src/city.h`, `src/arena.c`, `src/arena.h`, `src/facades_*.inc`, `tools/prep-lab.mjs`, `tools/prep-city.mjs`, `tools/prep-arena.mjs`, `assets/models/{lab,city,arena}*` |
+| models | `tools/prep-vrm.mjs` (and any new prep tool for non VRM rigs), `src/actor.c`, `src/actor.h`, `src/anim.c`, `source/vrm`, `assets/models/char_*`, `CREDITS` |
+| lead | `tools/script/compile.mjs`, `tools/script/dsl.mjs`, `src/script.h`, `src/input.c`, `src/main.c`, `docs/`, `HANDOFF.md`, voices, shipping |
+
+### Private builds of the script
+
+`src/gen/script.c` is shared. To try a script without touching it: `DAY=path/to/day.mjs GEN=build-x/gen node tools/script/compile.mjs`, then build with `KH_SRC="... ../build-x/gen/script.c" EXTRA_CFLAGS="-DKH_GEN_ENUM='\"../build-x/gen/script_enum.h\"'"`. Only the writer and the lead write `src/gen/script.c`.
+
+### Hosting (story runtime implements, writer uses)
+
+`ROAM(place, radius, prompt, { hour, until, sides, tasks, need, banter })`, `TASK(kind, name, o)`, `BT(who, text, o)` and `BARK(who, text)`: see `dsl.mjs`. Task kinds:
+- `greet`: a walk in at the door looks around; reach them and press while they look for someone (a shrinking window). A quick look up gives the reward; a slow one gives less.
+- `point`: tour stops. The visitor follows; at the station, aim at it and press.
+- `answer`: a visitor asks something; `before` beats hold a CHOICE.
+- `carry`: pick up at `at`, put down at `to`, `n` trips (tools to the pegboard, soda to the fridge).
+- `fix`: a minigame at `at` by `mode`: `timing` (press in the zone: printer unjam), `mash`, `hold` (the laser hood), `stick` (turn a knob).
+- `signin`: a short button sequence at the sign in board with a visitor.
+- `errand`: go there and press (Main Street).
+
+Rewards are at most two stats. Optional tasks show in the task list in grey. Named lab places the story runtime provides (plan coordinates in `story.c`): `lab_welcome lab_laser lab_kitchen lab_cowork lab_shop lab_printer lab_laser_hood lab_soda lab_pegboard lab_signin lab_toolwall lab_elec lab_lounge lab_fab lab_scrap lab_couch lab_classroom` (it may add more and report them).
+
+### Fights (combat implements, story runtime fills, writer authors)
+
+In the FIGHTS table in `day.mjs`: `twist` (none tutorial timer retrieve score hold defend protect boss), `twist_a`, `twist_b`, `obj: [x, z]` (relative to the fight's centre), `obj_label`, `protect: 'sam'`, `barks: [{ on, who, text }]` (on: start phase2 foe_low player_low assist obj_warn hazard finish parry), `assists: [{ who, flag, trust }]` (callable when the flag is set or Trust is at least `trust`), `phase2` (hp fraction), `qte`, `tier` (1 to 5, the Battle Zone ladder). Barks are voiced: the compiler adds them to `lines.json`. `fight_phase()` gives the checkpoint for a retry; `fight_result_get()` gives the score.
+
+### Film language
+
+New shot types `push react insert hero whip top`; `SHOT(type, subjects, { part, at, dur })`. The director re-solves while a shot runs, so a close up never ends in hair or a face when someone moves. `director_whip()` is how strongly a whip is happening, for speed lines.
+
+### Music
+
+Moods `title explore hosting tension cine fight boss final night zone clear silent`. `explore` is the street by day, `hosting` the lab by day, `final` the last boss.
+
+### Battle Zone
+
+A replayable ladder from the title, unlocked as the day is played. Progress is kept in the last 500 bytes of `DS_SAVE.data` (bytes 520 to 1019), which the day's save never touches. `battle.h`: `void battle_unlock_fight(int fi); void battle_unlock_weapon(int w);` (story runtime calls them when a fight is won or a weapon is given).

@@ -272,7 +272,11 @@ void audio_init(uint32_t rate) {
   voice_init(rate);
 }
 
-void music_mood(mood_t m) { want = (int)m; }
+void music_mood(mood_t m) {
+  /* shim: the v1.1 moods play their nearest old tune until they are written */
+  if (m == MOOD_HOSTING) m = MOOD_EXPLORE; else if (m == MOOD_TENSION || m == MOOD_NIGHT) m = MOOD_CINE; else if (m == MOOD_ZONE) m = MOOD_FIGHT; else if (m == MOOD_FINAL) m = MOOD_BOSS;
+  want = (int)m;
+}
 void audio_set_music(int on) { music_on = on ? 1.f : 0.f; }
 
 /* continuous voice

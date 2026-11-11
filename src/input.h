@@ -11,6 +11,7 @@
  *   special             RB                 U                   wheel
  *   lock on (toggle)    LB, R3             Tab                 wheel
  *   weapon              d-pad left/right   1 to 5, Q
+ *   assist (call ally)  d-pad up           R
  *   talk, use           X                  E
  *   sprint (held)       L3, or stick full  Left Alt
  *   pause               START              Esc, P
@@ -31,6 +32,7 @@ typedef struct {
   bool lock;               /* pressed: toggle lock on */
   int weapon_step;         /* -1, +1: weapon cycle this frame */
   int weapon_pick;         /* -1, or a slot from the number keys */
+  bool assist;             /* pressed: call an ally (fight) */
   bool interact, sprint, pause;
   int nav_x, nav_y;        /* menus: edges, y +1 = down */
   bool ok, back;

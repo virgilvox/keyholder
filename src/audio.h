@@ -28,7 +28,9 @@ typedef enum {
   SFX_COUNT
 } sfx_t;
 
-typedef enum { MOOD_TITLE, MOOD_EXPLORE, MOOD_FIGHT, MOOD_BOSS, MOOD_CLEAR, MOOD_CINE, MOOD_SILENT } mood_t;
+/* v1.1: MOOD_EXPLORE is the street by day; HOSTING the lab by day; TENSION a scene turning; NIGHT the quiet
+ * late hours; ZONE the Battle Zone menu and ladder. MOOD_SILENT stays last. */
+typedef enum { MOOD_TITLE, MOOD_EXPLORE, MOOD_FIGHT, MOOD_BOSS, MOOD_CLEAR, MOOD_CINE, MOOD_HOSTING, MOOD_TENSION, MOOD_NIGHT, MOOD_ZONE, MOOD_FINAL, MOOD_SILENT } mood_t;
 
 void audio_init(uint32_t rate);
 void audio_render(float *ring, uint32_t cap, uint32_t *cursor, uint32_t rate, double ms);

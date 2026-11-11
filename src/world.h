@@ -53,4 +53,7 @@ void world_door(float open);
 void world_door_auto(bool on);
 /* chunks drawn and their triangles before frustum culling, for the debug overlay */
 void world_debug_counts(int *draws, int *tris);
+/* v1.1: an arena's second look for a boss's phase two (0 normal, 1 transformed: the laser corner fogs green,
+ * the fridge frosts over, the shop goes back to the old building, the unfolded lab breaks apart). */
+void world_arena_phase(int phase);
 #endif

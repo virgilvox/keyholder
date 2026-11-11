@@ -37,3 +37,21 @@ export const DOOR = (open) => ({ op: 'door', open });
 export const FX = (kind, t = 0.5) => ({ op: 'fx', kind, t });  // fade_in fade_out flash slowmo shake lights_out
 export const NOTE = (text) => ({ op: 'note', text });          // a small line on screen, no voice
 export const END = () => ({ op: 'end' });
+
+// ---- v1.1: hosting gameplay, banter, barks, film language
+// ROAM(place, radius, prompt, { hour, until, sides, tasks, need, banter, indoors, follow })
+//   tasks: TASK(...) list; need: how many must be done before the place's marker shows (place null: the roam
+//   ends when they are done); until: the clock eases from hour to until as tasks finish; banter: BT(...) list.
+// TASK(kind, name, o): kind 'greet' | 'point' | 'answer' | 'carry' | 'fix' | 'signin' | 'errand'
+//   o.who: who it is with (a cast id, may be an extra like 'walkin1'); o.at: where it is; o.to: second mark (carry
+//   destination, point target); o.prompt: the button prompt; o.label: the task list line; o.n: count (carry trips);
+//   o.mode: fix minigame 'timing' | 'mash' | 'hold' | 'stick'; o.reward: { trust: 1, vibe: 1 } (two stats at most);
+//   o.before / o.after: beats said before the minigame and after success; o.optional; o.requires: another task's
+//   name that must be done first; o.delay: seconds into the roam before it appears.
+export const TASK = (kind, name, o = {}) => ({ kind, name, ...o });
+// BT(who, text, { delay, near }): an ambient line while walking, no camera cut, a small subtitle
+export const BT = (who, text, o = {}) => ({ who, text, ...o });
+// BARK(who, text): a voiced line that does not stop the scene (said over whatever happens next)
+export const BARK = (who, text) => ({ op: 'bark', who, text });
+// SHOT types added: push react insert hero whip top. o.part: 'rhand' | 'lhand' | 'head' | 'point'; o.at: a mark for 'point'
+// MUSIC moods added: hosting tension night zone final

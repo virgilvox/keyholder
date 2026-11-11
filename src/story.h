@@ -5,7 +5,11 @@
 #include "ds.h"
 #include "input.h"
 #include "three.h"
+#ifdef KH_GEN_ENUM
+#include KH_GEN_ENUM
+#else
 #include "gen/script_enum.h"
+#endif
 
 typedef enum { SR_RUNNING, SR_ROAM, SR_FIGHT, SR_EPILOGUE, SR_DONE } story_run;
 typedef struct {
