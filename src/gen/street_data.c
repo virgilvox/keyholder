@@ -570,7 +570,7 @@ const st_type ST_TYPES[] = {
 };
 const int ST_NTYPE = 24, ST_NTALK = 92;
 const st_person ST_CAMEO[2] = {{"Moheeb", "moheeb", 0x7ec8e3}, {"Luis", "luis", 0xf0a050}};
-const float ST_CAMEO_H0 = 11.000f, ST_CAMEO_H1 = 25.000f;
+const float ST_CAMEO_H0 = 0.000f, ST_CAMEO_H1 = 30.000f;
 const int ST_CHAT0 = 73, ST_NCHAT = 12, ST_CTALK0 = 85, ST_NCTALK = 7;
 const char *const ST_VENUES[] = {"pxg_north", "worth", "burritoholics", "nct", "gus", "oro", "old_brick", "ribaudo", "chupacabra", "boutique", "naysayer", "phantom_fox", "blossom", "crismons", "que_chevere", "atomic", "pomeroy", "haunted", "against_grain", "cream_block", "butterfly", "trellis", "one_macdonald", "level1", "mad_candy", "mangos", "booms", "twelve_west", "margaritas", "lost_dutchman", "bri", "main_burger", "az_distilling", "history", "chiwas", "proof", "espiritu", "tre_bella", "west_of_nile", "nile", "oneohone", "le_studio", "linton", "nunthaporn", "drew_lofts", "casa_copal", "diamond_dons", "organic_bean", "chupacabra_table", "chupacabra_seat_a", "chupacabra_seat_b", "chupacabra_patio", "lab_back_table", "lab_alley", "lab_truck_tailgate", "proof", "chupacabra", "level1", "nile", "arts_center"};
 const int ST_NVENUE = 60;

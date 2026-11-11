@@ -242,6 +242,7 @@ const open_up = [
     BT('m1', "Ten minutes. Five bucks says the first one asks if we're a coffee shop.", { delay: 22 }),
     BT('regular', "Has anyone seen the good scissors? Not the tape ones.", { delay: 34 }),
     BT('m1', "The loaner bike's on the stand by the lounge. Host gets first pick, if you want it for lunch.", { delay: 10, near: lab(17.5, 5.6) }),
+    BT('m2', "Moheeb and Luis are already out on the Chupacabra patio, over on Robson. Say hi if you step out.", { delay: 48 }),
   ] }),
 ];
 

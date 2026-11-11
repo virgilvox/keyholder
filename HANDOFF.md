@@ -1,8 +1,12 @@
 # KEYHOLDER handoff
 
-State as of 2026-11-11: v1.3.2 is on GitHub (github.com/virgilvox/keyholder), on Pages (virgilvox.github.io/keyholder) and in the v1.3.2 release (cart md5 `dbcadbfc184fb7874474e5fe1dc6fa8b`). The game station still runs 1.0.2: on 2026-11-10 and 2026-11-11 it did not answer at 172.22.111.83 (not on ARP from the R610 either; likely powered off). To update it, wait until `pidof retroarch` is empty, back up the old cart, copy the new one to `.incoming/` and `mv` it into place, check the md5, and add a row to `HeatSync Labs Operations 2026/docs/06-change-log.md`.
+State as of 2026-11-11: v1.3.3 is on GitHub (github.com/virgilvox/keyholder), on Pages (virgilvox.github.io/keyholder) and in the v1.3.3 release (cart md5 `78f2baf7958df1b9a1d539385b57fa54`). The game station still runs 1.0.2: on 2026-11-10 and 2026-11-11 it did not answer at 172.22.111.83 (not on ARP from the R610 either; likely powered off). To update it, wait until `pidof retroarch` is empty, back up the old cart, copy the new one to `.incoming/` and `mv` it into place, check the md5, and add a row to `HeatSync Labs Operations 2026/docs/06-change-log.md`.
 
 Read `docs/DESIGN.md` for the module contract and the art rules, and `docs/PLACES.md` for every downtown address.
+
+## v1.3.3 (2026-11-11)
+- Moheeb and Luis are on the Chupacabra patio all day and every night (CAMEO.hours [0, 30]); they load at the first roam, and the opening roam's banter says where they are.
+- Checked on the real key path (KH_GEAR_TEST cart, keys B, B on the 1:05 PM roam): getting off the bike drops both arms at once.
 
 ## v1.3.2 (2026-11-11)
 
@@ -10,7 +14,7 @@ Read `docs/DESIGN.md` for the module contract and the art rules, and `docs/PLACE
 - **Memory:** bodies keep their compressed images and the last part's cast is freed at each night: about 300 MB at boot, 380 MB at the end of the full run (was 566 and 744).
 - **Scene solids:** world_solid (world.h) stands up a box for a scene's van or table; bodies, lenses and lines of sight stop at it. The crew truck uses the same list.
 - **Scenes:** P('me') and FACE on the player now move the player too (story.c), so a later camera hand-off does not snap them back; FACE also turns the head. Kneeling or seated task partners get 1.6 m of room. A roam never sets the clock back past its chapter card, and the card hides the old goal and the wayfinder.
-- **Street:** Moheeb and Luis sit on the Chupacabra patio from 11 am, load at the first roam in those hours, and remember you from the day into the nights; a new game or a night from the title starts fresh (street_reset(keep_friends)). The lunch roam's banter points at them.
+- **Street:** Moheeb and Luis sit on the Chupacabra patio all day and every night (hours [0, 30] in street.mjs), load at the first town roam, and remember you from the day into the nights; a new game or a night from the title starts fresh (street_reset(keep_friends)). The lunch roam's banter points at them.
 - **Bike:** every way off the bike lets go of the grips at once (actor_reach with 0).
 - **Cars:** five body types from one table, wheels in the arches, both end caps facing out, far versions with the same outlines; lot stalls never cross paint or each other.
 
@@ -18,7 +22,7 @@ Read `docs/DESIGN.md` for the module contract and the art rules, and `docs/PLACE
 
 - **Nights:** tools/script/night1.mjs to night3.mjs (Open Hack Night, Hack Your Hackerspace, Second Friday) run after the day, with carry-over flags, a NIGHTS row on the title, and do-ocracy lessons in scenes. KH_AUTO plays everything and ends with `[auto] END FINAL KEYHOLDERS`.
 - **Roams:** once required tasks are done the goal is shown and reached in a generous circle (some roams end on a timer). The wayfinder sticks to one labelled target and routes round walls.
-- **Street:** src/street.c, tools/script/street.mjs (24 stranger types, documented in its header), `node tools/script/street_compile.mjs`, then bake. Doors into five interiors (src/interior.c, one table line per room). Moheeb and Luis on the Chupacabra patio (from 11 am since v1.3.2) (Kyutai voices via tools/voices_kyutai.py).
+- **Street:** src/street.c, tools/script/street.mjs (24 stranger types, documented in its header), `node tools/script/street_compile.mjs`, then bake. Doors into five interiors (src/interior.c, one table line per room). Moheeb and Luis on the Chupacabra patio (always out since v1.3.3) (Kyutai voices via tools/voices_kyutai.py).
 - **Town:** Mesa Arts Center, Chupacabra (14 N Robson), the lab's back alley, parked cars facing their stalls, original printer models in prep-lab.mjs. Sources in docs/PLACES.md.
 - **Pages:** the one-file page is now 106 MB, over GitHub's 100 MB file limit, so tools/publish-pages.sh publishes a small loader page that fetches keyholder.wasc beside it. The one-file page ships in each release.
 - **Memory:** about 586 MB at boot and 728 MB after the nights (voices are 44 MB). Too much for the station is likely; an actor free in actor.c would let each night release the day's bodies.

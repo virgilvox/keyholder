@@ -574,13 +574,13 @@ export const STRANGERS = [
 ];
 
 // ---------------------------------------------------------------- the Chupacabra patio
-// Moheeb and Luis, at a table outside the taproom from late morning on: Moheeb on his laptop, Luis with a
+// Moheeb and Luis, at a table outside the taproom all day and every night: Moheeb on his laptop, Luis with a
 // beer. They made a game called Coffee and Kill. Their voices are the Kyutai clones from SMALL PARTS
 // (tools/bake_tts.py, KYUTAI); voice and speed below are only the Kokoro stand ins if that is not set up.
 // chatter: what they say to each other when you are near (one exchange at a time, each once a day).
 // talks: what they say to you (a "Talk" at the table).
 export const CAMEO = {
-  hours: [11, 25],
+  hours: [0, 30],   // always out: you can walk over the moment the day starts
   people: {
     moheeb: { name: 'Moheeb', color: 0x7ec8e3, voice: 'am_michael', speed: 1.0 },
     luis: { name: 'Luis', color: 0xf0a050, voice: 'am_adam', speed: 1.04 },
