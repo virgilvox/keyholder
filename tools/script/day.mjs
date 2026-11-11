@@ -16,7 +16,7 @@
 // says "should be fine"; Ruth is precise and dry and protective of the laser. m1 is Vee or Dex, m2 is Ruth or Dex, so
 // the lines that carry a personality take { vee, dex, ruth } text. Lou is half asleep and counts nights. Pat says
 // "quick one" and reports everything to both chats. Jo asks questions, with one flat statement each time.
-import { lab, at, stage, CHAPTER, CLOCK, P, HIDE, W, WAITW, S, SHOT, FIX, WAIT, FACE, LOOK, CLIP, EMO, OBJ, ROAM, SIDE, FIGHT, CHOICE, O, A, IF, SET, ADD, CARD, MUSIC, STAGE, GIVE, DRAW, DOOR, FX, NOTE, END, TASK, BT, BARK } from './dsl.mjs';
+import { lab, at, stage, CHAPTER, CLOCK, P, HIDE, W, WAITW, S, SHOT, FIX, WAIT, FACE, LOOK, CLIP, EMO, OBJ, ROAM, SIDE, FIGHT, CHOICE, O, A, IF, SET, ADD, CARD, MUSIC, STAGE, GIVE, DRAW, DOOR, FX, NOTE, END, TASK, BT, BARK, BIKE, BIKE_WITH, BIKE_BACK, PROP } from './dsl.mjs';
 
 // ---------------------------------------------------------------- fights
 // tier: the Battle Zone ladder. assists: callable when the flag is set or Trust reaches trust (99: the flag only).
@@ -50,7 +50,7 @@ export const FIGHTS = {
       { on: 'obj_warn', who: 'rennick', text: "Pedal, Dobbs! Pedal!" },
       { on: 'parry', who: 'dobbs', text: "Huh. The sandwich person can block." },
       { on: 'player_low', who: 'rennick', text: "Watch the bread. Seriously, watch the bread." },
-      { on: 'foe_low', who: 'dobbs', text: "Hammer was a strong word. Ow." },
+      { on: 'foe_low', who: 'dobbs', text: "Hammer's a strong word. Ow." },
       { on: 'finish', who: 'dobbs', text: "Lean it, don't drop it. Got it." } ] },
   arcade: { title: 'FREE PLAY', sub: 'Insert coin', where: 'level1', radius: 8, twist: 'score', twist_a: 30000, obj_label: 'BEAT THE HIGH SCORE', tier: 3, foes: [
     { who: 'champ', weapon: 'TWIN', ai: 'DUELIST', hp: 120, power: .9, speed: 1.2, at: [0, -5] } ],
@@ -80,18 +80,18 @@ export const FIGHTS = {
       { on: 'player_low', who: 'haunter', text: "Is that too spooky? Should I dial it back?" },
       { on: 'foe_low', who: 'haunter', text: "The foam's holding! Is it holding? It is!" },
       { on: 'finish', who: 'haunter', text: "Field tested! Can I put field tested on the sign?" } ] },
-  copper: { title: 'THE BACK LOT', sub: 'Three of them, one of you, plenty of daylight', where: 'lot_fight', radius: 12, twist: 'defend', twist_a: 70,
-    obj: [0, -9], obj_label: 'GUARD THE SCRAP CAGE', tier: 3, foes: [
+  copper: { title: 'THE BACK LOT', sub: 'Three of them, one welding table, plenty of daylight', where: 'lot_fight', radius: 12, twist: 'defend', twist_a: 70,
+    obj: [0, -7], obj_label: 'GUARD THE WELDING TABLE', obj_prop: 'welding_table', tier: 3, foes: [
     { who: 'cal', weapon: 'MAUL', ai: 'BRUISER', hp: 180, power: 1.0, speed: .9, at: [0, -6] },
     { who: 'crew', weapon: 'SPEAR', ai: 'SKIRMISH', hp: 70, power: .75, speed: 1, at: [-4, -5] },
     { who: 'crew', weapon: 'ARC', ai: 'SKIRMISH', hp: 70, power: .75, speed: 1, at: [4, -5], palette: 'alt' } ],
     barks: [
-      { on: 'start', who: 'cal', text: "Two bucks a pound, partner. It's just math." },
-      { on: 'obj_warn', who: 'crew', text: "Grab the good copper! The shiny stuff!" },
+      { on: 'start', who: 'cal', text: "Three hundred pounds of steel, partner. That's just math." },
+      { on: 'obj_warn', who: 'crew', text: "Tip it onto the dolly! Watch the casters!" },
       { on: 'player_low', who: 'cal', text: "Go sit in the shade, partner. It's hot out." },
-      { on: 'foe_low', who: 'cal', text: "That's a lot of fight for a bin of old VCRs." },
-      { on: 'assist', who: 'hal', text: "Forty years on a lathe. Try me." },
-      { on: 'finish', who: 'cal', text: "All right! It's not scrap! It's curriculum!" } ],
+      { on: 'foe_low', who: 'cal', text: "That's a lot of fight for a table with a bracket on it." },
+      { on: 'assist', who: 'hal', text: "Forty years in a shop. Try me." },
+      { on: 'finish', who: 'cal', text: "All right! It's not scrap! Somebody's welding on it!" } ],
     assists: [{ who: 'hal', flag: 'hal_stays', trust: 99 }, { who: 'm1', flag: null, trust: 13 }, { who: 'm2', flag: null, trust: 14 }] },
   root: { title: 'ACCESS DENIED', sub: 'Root, member since the old building, ninety days unpaid', where: 'stage', radius: 11, twist: 'boss', phase2: .5, tier: 4, foes: [
     { who: 'root', weapon: 'MAUL', ai: 'BOSS', hp: 320, power: 1.1, speed: 1, at: [0, -7] } ],
@@ -228,19 +228,20 @@ const open_up = [
   P('napper', lab(16.3, 4.3, -60)), CLIP('napper', 'Sitting_Idle_Loop', { loop: true }),
   P('regular', at('lab_printer', .8, 0)),
   MUSIC('hosting'),
-  ROAM('lab_welcome', 2.2, 'Stand at the welcome board', { indoors: true, hour: 9.2, until: 9.95, need: 2, tasks: [
+  ROAM('lab_welcome', 2.2, 'Wait by the welcome board', { indoors: true, hour: 9.2, until: 9.95, need: 2, auto: 30, tasks: [
     TASK('signin', 'sign_me', { at: at('lab_signin'), label: 'Sign yourself in', prompt: 'Sign in', reward: { trust: 1 },
       after: [BARK('m1', { vee: "Look at you. Officially here.", dex: "There you go. Officially here." })] }),
-    TASK('carry', 'soda', { at: at('lab_kitchen'), to: at('lab_soda'), n: 3, label: 'Restock the soda fridge', prompt: 'Grab a flat', reward: { vibe: 1 },
+    TASK('carry', 'soda', { at: at('lab_kitchen'), to: at('lab_soda'), n: 2, label: 'Restock the soda fridge', where: 'Kitchen', where2: 'Soda fridge', prompt: 'Grab a flat', reward: { vibe: 1 },
       after: [BARK('napper', "Oh, cold ones. Bless you.")] }),
     TASK('fix', 'printer', { at: at('lab_printer'), mode: 'timing', label: 'Unjam the printer', prompt: 'Unjam', optional: true, who: 'regular', reward: { trust: 1, vibe: 1 },
       before: [S('regular', "Quick one. Brenda's eating filament again. I posted in both chats.")],
       after: [S('regular', "You're a wizard. I'm un-posting.", { emote: 'joy', amount: .8 })] }),
   ], banter: [
-    BT('m2', "Soda's in the kitchen, three flats. It's honor system, even for hosts.", { delay: 2 }),
+    BT('m2', "Soda's in the kitchen, two flats. It's honor system, even for hosts.", { delay: 2 }),
     BT('napper', "Is it morning? It feels like morning.", { delay: 9, near: lab(16.3, 4.3) }),
     BT('m1', "Ten minutes. Five bucks says the first one asks if we're a coffee shop.", { delay: 22 }),
     BT('regular', "Has anyone seen the good scissors? Not the tape ones.", { delay: 34 }),
+    BT('m1', "The loaner bike's on the stand by the lounge. Host gets first pick, if you want it for lunch.", { delay: 10, near: lab(17.5, 5.6) }),
   ] }),
 ];
 
@@ -296,7 +297,7 @@ const first_visitor = [
   S('sam', "Is it okay if I look around? Or is that a members thing?"),
   S('me', "Anyone can look around. We're open to the public. Come on, I'll give you the five minute tour."),
   OBJ('Give Sam the tour'),
-  ROAM('lab_cowork', 2.5, 'Get Sam a seat', { indoors: true, hour: 10.1, until: 10.8, follow: 'sam', need: 4, tasks: [
+  ROAM('lab_cowork', 2.5, 'Get Sam a seat at the tables', { indoors: true, hour: 10.1, until: 10.8, follow: 'sam', need: 5, tasks: [
     TASK('point', 'tour_laser', { who: 'sam', at: at('lab_laser'), label: 'Tour: the laser', prompt: 'Show', reward: { safety: 1 },
       after: [S('me', "This is the big laser. Everybody wants it. You take one class, and then you can use it."),
         IF({ flag: 'promised_laser' }, [S('sam', "Class first. You said that really fast earlier.", { emote: 'fun', amount: .5 })],
@@ -309,7 +310,11 @@ const first_visitor = [
     TASK('point', 'tour_elec', { who: 'sam', at: at('lab_elec'), label: 'Tour: the electronics bench', prompt: 'Show', reward: { safety: 1 },
       after: [S('me', "Electronics bench. No class here, just the waiver. And the iron always goes back in its holder."),
         S('sam', "Did somebody find that out the hard way?"),
-        S('me', "There's a mark on the bench. You'll find it.")] }),
+        S('me', "There's a mark on the bench. You'll find it."),
+        S('sam', "Who decides what gets fixed here? Like that drawer somebody's taking apart?"),
+        S('me', "Whoever fixes it. That one was broken, so they asked the chat if anyone minded. Nobody did, so they started."),
+        S('sam', "At my last job, a drawer needed three signatures.", { emote: 'fun', amount: .4 }),
+        S('me', "And the drawer would still be broken.")] }),
     TASK('answer', 'dues', { who: 'sam', at: at('lab_signin'), label: 'Sam has a question', prompt: 'Listen',
       before: [
         S('sam', "Can I ask what this costs? The website kind of lost me.", { shot: 'mcu' }),
@@ -363,7 +368,7 @@ const nap_side = [
   ADD('vibe', 1), SET('met_lou'),
 ];
 const haunter_side = [
-  S('haunter', "Hi! Don't mind the torsos. They're curing.", { shot: 'mcu', emote: 'joy', amount: .9 }),
+  S('haunter', "Hi! Don't mind the torsos. They're for my October haunted house. They're curing.", { shot: 'mcu', emote: 'joy', amount: .9 }),
   S('me', "Why are there torsos on the couch?"),
   S('haunter', "Where else would they cure? We'll move them before the school group.", { emote: 'fun', amount: .6 }),
   S('me', "There's a school group?"),
@@ -380,11 +385,11 @@ const material = [
   BARK('m2', "Is the hood closed? It's always the hood."),
   CHAPTER(11, 'Material Safety', 'The laser corner'),
   CLIP('regular', 'Idle_Loop', { loop: true }),
-  ROAM('lab_laser', 3, 'Follow the smell', { indoors: true, hour: 10.9, until: 11.2, need: 1, tasks: [
+  ROAM('lab_laser', 3, 'See who is at the laser', { indoors: true, hour: 10.9, until: 11.2, need: 1, tasks: [
     TASK('fix', 'hood', { at: at('lab_laser_hood'), mode: 'hold', who: 'regular', label: 'Close the laser hood', prompt: 'Hold it shut', reward: { safety: 1, trust: 1 },
       before: [S('regular', "The hood's closed. I think. Hold on.")],
       after: [S('regular', "It lives! Don't tell the chats.", { emote: 'joy', amount: 1, shot: 'mcu' })] }),
-    TASK('greet', 'hal', { who: 'hal', at: at('lab_door', 0, -1.5), delay: 8, optional: true, label: 'Someone at the door', prompt: 'Say hi', reward: { trust: 1 },
+    TASK('greet', 'hal', { who: 'hal', at: at('lab_door', 0, -1.5), delay: 2, optional: true, label: 'Someone at the door', prompt: 'Say hi', reward: { trust: 1 },
       after: [
         S('hal', "Name's Hal. I ran a lathe for forty years, and I'm bored stiff. Where's yours?", { shot: 'mcu' }),
         S('me', "In the back. You'd have to get certified here first, though."),
@@ -533,10 +538,10 @@ const lunch_run = [
   MUSIC('explore'),
   P('reggie', at('macdonald_main', -1, 1, -90)),
   CHAPTER(12.5, 'Lunch Run', 'West Main Street'),
-  ROAM('mid_block', 6, 'Head back', { hour: 12.5, until: 12.9, need: 1, tasks: [
-    TASK('errand', 'order', { at: at('proof'), label: 'Pick up the order at Proof Bread', prompt: 'Pick up', reward: { vibe: 1 },
+  ROAM('lab_door', 4, 'Back to the lab with lunch', { hour: 12.5, until: 12.9, need: 1, tasks: [
+    TASK('errand', 'order', { at: at('proof'), label: 'Pick up the order at Proof Bread', where: 'Proof Bread', prompt: 'Pick up', reward: { vibe: 1 },
       after: [BARK('me', "Fourteen sandwiches. One of them just says surprise.")] }),
-    TASK('greet', 'reggie', { who: 'reggie', at: at('macdonald_main', -1, 1), optional: true, label: 'A lost delivery driver', prompt: 'Help', reward: { trust: 1 },
+    TASK('greet', 'reggie', { who: 'reggie', at: at('macdonald_main', -1, 1), optional: true, label: 'A lost delivery driver', where: 'Macdonald and Main', prompt: 'Help', reward: { trust: 1 },
       after: [
         S('reggie', "Hey. You know a one forty West Main? The box says one forty.", { shot: 'mcu', clip: 'Idle_TalkingPhone_Loop' }),
         S('me', "That's us, sort of. We moved one building over, to one oh eight. Years ago."),
@@ -553,21 +558,37 @@ const lunch_run = [
     BT('me', "Ninety degrees, and it's not even one.", { delay: 8 }),
     BT('reggie', "One forty, one forty. Where's one forty?", { near: at('macdonald_main') }),
   ] }),
-  P('rennick', at('lab_door', 4, 2.2, 0)), P('dobbs', at('lab_door', 6, 3.4, -80)), P('me', at('mid_block', 0, 3, 0)),
-  FIX(at('lab_door', -3, 7), at('lab_door', 5, 1), 34),
+  // at the door with lunch. The bike by the door is the lab's loaner if you took it this morning (you leaned it
+  // there to carry fourteen sandwiches in), else a member's, with a wheel she spent four months building
+  BIKE(at('lab_door', 3.4, 1.7, 90)),
+  P('me', at('lab_door', -2.4, 3.4, 80)), P('rennick', at('lab_door', 3.3, 2.7, -100)), P('dobbs', at('lab_door', 4.6, 3.5, -130)),
+  FIX(at('lab_door', -3, 7), at('lab_door', 3.5, 1.8), 34),
   CLIP('rennick', 'Interact'),
-  S('rennick', "Told you. Nobody locks the good ones."),
-  S('dobbs', "It says lab bike on it. Is that a lab bike?"),
-  SHOT('push', ['me']),
-  S('me', "Somebody spent four months building that wheel."),
-  W('me', at('lab_door', 2, 6), { run: true, nowait: true }),
-  SHOT('track', ['me']),
+  IF({ flag: 'has_bike' }, [
+    S('rennick', "Told you. Nobody locks a bike they're coming right back to."),
+    S('dobbs', "The fender says lab loaner. Is a loaner like a free one?"),
+    SHOT('push', ['me']),
+    S('me', "I signed that out this morning. It was out of my hands for nine seconds."),
+  ], [
+    S('rennick', "Told you. Nobody locks the good ones."),
+    S('dobbs', "The fender says it belongs to somebody at the lab. Is that a lab bike?"),
+    SHOT('push', ['me']),
+    S('me', "Somebody spent four months building that back wheel."),
+  ]),
+  BIKE_WITH('rennick'),
+  W('rennick', at('lab_door', -9, 6.5, -90), { speed: 1.9, nowait: true }), W('dobbs', at('lab_door', -8, 8, -90), { speed: 1.8, nowait: true }),
+  SHOT('track', ['rennick']),
   BARK('me', "Hey! Hey, that's ours!"),
-  WAITW('me'),
+  WAIT(1.6),
+  FX('fade_out', .3),
+  // they get as far as the middle of the block: neither of them can ride
+  P('rennick', at('mid_block', -1, -1.2, 90)), P('dobbs', at('mid_block', 1.4, -.4, 70)), P('me', at('mid_block', -5.5, 2.6, 80)),
+  FX('fade_in', .35),
   SHOT('two', ['me', 'rennick']),
-  CHOICE("Two people have the lab bike. You're holding fourteen sandwiches.", [
-    O("It's shared. Put it down.", [ADD('vibe', 1), S('rennick', "Shared! Exactly. We're sharing.", { emote: 'fun', amount: .8 })],
-      { say: "That's a shared bike. Put it down." }),
+  S('dobbs', "Rennick, I said I can't ride a bike. I've been meaning to learn.", { emote: 'sorrow', amount: .3 }),
+  CHOICE("Two people are walking the bike down Main. You're holding fourteen sandwiches.", [
+    O("It's shared. Put it down.", [ADD('vibe', 1), S('rennick', "Shared! Exactly. We're sharing it with us.", { emote: 'fun', amount: .8 })],
+      { say: "That bike is shared. Put it down." }),
     O("I'm filming this.", [ADD('safety', 1), S('dobbs', "Cool. Get my good side.", { shot: 'low' })],
       { say: "I'm filming this, by the way." }),
     O("Give me the bike. Now.", [ADD('vibe', -1), S('rennick', "Ooh. Bread and attitude.", { emote: 'fun', amount: .8 })]),
@@ -575,20 +596,39 @@ const lunch_run = [
   S('rennick', "Relax. Dobbs, handle the sandwich person.", { shot: 'mcu' }),
   DRAW('rennick', 'TWIN'), DRAW('dobbs', 'MAUL'),
   SHOT('hero', ['dobbs']),
-  S('dobbs', "I wouldn't call it stealing. I would call this a hammer."),
+  S('dobbs', "Theft's a strong word. So's hammer."),
   DRAW('me', 'ARC'),
   SHOT('whip', ['rennick']),
   MUSIC('fight'),
   FIGHT('bike'),
   MUSIC('explore'),
   DRAW('me', -1),
+  BIKE(at('mid_block', -3.6, 2.2, 0)),
   SHOT('two', ['me', 'dobbs']),
-  S('dobbs', "We'll put it back on the rack. Honestly, it was a lot of bike.", { emote: 'sorrow', amount: .5 }),
-  S('me', "Lean it, don't drop it. The bread's fine, by the way."),
+  S('dobbs', "We'll walk it back. Honestly, it was a lot of bike.", { emote: 'sorrow', amount: .5 }),
+  IF({ flag: 'has_bike' }, [
+    S('me', "I'll ride it back, thanks. And the bread's fine, by the way."),
+    BIKE_BACK(),
+  ], [
+    S('me', "Lean it on the rack by the door. Don't drop it. The bread's fine, by the way."),
+    BIKE(at('lab_door', 3.4, 1.7, 90)),
+  ]),
   ADD('trust', 1),
   HIDE('rennick', 'dobbs'),
   OBJ('Back inside with lunch'),
-  ROAM('lab_door', 3, 'Go in', { hour: 13.4 }),
+  // a man in a clean blazer photographs the storefront: he comes back at seven
+  P('brant', at('lab_door', 7.5, 4.2, -70)), CLIP('brant', 'Idle_TalkingPhone_Loop', { loop: true }),
+  ROAM('lab_door', 4, 'Go in with lunch', { hour: 13.4, auto: 30, sides: [
+    SIDE('brant', 'brant', at('lab_door', 7.5, 4.2, -70), 'Talk', [
+      S('brant', "Love the bones of this place. Love the foot traffic. Who owns it? Asking for a deck.", { shot: 'mcu', emote: 'joy', amount: .8 }),
+      S('me', "Nobody owns it. It's a nonprofit. The members run it."),
+      S('brant', "Nobody. Love that. I'll swing by tonight and talk to nobody.", { emote: 'fun', amount: .6 }),
+    ]),
+  ], banter: [
+    BT('brant', "Great light. Great frontage. Very ownable.", { near: at('lab_door', 7.5, 4.2) }),
+  ] }),
+  HIDE('brant'),
+  BIKE(null),
 ];
 
 // ---------------------------------------------------------------- 2 pm, the inspector
@@ -600,11 +640,14 @@ const inspector = [
   SHOT('insert', ['lim'], { part: 'rhand' }), WAIT(.6),
   SHOT('two', ['lim', 'me']),
   S('lim', "Inspector Lim, city fire prevention. Annual walk through. Are you in charge?", { clip: 'Idle_FoldArms_Loop' }),
+  S('lim', "Also, a man in a blazer is out front measuring your storefront with his phone. Friend of yours?", { shot: 'mcu' }),
+  S('me', "Never seen him. People measure us sometimes. We're a very measurable building."),
   S('me', "I'm hosting today. Nobody's really in charge."),
   S('lim', "That'll do. You lead. I'll write.", { shot: 'mcu' }),
   OBJ('Walk the inspector through'),
+  // Lim's walk through: cords, chemicals, extinguishers, exits. Each one she checks; each skipped one shows up below
   ROAM('lab_fab', 2.5, 'Show her the rear exit', { indoors: true, hour: 14, until: 14.6, follow: 'lim', need: 1, tasks: [
-    TASK('fix', 'strip', { who: 'lim', at: at('lab_cowork', -.6, .4), mode: 'mash', label: 'The daisy chained power strips', prompt: 'Untangle', reward: { safety: 1 },
+    TASK('fix', 'strip', { who: 'lim', at: at('lab_cowork', -.6, .4), mode: 'mash', label: 'Untangle the daisy chained strips', where: 'Coworking power strips', prompt: 'Untangle', reward: { safety: 1 },
       before: [
         S('lim', "A strip, into a strip, into an extension cord. Whose?", { emote: 'angry', amount: .3 }),
         CHOICE('You were untangling this exact one at ten.', [
@@ -617,30 +660,50 @@ const inspector = [
         ]),
       ],
       after: [S('lim', "One per outlet. Noted.")] }),
-    TASK('carry', 'binder', { at: at('lab_classroom'), to: at('lab_kitchen'), optional: true, label: 'Put the safety data binder back in the kitchen window', prompt: 'Take the binder', reward: { safety: 1 },
-      after: [SET('found_binder'), S('lim', "The binder. With a label. Huh.", { emote: 'joy', amount: .3 })] }),
-    TASK('fix', 'extinguisher', { at: at('lab_shop'), mode: 'timing', optional: true, label: 'Check the extinguisher tag', prompt: 'Check', reward: { safety: 1 },
-      after: [BARK('lim', "In date. Good.")] }),
+    TASK('carry', 'binder', { at: at('lab_classroom'), to: at('lab_kitchen'), optional: true, label: 'Return the chemical safety binder', where: 'Classroom whiteboard', where2: 'Kitchen window', prompt: 'Take the binder', reward: { safety: 1 },
+      after: [SET('found_binder'), S('lim', "The binder, in the window, with a label. Huh.", { emote: 'joy', amount: .3 })] }),
+    TASK('fix', 'extinguisher', { at: at('lab_shop'), mode: 'timing', optional: true, label: 'Check the extinguisher tag', where: 'Woodshop extinguisher', prompt: 'Check', reward: { safety: 1 },
+      after: [SET('checked_tag'), BARK('lim', "In date. Good. You looked before I asked.")] }),
+    TASK('fix', 'pallet', { at: at('lab_fab', -1.4, .2), mode: 'mash', optional: true, label: 'Shove the pallet off the exit path', where: 'Rear exit', prompt: 'Shove', reward: { safety: 1 },
+      after: [SET('cleared_exit'), BARK('me', "One pallet of donated monitors, moved. Somebody's going to ask where.")] }),
   ], banter: [
+    BT('lim', "I'll want your chemical safety binder. It's supposed to live in the kitchen window.", { delay: 3 }),
+    BT('m2', "The binder's in the classroom. Somebody taught a resin class out of it.", { delay: 10 }),
     BT('lim', "Is that a couch in a workshop?", { near: lab(16.3, 4.3) }),
-    BT('lim', "Does anyone here own a broom?", { delay: 20 }),
-    BT('napper', "I'm not here. I'm a torso.", { delay: 32, near: lab(16.3, 4.3) }),
+    BT('lim', "Cords, chemicals, extinguishers, exits. It's the same four everywhere I go.", { delay: 22 }),
+    BT('napper', "I'm not here. I'm a torso.", { delay: 34, near: lab(16.3, 4.3) }),
   ] }),
   P('me', lab(32, 4.8, 90)), P('lim', lab(33, 5, -90), 'me'),
   SHOT('two', ['me', 'lim']),
   S('lim', "Rear exit. Walk me there without moving anything."),
   W('me', lab(35.5, 4.6, 90), { nowait: true }), W('lim', lab(36.2, 5.0, 90), { nowait: true }),
   SHOT('track', ['me', 'lim']),
-  IF({ flag: 'found_binder' }, [SET('inspect_ok')]),
-  IF({ stat: 'safety', gte: 11 }, [SET('inspect_ok')]),
-  IF({ flag: 'inspect_ok' }, [
-    S('me', "Straight through the fab bay. Somebody always clears it."),
-    S('lim', "First building downtown that's done that today. Pass.", { emote: 'joy', amount: .4, shot: 'mcu' }),
-    SET('passed_inspection'), ADD('safety', 1), ADD('vibe', 1),
+  IF({ flag: 'cleared_exit' }, [
+    S('me', "Straight through the fab bay. It got cleared today."),
   ], [
     S('me', "It's clear. Mostly. There's a pallet of donated monitors."),
-    S('lim', "Conditional pass. Thirty days. Move the monitors. Find the binder.", { emote: 'angry', amount: .3 }),
-    ADD('dues', -1),
+    S('lim', "Mostly is a word I write down.", { shot: 'mcu' }),
+  ]),
+  IF({ flag: 'checked_tag' }, [], [
+    S('lim', "Your extinguisher. You walked right past it, so I checked. It's in date. Next time you check.", { emote: 'angry', amount: .2 }),
+    ADD('safety', -1),
+  ]),
+  IF({ flag: 'found_binder' }, [
+    IF({ flag: 'cleared_exit' }, [
+      S('lim', "First building downtown that's done all four today. Pass.", { emote: 'joy', amount: .4, shot: 'mcu' }),
+      SET('passed_inspection'), ADD('safety', 1), ADD('vibe', 1),
+    ], [
+      S('lim', "Conditional pass. Thirty days. Move the monitors off that exit.", { emote: 'angry', amount: .3 }),
+      SET('inspect_conditional'), ADD('dues', -1),
+    ]),
+  ], [
+    IF({ flag: 'cleared_exit' }, [
+      S('lim', "Conditional pass. Thirty days. Put a chemical safety binder where people can find it.", { emote: 'angry', amount: .3 }),
+    ], [
+      S('lim', "Conditional pass. Thirty days. The binder, and the monitors. I'll be back.", { emote: 'angry', amount: .4 }),
+      ADD('safety', -1),
+    ]),
+    SET('inspect_conditional'), ADD('dues', -1),
   ]),
   HIDE('lim'),
   MUSIC('hosting'),
@@ -663,16 +726,17 @@ const fridge = [
   FX('shake', .3),
   BARK('bex', "Whose jar has a tentacle?"),
   CHAPTER(15, 'Label Your Food', 'Tech Tear Apart, and the kitchen'),
+  OBJ('Tech Tear Apart is starting'),
   P('regular', lab(22.6, 2.2, 0)), P('haunter', lab(13.4, 3.6, 40)),
   ROAM('lab_kitchen', 3.5, 'See about the shouting', { indoors: true, hour: 15, until: 15.4, need: 2, tasks: [
     TASK('greet', 'dana', { who: 'dana', at: at('lab_door', 0, -1.5), label: 'A parent and a kid at the door', prompt: 'Say hi', reward: { trust: 1, vibe: 1 },
       after: [
-        S('dana', "Hi! Is this the tear apart thing? He's been up since five.", { shot: 'mcu' }),
+        S('dana', "Hi! Is this the tear apart thing? He's been up since five. I'm his ride, and his supervisor.", { shot: 'mcu' }),
         S('milo', "Can I break something?"),
         S('me', "We say take apart. It's the same thing, except you get to keep the pieces."),
         S('milo', "Can I take apart something hard?", { emote: 'joy', amount: 1 }),
       ] }),
-    TASK('point', 'bin', { who: 'milo', at: at('lab_teardown'), requires: 'dana', label: 'Show Milo the Tech Tear Apart bin', prompt: 'Show', reward: { safety: 1 },
+    TASK('point', 'bin', { who: 'milo', with: 'dana', at: at('lab_teardown'), requires: 'dana', label: 'Show Milo the Tear Apart bin', where: 'Tear Apart bin', prompt: 'Show', reward: { safety: 1 },
       after: [
         S('me', "These are the Tech Tear Apart bins. Old printers and VCRs, all unplugged, all for taking apart."),
         CHOICE('Milo is already holding a screwdriver.', [
@@ -682,7 +746,7 @@ const fridge = [
             { say: "Go for it. Unscrew anything you want." }),
         ]),
         S('milo', "This is the best place I've ever been."),
-        S('dana', "He said that about a car wash.", { emote: 'fun', amount: .7 }),
+        S('dana', "He said that about a car wash. I'll be right here, buddy. Hand me the screws as they come out.", { emote: 'fun', amount: .7 }),
         IF({ flag: 'met_jo' }, [S('haunter', "The school group! I told you there was one!", { emote: 'joy', amount: 1 })]),
       ] }),
   ], sides: [
@@ -693,7 +757,8 @@ const fridge = [
     BT('milo', "What's this one? Can I open this one?", { delay: 30 }),
     BT('haunter', "Does Milo want to see a foam head? Who wouldn't?", { delay: 42 }),
   ] }),
-  P('me', lab(37.0, 3.6, -20)), P('bex', lab(38.2, 1.5, 150), 'me'), P('m1', lab(36.4, 2.1, 100), 'bex'),
+  // the kitchen's open floor (plan x 37.6 to 39.4, z 1.2 to 3.3): the darkroom counter and the sink run round it
+  P('me', lab(37.8, 3.0, -60)), P('bex', lab(38.2, 1.5, 150), 'me'), P('m1', lab(39.0, 2.4, -150), 'bex'), FACE('me', 'bex'),
   SHOT('wide', ['me', 'bex', 'm1'], { dist: 4 }),
   CLIP('bex', 'Interact'),
   S('bex', "It's a do-ocracy, so I'm doing. Anything without a label goes in the bin. Now.", { emote: 'angry', amount: .9 }),
@@ -747,7 +812,7 @@ const fridge = [
   GIVE('SPEAR', 'Spool Naginata'),
   DRAW('me', -1), DRAW('bex', -1),
   FX('flash', .25), STAGE('town'),
-  P('me', lab(37.0, 3.6, -20)), HIDE('bex', 'm1', 'dana', 'milo'),
+  P('me', lab(37.8, 3.0, -60)), HIDE('bex', 'm1', 'dana', 'milo'),
   OBJ('Sam wants you to look at something'),
 ];
 
@@ -772,40 +837,68 @@ const props_side = [
       { say: "After my shift, I promise." }),
   ]),
 ];
+const GERALD = lab(15.75, 4.6, 90);   /* on the lounge floor in front of Ines, under her hands: open floor for a robot */
 const quiet = [
-  P('ines', lab(20.6, 7.6, 180)), P('hal', lab(21.6, 7.8, -150)),
-  CLIP('ines', 'Fixing_Kneeling', { loop: true }),
-  SHOT('insert', ['ines'], { part: 'rhand' }), WAIT(.4),
-  BARK('ines', "Gerald. Gerald, straight. Why do you hate straight?"),
+  P('ines', lab(15.2, 4.6, 90)), CLIP('ines', 'Fixing_Kneeling', { loop: true }),
+  PROP('gerald', GERALD, 'circle'),
+  IF({ flag: 'hal_stays' }, [P('hal', lab(14.2, 5.1, -60)), CLIP('hal', 'Idle_FoldArms_Loop', { loop: true })]),
   CHAPTER(16, 'What It Is For', 'The coworking tables'),
-  P('regular', lab(19.0, 4.6, 90)), P('haunter', lab(13.4, 3.6, 40)),
-  ROAM('lab_cowork', 2.8, 'See Sam', { indoors: true, hour: 15.8, until: 16.6, need: 2, tasks: [
-    TASK('answer', 'robot', { who: 'ines', at: at('lab_elec'), label: 'A student with a robot', prompt: 'Help', reward: { trust: 1, vibe: 1 },
+  SHOT('insert', ['ines'], { part: 'point', at: GERALD, height: .15 }), WAIT(1.2),
+  BARK('ines', "Gerald. Gerald, straight. Why do you hate straight?"),
+  P('regular', lab(10.8, 3.2, 90)), P('haunter', lab(13.0, 3.2, 40)),
+  ROAM('lab_cowork', 2.8, 'See how Sam is doing', { indoors: true, hour: 15.8, until: 16.6, need: 3, tasks: [
+    TASK('answer', 'robot', { who: 'ines', at: lab(15.2, 4.6), label: 'A student with a robot', where: 'Ines and Gerald', prompt: 'Help', reward: { trust: 1 },
       before: [
-        S('ines', "Sorry, hi, I'm Ines. This is Gerald. He only turns left.", { shot: 'mcu' }),
-        CHOICE("Gerald spins in a slow, sad circle.", [
-          O("One motor's wired backwards.", [SET('fixed_gerald'), CLIP('me', 'Interact'),
-            S('ines', "Oh no. It's red to black. Gerald, I'm so sorry.", { emote: 'joy', amount: .8 })],
-            { say: "I think one motor's wired backwards." }),
+        CLIP('ines', 'Fixing_Kneeling', { loop: true }),
+        S('ines', "Sorry, hi. I'm Ines. This is Gerald. He's our robotics club's line follower.", { shot: 'mcu' }),
+        S('ines', "Regionals are Saturday. He's supposed to follow the tape. He only turns left."),
+        SHOT('insert', ['ines'], { part: 'point', at: GERALD, height: .15 }), WAIT(.8),
+        CHOICE("Gerald drives a slow, perfect circle on the floor.", [
+          O("One motor's wired backwards.", [SET('gerald_diag'),
+            S('ines', "Backwards? Oh no. Red to black. Gerald, I'm so sorry.", { emote: 'joy', amount: .8 })],
+            { say: "I think one of his motors is wired backwards." }),
+          O("What does he do when you lift him?", [SET('gerald_diag'),
+            S('ines', "Both wheels spin. The same way. No, wait. The left one spins the other way.", { emote: 'joy', amount: .6 }),
+            S('ines', "So one motor's backwards. I wired it backwards. Gerald, it was me."),
+          ], { say: "Pick him up. What do the wheels do when they're off the floor?" }),
           O("Have you tried a fresh battery?", [
-            S('ines', "Fresh this morning. Maybe he's just a lefty.", { emote: 'sorrow', amount: .3 })]),
+            S('ines', "Fresh this morning. Look, a full battery, and he's turning faster.", { emote: 'sorrow', amount: .3 }),
+            CHOICE("Faster circles. Exactly the same circle.", [
+              O("Then one motor's wired backwards.", [SET('gerald_diag'),
+                S('ines', "Oh no. Red to black. That's the most Gerald thing he's ever done.", { emote: 'joy', amount: .6 })],
+                { say: "Then it's not power. One motor's wired backwards." }),
+              O("Pick him up. Watch the wheels.", [SET('gerald_diag'),
+                S('ines', "The left one spins backward. Oh. I did that. I wired that.", { emote: 'joy', amount: .5 })],
+                { say: "Pick him up and watch the wheels spin." }),
+            ]),
+          ], { say: "Have you tried a fresh battery?" }),
         ]),
+        CLIP('ines', 'Fixing_Kneeling', { loop: true }),
+      ] }),
+    TASK('fix', 'leads', { who: 'ines', at: lab(15.55, 5.15), mode: 'stick', requires: 'robot', label: "Swap Gerald's motor leads", where: 'Gerald', prompt: 'Swap the leads', reward: { safety: 1, vibe: 1 },
+      before: [S('ines', "Screw terminals. Loosen, swap red and black, tighten. Go slow.")],
+      after: [
+        SET('fixed_gerald'),
+        PROP('gerald', GERALD, 'straight'),
+        SHOT('insert', ['ines'], { part: 'point', at: lab(16.15, 4.6), height: .15 }), WAIT(1.4),
+        S('ines', "He's going straight. Gerald, you're going straight! Saturday, Gerald!", { emote: 'joy', amount: 1, shot: 'mcu' }),
         IF({ flag: 'hal_stays' }, [
-          S('hal', "Your wheels are off by a few thou, too. Come here, I'll show you.", { emote: 'joy', amount: .4 }),
+          S('hal', "He drifts a hair at the end. Your wheels are off by a few thou. Come here, I'll show you."),
           S('ines', "Gerald, say thank you to the nice machinist.", { emote: 'fun', amount: .6 }),
           SET('hal_mentor'),
         ]),
       ] }),
-    TASK('carry', 'clamps', { at: at('lab_shop'), to: at('lab_clamps'), n: 3, label: 'Clamps back on the woodshop pegboard', prompt: 'Grab clamps', reward: { safety: 1 },
+    TASK('carry', 'clamps', { at: at('lab_shop'), to: at('lab_clamps'), n: 2, label: 'Hang the clamps on the pegboard', where: 'Woodshop bench', where2: 'Clamp rack', prompt: 'Grab clamps', reward: { safety: 1 },
       after: [BARK('m2', { ruth: "Everything has a home. Even clamps. Especially clamps.", dex: "Everything has a home. The clamps just never believe it." })] }),
   ], sides: [
-    SIDE('regular', 'regular', lab(19.0, 4.6, 90), 'Talk', address_gag),
-    SIDE('haunter', 'haunter', lab(13.4, 3.6, 40), 'Foam swords?', props_side),
+    SIDE('regular', 'regular', lab(10.8, 3.2, 90), 'Talk', address_gag),
+    SIDE('haunter', 'haunter', lab(13.0, 3.2, 40), 'Foam swords?', props_side),
   ], banter: [
-    BT('hal', "In my shop we swept every night. Every single night.", { delay: 10 }),
-    BT('ines', "Gerald, we've talked about the table edge.", { delay: 24 }),
+    BT('ines', "Gerald, we're not mad. We're disappointed in your left motor.", { delay: 10 }),
+    BT('ines', "Gerald, we've talked about the table edge.", { delay: 40 }),
     BT('regular', "Is it four already? Where does four come from?", { delay: 36 }),
   ] }),
+  PROP('gerald', null, 'hide'),
   HIDE('regular', 'haunter'),
   P('me', lab(11.8, 5.6, 40)), P('sam', lab(11.0, 6.6, 140), 'me'),
   CLIP('sam', 'Sitting_Idle_Loop', { loop: true }),
@@ -831,13 +924,16 @@ const quiet = [
   ]),
   SHOT('react', ['sam', 'me']), WAIT(.6),
   MUSIC('tension'),
-  S('m2', "{me}! Back lot! Someone's in the scrap cage, and there's a van.", { shot: 'mcu', to: 'me', emote: 'angry', amount: .7 }),
+  S('m2', "{me}! The back lot! The welding table's out there, and somebody's backing a van up to it.", { shot: 'mcu', to: 'me', emote: 'angry', amount: .7 }),
+  S('me', "Why is the welding table outside?"),
+  S('m2', { ruth: "Someone rolled it out to weld in the fresh air. Then they went for tacos. Go!",
+    dex: "Somebody was welding brackets in the fresh air, then left for tacos, I think. Go!" }, { emote: 'angry', amount: .5 }),
   OBJ('Out the back, through the fab bay'),
 ];
 
 // ---------------------------------------------------------------- 5:45 pm, the back lot
 const copper = [
-  ROAM('lab_lot', 6, null, { hour: 17.7, banter: [
+  ROAM('lab_lot', 6, 'Out the back to the lot', { hour: 17.7, banter: [
     BT('m2', "Through the fab bay! Go through the fab bay!", { delay: 1 }),
     BT('me', "Why is there always a van?", { delay: 6 }),
   ] }),
@@ -846,9 +942,9 @@ const copper = [
   CLIP('cal', 'PickUp_Table'),
   SHOT('establish', ['cal', 'me'], { dist: 12, height: 3 }), WAIT(1.4),
   SHOT('low', ['cal']),
-  S('cal', "Afternoon, partner. It's all scrap. It says scrap right on it.", { clip: 'Idle_Loop', emote: 'fun', amount: .5 }),
-  S('me', "That's our scrap cage. It feeds Tech Tear Apart. A kid was taking a printer apart an hour ago."),
-  S('cal', "And it'll come apart at the yard, too. Two bucks a pound.", { shot: 'mcu' }),
+  S('cal', "Afternoon, partner. Nobody was standing at it. In my line of work, that makes it abandoned.", { clip: 'Idle_Loop', emote: 'fun', amount: .5 }),
+  S('me', "That's the lab's welding table. There's a bracket clamped in the vise. It's still warm."),
+  S('cal', "Three hundred pounds of steel. Two bucks a pound at the yard. I'm only doing the math out loud.", { shot: 'mcu' }),
   IF({ stat: 'trust', gte: 16 }, [
     S('m1', { vee: "Hey. Five bucks says you could use a hand.", dex: "Hey. Figured you'd want a hand." }, { to: 'me' }),
     P('m1', at('lot_fight', 3, 8, 200)), P('m2', at('lot_fight', -3, 8, 160)),
@@ -861,7 +957,7 @@ const copper = [
   ]),
   IF({ flag: 'hal_stays' }, [
     P('hal', at('lot_fight', 1.5, 9, 180)),
-    S('hal', "Forty years in a shop. I know a scrapper when I see one.", { shot: 'mcu' }),
+    S('hal', "Forty years in a shop. I know a man pricing a table by the pound.", { shot: 'mcu' }),
   ]),
   DRAW('cal', 'MAUL'),
   SHOT('hero', ['me']), DRAW('me', 'SPEAR'), WAIT(.4),
@@ -871,16 +967,17 @@ const copper = [
   MUSIC('explore'),
   DRAW('me', -1),
   SHOT('two', ['me', 'cal']),
-  S('cal', "All right, it goes back. All of it. I didn't know it was for kids.", { emote: 'sorrow', amount: .4 }),
-  S('me', "Arduino Night's tonight at seven. Come in the front door this time."),
+  S('cal', "All right, it goes back. We'll roll it to your door. I didn't know anybody was using it.", { emote: 'sorrow', amount: .4 }),
+  S('me', "Somebody always is. Leave the toolbox, too. And Arduino Night's at seven, if you want to come in the front."),
   HIDE('cal', 'crew', 'm1', 'm2', 'hal'),
   ADD('safety', 1),
 ];
 
 // ---------------------------------------------------------------- 6:30 pm, Root
 const root_scene = [
-  ROAM('lab_back_door', 3, 'Go in', { hour: 18.3, tasks: [
-    TASK('carry', 'cage', { at: at('lot_fight', 0, -4), to: at('lab_back_door', 1.5, 1), n: 2, optional: true, label: 'Put the scrap back in the cage', prompt: 'Pick up', reward: { safety: 1 } }),
+  ROAM('lab_back_door', 3, 'In through the back door', { hour: 18.3, tasks: [
+    TASK('carry', 'weld_box', { at: at('lot_fight', 0, -6), to: at('lab_back_table'), n: 1, optional: true, label: 'Bring the welding toolbox back', where: "Cal's van", where2: 'Welding table', prompt: 'Pick up', reward: { safety: 1 },
+      after: [SET('weld_box_back'), BARK('me', "Welding toolbox, home. Clamps still in it.")] }),
   ] }),
   P('me', at('lab_back_door', 2, 2, -135)), P('root', at('lab_back_door', -1, 1.5, 90), 'me'),
   CLIP('root', 'Interact', { loop: true }),
@@ -890,6 +987,7 @@ const root_scene = [
   CLIP('root', 'Idle_No_Loop', { loop: true }),
   SHOT('two', ['root', 'me']),
   S('root', "Your door's broken. I've been badging for ten minutes.", { emote: 'angry', amount: .4 }),
+  IF({ flag: 'weld_box_back' }, [S('root', "That's the welding box. I labeled it at the old building. The tape's still mine.", { emote: 'joy', amount: .3 })]),
   S('root', "People call me Root. I've had this card since the old building."),
   S('me', "The old place? One forty?"),
   S('root', "I carried half these benches over from one forty. One building over, and it took all summer.", { shot: 'low', emote: 'angry', amount: .7 }),
@@ -948,16 +1046,18 @@ const root_scene = [
 const arduino_night = [
   CHAPTER(19, 'Arduino Night', 'First Wednesday, seven to ten, no experience needed'),
   MUSIC('hosting'),
+  OBJ('Host Arduino Night'),
   P('me', lab(15.5, 5.2, -90)), P('sam', lab(12.2, 6.4, 90)), P('m1', lab(17.5, 4.2, -80)), P('m2', lab(13.2, 3.9, 60)),
-  P('kai', lab(14.2, 7.0, 170)), P('hal', lab(20.6, 7.2, 180)), P('ines', lab(21.4, 7.0, -160)),
+  P('kai', lab(14.2, 7.0, 170)), P('hal', lab(20.9, 5.6, -150)), P('ines', lab(19.8, 5.0, 60)),
+  PROP('gerald', lab(20.3, 4.6, 90), 'straight'),   /* Gerald, rewired, running laps of the hall */
   IF({ flag: 'invited_morgan' }, [P('morgan', lab(10.0, 4.0, 80))]),
   IF({ flag: 'root_returns' }, [P('root', lab(16.6, 6.6, -120))]),
   SHOT('crane', ['me'], { dist: 6, dur: 4, from: 1.4, to: 3.2 }),
   WAIT(2),
-  ROAM('lab_welcome', 2.2, 'The clean jacket at the door', { indoors: true, hour: 19.1, until: 20.4, need: 2, tasks: [
+  ROAM('lab_welcome', 2.2, 'The clean jacket at the door', { indoors: true, hour: 19.1, until: 20.4, need: 3, tasks: [
     TASK('signin', 'crowd', { at: at('lab_signin'), label: 'Sign in the crowd', prompt: 'Sign in', reward: { trust: 1, dues: 1 },
       after: [BARK('m1', { vee: "Thirty one tonight. New record. I had twenty eight.", dex: "Thirty one people. I guessed twenty. I always guess low." })] }),
-    TASK('carry', 'soda2', { at: at('lab_kitchen'), to: at('lab_soda'), n: 3, label: 'Restock the soda', prompt: 'Grab a flat', reward: { vibe: 1 },
+    TASK('carry', 'soda2', { at: at('lab_kitchen'), to: at('lab_soda'), n: 2, label: 'Restock the soda', where: 'Kitchen', where2: 'Soda fridge', prompt: 'Grab a flat', reward: { vibe: 1 },
       after: [BARK('napper', "Again? You're a saint.")] }),
     TASK('answer', 'lipo', { who: 'kai', at: lab(14.2, 7.0), label: 'Kai has a question', prompt: 'Listen', reward: { aff_kai: 1 },
       before: [
@@ -995,42 +1095,55 @@ const arduino_night = [
     S('morgan', "I asked four people who's in charge. Four different answers. One pointed at the fridge.", { to: 'me', emote: 'fun', amount: .5 }),
   ]),
   IF({ flag: 'lipo_demo' }, [NOTE('Out back, in the sand bucket, a LiPo puffs up like a marshmallow. Kai will never short one again.')]),
+  // Brant Holloway wants the lab: rent paid, if it becomes his company's private floor. Members only, open hours
+  // gone, and what members make belongs to HiveDesk. Refused, he goes after the people instead, starting with Sam
+  PROP('gerald', null, 'hide'),
   P('brant', lab(7.2, 3.3, 80)), P('intern', lab(6.6, 2.6, 80)),
-  S('sam', "Um, {me}? A guy in a really clean jacket wants the decision maker. I said I'm new.", { to: 'me', emote: 'sorrow', amount: .3 }),
+  S('sam', "Um, {me}? The blazer guy from this afternoon is here. He asked for the decision maker. I said I'm new.", { to: 'me', emote: 'sorrow', amount: .3 }),
   SHOT('low', ['brant']),
   MUSIC('tension'),
-  CARD('BRANT HOLLOWAY', 'Growth', 2),
+  CARD('BRANT HOLLOWAY', 'Founder, HiveDesk coworking', 2),
   W('me', lab(9.2, 4.2, -100), { speed: 1.4 }),
   SHOT('two', ['brant', 'me']),
-  S('brant', "What a space. What a vibe. Brant Holloway, HiveDesk. You're the decision maker?", { clip: 'Idle_Talking_Loop', emote: 'joy', amount: 1 }),
-  S('me', "I'm hosting. Nobody here decides anything alone."),
-  S('brant', "Love that. So. Picture this, with a kombucha tap.", { shot: 'mcu' }),
-  S('brant', "We keep the solder smell. As a texture. Hot desks, eighty nine a week."),
+  S('brant', "What a space. What a vibe. Brant Holloway, HiveDesk. Are you the decision maker?", { clip: 'Idle_Talking_Loop', emote: 'joy', amount: 1 }),
+  S('me', "I'm hosting tonight. Nobody here decides anything alone."),
+  S('brant', "Love that. So here's the offer. HiveDesk pays your rent. Forever. New lasers, new everything.", { shot: 'mcu' }),
+  S('me', "And in return?"),
   CLIP('brant', 'Interact'),
   SHOT('insert', ['brant'], { part: 'rhand' }),
-  S('brant', "Term sheet. Sign wherever."),
+  S('brant', "Tiny things. It becomes HiveDesk Labs. Members only, eighty nine a week. No more walk ins."),
+  S('brant', "And anything made on the floor belongs to HiveDesk. Standard. Term sheet. Sign wherever."),
+  SHOT('react', ['m1', 'me']),
+  S('m1', { vee: "So the kid soldering behind you pays eighty nine a week, and her robot belongs to him.",
+    dex: "So everything Ines builds tonight would be his. That's the actual deal?" }, { emote: 'angry', amount: .5 }),
+  S('m2', { ruth: "And no walk ins. Half the people in this room walked in off Main Street. I did.",
+    dex: "No walk ins means nobody wanders in off Main. That's how most of us got here. Me included." }, { emote: 'angry', amount: .4 }),
+  S('sam', "I walked in this morning. I almost didn't.", { emote: 'sorrow', amount: .4 }),
   SHOT('react', ['me', 'brant']),
-  CHOICE("Thirty people are soldering behind you. It's Wednesday night.", [
-    O("Sit down. There's a kit. Then pitch away.", [ADD('vibe', 1), ADD('trust', 1),
-      S('brant', "Ha! No. See, this is what I mean about your people.", { emote: 'fun', amount: .4 }),
-    ], { say: "Grab a stool. There's a kit for you. Then pitch whoever you want." }),
-    O("Over fifty bucks needs the Board.", [ADD('trust', 1), ADD('dues', 1),
-      S('brant', "Fifty. Dollars. That's the most beautiful thing I've ever heard.", { emote: 'fun', amount: .7 }),
-    ], { say: "Anything over fifty dollars needs a Board vote. I can't sign that." }),
-    O("Get out.", [ADD('vibe', -1),
-      S('brant', "Okay! Love the passion.", { emote: 'joy', amount: 1 }),
-    ]),
+  CHOICE("Thirty people are soldering behind you. He wants to own what they make.", [
+    O("It's not mine to sign. It's theirs.", [ADD('trust', 1), ADD('vibe', 1),
+      S('me', "The people doing the work run this place. Pitch them. They're right there, holding irons."),
+      S('brant', "Ha. I don't pitch irons. I pitch decision makers.", { emote: 'fun', amount: .4 }),
+    ], { say: "It's not mine to sign. The people doing the work run this place. Pitch them." }),
+    O("Over fifty bucks needs a Board vote.", [ADD('trust', 1), ADD('dues', 1),
+      S('brant', "Fifty. Dollars. That's the most beautiful thing I've ever heard. I'm offering millions.", { emote: 'fun', amount: .7 }),
+      S('me', "Then it's a very long vote. Second Thursday. Anyone can come and say no."),
+    ], { say: "Anything over fifty dollars needs a Board vote. This would need every member. I can't sign that." }),
+    O("No. The door stays open.", [ADD('vibe', -1), ADD('trust', 1),
+      S('brant', "Okay! Love the passion. Hate the answer.", { emote: 'joy', amount: 1 }),
+    ], { say: "No. The door stays open, and what people make stays theirs." }),
   ]),
   IF({ flag: 'invited_morgan' }, [
     S('morgan', "Brant, downtown paper. Is that a term sheet? Can I have a copy?", { shot: 'mcu', emote: 'fun', amount: .6 }),
     S('brant', "Off the record?"),
     S('morgan', "No.", { emote: 'joy', amount: .5 }),
   ]),
-  S('brant', "I read your code of conduct. Collaboration before conflict. I collaborated.", { shot: 'low' }),
+  SHOT('low', ['brant']),
+  S('brant', "Fine. If the lab won't sign, I'll sign the makers. One at a time. Starting with her.", { emote: 'angry', amount: .5 }),
+  S('brant', "I read your code of conduct, too. Weapons, handled by trained people. I took a two day course.", { shot: 'push', emote: 'joy', amount: 1 }),
   DRAW('brant', 'ARC'),
-  S('brant', "Trained individuals. I took a two day course.", { shot: 'push', emote: 'joy', amount: 1 }),
-  S('intern', "Per Brant, we're also taking the cardboard girl. For culture."),
-  S('sam', "Me? I'm not even a member!", { emote: 'sorrow', amount: .7 }),
+  S('intern', "Per Brant, the cardboard girl is now HiveDesk's first maker in residence. Here's your lanyard."),
+  S('sam', "Me? I'm not even a member! I don't want a lanyard!", { emote: 'sorrow', amount: .7 }),
   FX('flash', .4), STAGE('bench'),
   P('me', stage(0, 6, 180)), P('brant', stage(0, -7, 0), 'me'), P('sam', stage(0, 8.5, 180)),
   GIVE('STAFF', 'Beam Staff'),
@@ -1046,18 +1159,22 @@ const arduino_night = [
   SHOT('orbit', ['brant'], { dist: 5 }),
   WAIT(1.2),
   SHOT('hero', ['me']), DRAW('me', 'ARC'), WAIT(.4),
-  S('me', "Sam, stay behind me."),
+  S('me', "Sam, stay behind me. Nobody's signing you."),
   SHOT('whip', ['brant']),
   MUSIC('boss'),
   FIGHT('brant'),
   MUSIC('cine'),
   SHOT('two', ['me', 'brant']),
   S('brant', "Great. Great session. Lots of learnings. I'll circle back.", { emote: 'sorrow', amount: .5 }),
-  S('me', "Bring it to Hack Your Hackerspace. Second Thursday or fourth Saturday. Anyone can pitch."),
+  CLIP('me', 'Interact'), SHOT('insert', ['me'], { part: 'rhand' }),
+  NOTE('The term sheet goes in the paper recycling. Somebody labeled the bin.'),
+  S('me', "Hack Your Hackerspace is the second Thursday. Anyone can pitch. Everybody gets to say no."),
   S('brant', "Is there a deck?", { emote: 'sorrow', amount: .3 }),
   S('me', "There's a whiteboard. And afterward, everybody cleans."),
   IF({ flag: 'bex_proposal' }, [S('me', "Bex is presenting first. It's about the fridge. You'll hate it.", { emote: 'fun', amount: .6 })]),
   SHOT('react', ['sam', 'me']),
+  S('sam', "So the door stays open? Anybody can still just walk in?", { emote: 'joy', amount: .4 }),
+  S('me', "Tuesday, Wednesday and Saturday. Anybody. Even guys in blazers."),
   S('sam', "I hid behind you. That's a first. Probably for both of us.", { emote: 'joy', amount: .5 }),
   DRAW('me', -1), DRAW('brant', -1),
   FX('flash', .25), STAGE('town'),
@@ -1077,7 +1194,7 @@ const walk_sam = [
   OBJ('Walk Sam to the train at Center and Main'),
   P('sam', at('lab_door', -1, 2, 90)),
   ROAM('center_main_station', 7, null, { hour: 22, follow: 'sam', banter: [
-    BT('sam', "It's so quiet. Where does everybody on Main Street go at night?", { delay: 4 }),
+    BT('sam', "Main's so quiet at night. Like it's holding its breath.", { delay: 2 }),
     BT('sam', "Do you do this every Wednesday? The whole day?", { delay: 16 }),
     BT('me', "Once a month. Today it felt like a year.", { delay: 21 }),
     BT('sam', "I'm going to dream about cardboard. Good dreams.", { delay: 34 }),
@@ -1170,7 +1287,7 @@ const lock_up = [
       after: [IF({ flag: 'pvc_cut' }, [BARK('me', "Sorry, optics.")], [BARK('me', "Night, laser.")])] }),
     TASK('fix', 'iron', { at: at('lab_elec'), mode: 'stick', label: 'An iron left on at the bench', prompt: 'Turn it off', reward: { safety: 1 },
       after: [BARK('me', "The iron's still on. Back in the holder. That's almost a second mark.")] }),
-    TASK('carry', 'mugs', { at: at('lab_cowork'), to: at('lab_kitchen'), n: 3, label: 'Mugs to the kitchen', prompt: 'Grab mugs', reward: { vibe: 1 } }),
+    TASK('carry', 'mugs', { at: at('lab_cowork'), to: at('lab_kitchen'), n: 1, label: 'Mugs to the kitchen', where: 'Coworking tables', where2: 'Kitchen sink', prompt: 'Grab mugs', reward: { vibe: 1 } }),
     TASK('errand', 'fridge_check', { at: at('lab_kitchen', .8, 0), label: 'Check the fridge', prompt: 'Open it', optional: true, reward: { safety: 1 },
       after: [IF({ flag: 'red_tag' }, [BARK('me', "Red tags on every jar. All dated.")],
         [BARK('me', "The jar's closer to the door than it was.")])] }),
@@ -1276,10 +1393,12 @@ export const STAT_LINES = [
   { flag: 'fixed_joint', not: 'sam_joins', text: 'Sam fixed the joint and took it home. The door still says open.' },
   { flag: 'root_returns', text: "Root paid what he owed. He runs a class on why everything's the way it is." },
   { flag: 'hal_teaches', text: 'Hal tested out on the lathe, then started teaching the class.' },
-  { flag: 'hal_mentor', not: 'hal_teaches', text: 'Hal comes in Thursdays now. Gerald drives straight.' },
+  { flag: 'hal_mentor', not: 'hal_teaches', text: 'Hal comes in Thursdays now. He trued up Gerald\'s wheels.' },
   { flag: 'helped_bex', text: "The kitchen is a rotation now. Bex isn't on it this month." },
   { flag: 'asked_kai', text: 'Kai had a couch by Friday and still comes Wednesdays. It is a drone. It is also a wearable.' },
   { flag: 'passed_inspection', text: 'The city passed the building. The binder has a home.' },
+  { flag: 'inspect_conditional', text: 'The inspector came back in thirty days. Everything she wrote down had been fixed.' },
+  { flag: 'fixed_gerald', text: 'Gerald placed fourth at regionals. He only turned left once, on purpose.' },
   { flag: 'pvc_cut', text: 'The laser needed new optics. Everyone knows why. Everyone.' },
   { flag: 'milo_glasses', text: 'Milo wears the safety glasses to school. Nobody can stop him.' },
   { flag: 'wes_invited', text: 'Wes brought his whole science club to the next Arduino Night.' },

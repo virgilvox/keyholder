@@ -14,7 +14,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const font = fs.readFileSync(path.join(root, 'assets/fonts/Archivo.ttf')).toString('base64');
 // a literal "</script" inside the bundle would end the inline script tag early
 const host = fs.readFileSync(bundle, 'utf8').replace(/<\/script/gi, '<\\/script');
-const cartB64 = fs.readFileSync(cart).toString('base64');
+const cartB64 = cart === '-' ? '' : fs.readFileSync(cart).toString('base64');   // '-': a loader page that fetches keyholder.wasc beside it
 
 let html = fs.readFileSync(src, 'utf8');
 // function replacers, so "$&" style sequences in the payloads are never interpreted

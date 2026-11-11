@@ -17,4 +17,21 @@ void interior_exit(void);
 int interior_current(void);                       /* -1 outdoors (or in the lab) */
 bool interior_contains(v3 p);                     /* inside the current room: the camera keeps under its ceiling */
 float interior_ceiling(void);                     /* the current room's ceiling height above its floor */
+
+/* added by the town (world.c uses these; nothing else needs them) */
+const char *interior_id(int i);                   /* the place id of its facade: "proof", "chupacabra", "level1" */
+int interior_find(const char *id);                /* by that id, or -1 */
+/* the named spots inside, for world_place: "proof_counter", "level1_bar", ... Answered whether or not the
+ * room has been built. pos.y is the floor (or the stage, or a seat's top where the name says seat) */
+bool interior_place(const char *name, v3 *pos, float *yaw);
+int interior_spot_count(int i);
+const char *interior_spot_name(int i, int k);
+/* the current room's walls and furniture, for world_move, world_floor_y and world_raycast. Each answers
+ * only for a point (a ray's origin) inside the current room, and then the city is not asked */
+bool interior_push(v3 *p, float r, float h, v3 *normal, bool *hit);
+bool interior_floor(v3 p, float up, float *y);
+bool interior_raycast(v3 o, v3 d, float max_dist, float *t, v3 *normal);
+void interior_set_time(float night);              /* the daylight in the windows */
+int interior_tris(void);                          /* the current room's triangles (the debug counts) */
+void interior_attach(t3_object *parent);          /* hang the rooms under the town group (world_init) */
 #endif

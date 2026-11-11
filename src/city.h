@@ -14,5 +14,17 @@ bool city_raycast(v3 o, v3 d, float max_dist, float *t, v3 *n);
 bool city_place(const char *name, v3 *pos, float *yaw);
 int city_stats(int *tris);
 bool city_train_bell(v3 *at);
-void city_traffic(bool on);                        /* see world_train_bell */                           /* meshes drawing now, their triangles */
+void city_traffic(bool on);                        /* see world_train_bell */
+void city_crew_truck(bool on);                     /* see world_crew_truck */
+/* for interior.c: a lot's facade (the centre of its front on the wall line, the yaw it faces, its width),
+ * the sign atlas (a key's rectangle, the shared sign material) and the brick texture */
+bool city_lot_front(const char *place, v3 *front, float *yaw, float *width);
+bool city_sign_uv(const char *key, float uv[4]);
+t3_material *city_sign_material(void);
+t3_texture *city_brick_texture(void);
+/* ground the city counts as open: not a street, not inside a footprint (the props and the back kit use it) */
+bool city_open_ground(float x, float z);
+/* the named places of the hand-placed set pieces (for the world test) */
+int city_set_place_count(void);
+const char *city_set_place_name(int i);
 #endif

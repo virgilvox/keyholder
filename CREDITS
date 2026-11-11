@@ -15,7 +15,12 @@ Fonts: Archivo, IBM Plex Mono and JetBrains Mono, SIL Open Font License (assets/
 Story, code, music and sound: original, under the MIT licence (LICENSE).
 Downtown Mesa: map data (c) OpenStreetMap contributors, Open Database License (openstreetmap.org/copyright);
 source/osm/mesa-overpass.json is a trimmed extract, and the street layout, footprints and placements in
-src/gen/city_data.h are derived from it. Street furniture and facade corrections are by eye from street level.
+src/gen/city_data.h are derived from it. Street furniture and facade corrections are by eye from street level; the town's own set pieces (the lab's
+back, Chupacabra's front and patio, the Arts Center's Shadow Walk) are drawn from photos listed in docs/PLACES.md.
+Cars: Kenney Car Kit (CC0, kenney.nl/assets/car-kit; source/kenney-car-kit), recoloured and given lighter
+wheels by tools/prep-cars.mjs.
+Moheeb and Luis on the Chupacabra patio: their Coffee & Kill character scans, used with their permission, prepared by
+tools/prep-cameo.mjs. Their voices are Kyutai TTS clones of their own recordings, as in SMALL PARTS.
 Storefront geometry: src/facades_mesa.inc is ported from BikeMesa by Luis Montes (MIT, notice in that file),
 github.com/monteslu/cartwheel-examples, games/bikemesa. Real businesses appear only as neutral scenery; names
 and logos belong to their owners, and none of them endorses this game.

@@ -321,9 +321,9 @@ static void draw_twist(float t) {
       hot = k < .4f;
       uint32_t c = T->obj_flash > 0 ? 0xffffff : hot && fmodf(t * 4, 1) < .5f ? C_ALERT : 0x60e090;
       obj_bar(bx, by, w, 14, k, c, 0x22242e);
-      snprintf(num, sizeof num, T->kind == FT_DEFEND ? "CAGE %d" : "SAM %d", (int)ceilf(T->obj_hp));
+      snprintf(num, sizeof num, "%s %d", T->kind == FT_DEFEND ? fight_obj_name() : "SAM", (int)ceilf(T->obj_hp));
       v3 p = T->kind == FT_PROTECT && FG.def.protect_actor ? actor_pos(FG.def.protect_actor) : T->obj;
-      world_tag(0, v3_add(p, v3_(0, T->kind == FT_DEFEND ? 2.3f : 2.f, 0)), T->kind == FT_DEFEND ? "CAGE" : "SAM", hot ? C_ALERT : 0x60e090, t);
+      world_tag(0, v3_add(p, v3_(0, T->kind == FT_DEFEND ? 2.3f : 2.f, 0)), T->kind == FT_DEFEND ? fight_obj_name() : "SAM", hot ? C_ALERT : 0x60e090, t);
       break; }
     default: break;
   }

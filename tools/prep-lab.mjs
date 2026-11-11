@@ -12,7 +12,7 @@
 // (0, DOOR_Z) on the street line, in front of the recessed double doors at plan x 5.45.
 //
 // The Elegoo Centauri Carbon 2 printers in the model are converted from a GPL-3.0 CAD release,
-// so they are dropped and plain printer boxes of the same size stand in their place.
+// so they are dropped; an original low poly printer of the same size stands in each one's place.
 //
 //   node tools/prep-lab.mjs [HSL-108-full.glb]
 import { writeFileSync, mkdirSync } from 'node:fs';
@@ -151,13 +151,85 @@ const CURTAINS = [
   }));
 }
 
-// printers: a dark cabinet with a lighter door, no CAD
-for (const b of printers.values()) {
-  const w = worldBox(b), c = ch(band((b[0] + b[3]) / 2), 'opaque');
-  for (const k of [c, ch(`${c.name}_far`, 'opaque')]) {
-    k.box(...w, srgb(0x2e3034));
-    k.box(w[0] + 0.03, w[1] + (w[4] - w[1]) * 0.25, w[2] + 0.04, w[3] - 0.03, w[4] - 0.05, w[2] - 0.005, srgb(0x96a0aa));
-  }
+// printers. The model's Elegoo Centauri Carbon 2 meshes come from a GPL-3.0 CAD release and stay out; in
+// each one's exact box stands an original low poly printer drawn here from photos of the real one: an
+// enclosed CoreXY cube on four feet, black frame and side panels, a tinted glass door with a handle and a
+// tinted glass lid, the touchscreen glowing faintly in the bezel under the door, the bed and the toolhead on
+// its gantry seen through the glass, the multicolour feeder on top and a spool on the side. Some 400
+// triangles each. One of them, Brenda (#2, top shelf, toward the back), is part way through a print.
+// The far twin keeps the plain cabinet. Plan metres: x from the street, y up, z from the west wall; the
+// printers stand against the west wall, so their fronts face plan +z.
+{
+  const pbox = (c, px0, y0, pz0, px1, y1, pz1, rgb) => c.box(pz0 - DOOR_Z, y0, -px1, pz1 - DOOR_Z, y1, -px0, rgb);
+  // an n sided drum along plan x (a spool): side quads and two fan caps, wound outward
+  const drum = (c, xa, xb, cy, cz, r, rgb, n = 8) => {
+    const pos = [], idx = [];
+    for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2; pos.push(xa, cy + r * Math.cos(a), cz + r * Math.sin(a), xb, cy + r * Math.cos(a), cz + r * Math.sin(a)); }
+    for (let i = 0; i < n; i++) { const j = (i + 1) % n, A = i * 2, B = j * 2; idx.push(A, B, B + 1, A, B + 1, A + 1); }
+    for (let i = 1; i + 1 < n; i++) { idx.push(1, i * 2 + 1, (i + 1) * 2 + 1); idx.push(0, (i + 1) * 2, i * 2); }
+    c.add(Float32Array.from(pos), idx, rgb, toWorld);
+  };
+  const BLACK = srgb(0x1a1b1e), FRAME = srgb(0x2b2d31), PANEL = srgb(0x232428), STEEL = srgb(0x9aa0a6), SILVER = srgb(0xc4c8cc);
+  const TINT = srgb(0x3a3630), PLATE = srgb(0x6a5f4c), TOOL = srgb(0x303236), TOOLF = srgb(0xd8d8d4), CANVAS = srgb(0xb8bbbe), SCREEN = srgb(0x3d6f96);
+  const FIL = [srgb(0xe8e8e2), srgb(0xd8691e), srgb(0x2a63b8), srgb(0x2c2c2c)];
+  const tint = ch('lab_glass_tint', 'glass'), glow = ch('lab_glow_f', 'glow');
+  [...printers.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).forEach(([name, b], n) => {
+    const c = ch(band((b[0] + b[3]) / 2), 'opaque');
+    const brenda = /#2$/.test(name);
+    const [x0, y0, z0, x1, y1, z1] = b, H = y1 - y0;
+    const bx0 = x0, bx1 = x1 - 0.06, bz0 = z0 + 0.02, bz1 = z1 - 0.01, yb = y0 + 0.025, yt = y0 + H * 0.8, F = 0.022;
+    // feet, the base with its bezel, the screen, a light logo bar
+    for (const fx of [bx0 + 0.03, bx1 - 0.07]) for (const fz of [bz0 + 0.03, bz1 - 0.07]) pbox(c, fx, y0, fz, fx + 0.04, yb, fz + 0.04, BLACK);
+    pbox(c, bx0, yb, bz0, bx1, yb + 0.07, bz1, BLACK);
+    pbox(glow, bx1 - 0.16, yb + 0.012, bz1 + 0.001, bx1 - 0.035, yb + 0.06, bz1 + 0.004, SCREEN);
+    pbox(c, bx0 + 0.04, yb + 0.03, bz1, bx0 + 0.13, yb + 0.04, bz1 + 0.003, STEEL);
+    // the frame: four posts, the top rim; side and back panels
+    for (const [px, pz] of [[bx0, bz0], [bx1 - F, bz0], [bx0, bz1 - F], [bx1 - F, bz1 - F]]) pbox(c, px, yb + 0.07, pz, px + F, yt, pz + F, FRAME);
+    pbox(c, bx0, yt - 0.02, bz0, bx1, yt, bz0 + F, FRAME); pbox(c, bx0, yt - 0.02, bz1 - F, bx1, yt, bz1, FRAME);
+    pbox(c, bx0, yt - 0.02, bz0, bx0 + F, yt, bz1, FRAME); pbox(c, bx1 - F, yt - 0.02, bz0, bx1, yt, bz1, FRAME);
+    pbox(c, bx0, yb + 0.07, bz0 + F, bx0 + 0.008, yt - 0.02, bz1 - F, PANEL);
+    pbox(c, bx1 - 0.008, yb + 0.07, bz0 + F, bx1, yt - 0.02, bz1 - F, PANEL);
+    pbox(c, bx0 + F, yb + 0.07, bz0, bx1 - F, yt - 0.02, bz0 + 0.008, PANEL);
+    // the tinted glass: lid and door, the door's thin frame and its handle
+    pbox(tint, bx0 + F, yt - 0.008, bz0 + F, bx1 - F, yt - 0.002, bz1 - F, TINT);
+    pbox(tint, bx0 + F, yb + 0.075, bz1 - 0.006, bx1 - F, yt - 0.02, bz1 - 0.001, TINT);
+    pbox(c, bx0 + F, yt - 0.035, bz1 - 0.004, bx1 - F, yt - 0.02, bz1 + 0.002, FRAME);
+    pbox(c, bx0 + F, yb + 0.07, bz1 - 0.004, bx1 - F, yb + 0.085, bz1 + 0.002, FRAME);
+    pbox(c, bx1 - 0.055, yb + 0.2, bz1 + 0.002, bx1 - 0.043, yb + 0.36, bz1 + 0.02, SILVER);
+    // inside: the gantry near the top (two rails front to back, the beam across), the toolhead on it
+    const yg = yt - 0.07, zx = (bz0 + bz1) / 2 + (brenda ? 0.02 : -0.03), xt = brenda ? (bx0 + bx1) / 2 + 0.01 : bx0 + 0.11 + n * 0.03;
+    pbox(c, bx0 + F, yg, bz0 + F, bx0 + F + 0.014, yg + 0.02, bz1 - F, STEEL);
+    pbox(c, bx1 - F - 0.014, yg, bz0 + F, bx1 - F, yg + 0.02, bz1 - F, STEEL);
+    pbox(c, bx0 + F, yg - 0.005, zx - 0.012, bx1 - F, yg + 0.02, zx + 0.012, FRAME);
+    pbox(c, xt - 0.035, yg - 0.06, zx - 0.03, xt + 0.035, yg + 0.025, zx + 0.035, TOOL);
+    pbox(c, xt - 0.03, yg - 0.05, zx + 0.035, xt + 0.03, yg + 0.015, zx + 0.04, TOOLF);
+    pbox(c, xt - 0.006, yg - 0.075, zx - 0.006, xt + 0.006, yg - 0.06, zx + 0.006, STEEL);
+    // the bed on its carriage and the Z rods behind it; Brenda's is up under the nozzle with a print on it
+    const printH = 0.075, yp = brenda ? yg - 0.075 - printH - 0.012 : yb + 0.13;
+    pbox(c, bx0 + 0.06, yp, bz0 + 0.06, bx1 - 0.06, yp + 0.012, bz1 - 0.05, PLATE);
+    pbox(c, bx0 + 0.09, yp - 0.025, bz0 + 0.03, bx1 - 0.09, yp, bz0 + 0.07, FRAME);
+    for (const rx of [bx0 + 0.08, bx1 - 0.09]) pbox(c, rx, yb + 0.07, bz0 + 0.03, rx + 0.01, yg, bz0 + 0.04, STEEL);
+    if (brenda) {
+      // a vase part way up: stepped rings of orange, the open top layer under the nozzle
+      const cx = xt, cz = zx + 0.002, ORANGE = srgb(0xe2731f);
+      for (let k = 0; k < 4; k++) {
+        const r = 0.045 - k * 0.006, ya = yp + 0.012 + (k * printH) / 4, yb2 = ya + printH / 4;
+        pbox(c, cx - r, ya, cz - r, cx + r, yb2, cz + r, ORANGE);
+      }
+    }
+    // the feeder on top toward the right, its tube, and the spool on the right side toward the back
+    pbox(c, bx1 - 0.2, yt, bz0 + 0.06, bx1 - 0.03, yt + 0.1, bz0 + 0.3, CANVAS);
+    pbox(c, bx1 - 0.19, yt + 0.1, bz0 + 0.07, bx1 - 0.04, yt + 0.11, bz0 + 0.29, FRAME);
+    pbox(c, bx1 - 0.12, yt + 0.11, bz0 + 0.17, bx1 - 0.11, yt + 0.16, bz0 + 0.18, SILVER);
+    const sr = Math.min(0.1, (y1 - y0) * 0.16), scy = y0 + H * 0.45, scz = bz0 + 0.16;
+    drum(c, bx1 + 0.004, x1 - 0.004, scy, scz, sr, FIL[(n + (brenda ? 1 : 0)) % 4]);
+    drum(c, bx1, x1, scy, scz, 0.028, BLACK, 6);
+    pbox(c, bx1 - 0.005, scy - 0.01, scz - 0.01, bx1 + 0.004, scy + 0.01, scz + 0.01, FRAME);
+    // the far twin: the cabinet and its door, as before
+    const w = worldBox(b), fc = ch(`${c.name}_far`, 'opaque');
+    fc.box(...w, srgb(0x2e3034));
+    fc.box(w[0] + 0.03, w[1] + (w[4] - w[1]) * 0.25, w[2] + 0.04, w[3] - 0.03, w[4] - 0.05, w[2] - 0.005, srgb(0x96a0aa));
+  });
 }
 
 // the shell the model leaves out. Ceiling over the hall, a higher one over the attic end, the
@@ -248,5 +320,5 @@ h += '};\nenum {\n'; names.forEach((a, i) => { h += `  AREA_${id(a)} = ${i},\n`;
 mkdirSync(join(ROOT, 'src/gen'), { recursive: true });
 writeFileSync(join(ROOT, 'src/gen/lab_areas.h'), h);
 let verts = 0; for (const c of list) verts += c.nv;
-console.log(`lab: ${list.length} chunks, ${verts} verts, ${r.tris} tris, ${(r.bytes / 1e6).toFixed(2)} MB; ${printers.size} printers boxed, ${droppedT} tris dropped, ${names.length} areas`);
+console.log(`lab: ${list.length} chunks, ${verts} verts, ${r.tris} tris, ${(r.bytes / 1e6).toFixed(2)} MB; ${printers.size} printers drawn, ${droppedT} tris dropped, ${names.length} areas`);
 for (const c of list) console.log(`  ${c.name.padEnd(18)} ${c.kind.padEnd(7)} ${c.tris}`);

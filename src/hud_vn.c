@@ -11,7 +11,7 @@
 #define INK 0x12121au
 #define PAPER 0xf4eee2u
 #define DIMT 0xa8a49au
-static layer_t L_box, L_name, L_opt[5], L_prompt, L_ch, L_card, L_note, L_obj, L_clock, L_use, L_toast, L_got, L_title, L_menu, L_cards[3], L_retry, L_end, L_mk, L_tasks, L_mgt, L_mgh, L_seq, L_sub, L_trip, L_greet, L_gear[2];
+static layer_t L_box, L_name, L_opt[5], L_prompt, L_ch, L_card, L_note, L_obj, L_clock, L_use, L_toast, L_got, L_title, L_menu, L_cards[3], L_retry, L_end, L_mk, L_tasks, L_mgt, L_mgh, L_seq, L_sub, L_trip, L_greet, L_gear[2], L_nights;
 
 static float ez(float t) { t = ds_clamp(t, 0, 1); return 1 - (1 - t) * (1 - t) * (1 - t); }
 
@@ -180,12 +180,20 @@ static void draw_roam(const story_ui_t *U) {
     if (U->marker_behind) { y = DS_H - 90; x = x < DS_W / 2 ? DS_W - 70 : 70; }
     x = ds_clamp(x, 60, DS_W - 60); y = ds_clamp(y, 110, DS_H - 90);
     float bob = sinf((float)ds_now() * 4) * 4;
-    hg_rect_m(x, y - 18 + bob, 15, 15, .785f, U->marker_task ? ORANGE : PAPER, 1);
-    hg_rect_m(x, y - 18 + bob, 7, 7, .785f, INK, 1);
-    char d[24]; snprintf(d, sizeof d, "%d m", (int)(U->marker_dist + .5f));
-    c = layer_begin(&L_mk, 90, 24, hash_str(d, 3));
-    if (c) { p_text(c, F_MONO, 15, 0, CV_CENTER, d, 45, 17, PAPER, 1); layer_end(&L_mk, c); }
-    hg_tex(&L_mk, x - 45, y - 2 + bob, .95f);
+    /* a corner of the route is a smaller, hollow diamond: the way round, not the place */
+    float sz = U->marker_corner ? 11 : 15;
+    hg_rect_m(x, y - 18 + bob, sz, sz, .785f, U->marker_task ? ORANGE : PAPER, 1);
+    hg_rect_m(x, y - 18 + bob, U->marker_corner ? 7 : 7, U->marker_corner ? 7 : 7, .785f, INK, 1);
+    /* what it points at and how far: "Soda fridge  12 m" */
+    char d[128]; int m = (int)(U->marker_dist + .5f);
+    if (U->marker_label && U->marker_label[0]) snprintf(d, sizeof d, "%s  %d m", U->marker_label, m); else snprintf(d, sizeof d, "%d m", m);
+    c = layer_begin(&L_mk, 420, 28, hash_str(d, 3));
+    if (c) {
+      cv_font(c, F_MONO, 15); float w = cv_measure(c, d) + 18;
+      cv_fill_hex(c, INK, .55f); cv_fill_rect(c, 210 - w / 2, 2, w, 22);
+      p_text(c, F_MONO, 15, 0, CV_CENTER, d, 210, 18, PAPER, 1); layer_end(&L_mk, c);
+    }
+    hg_tex(&L_mk, ds_clamp(x, 220, DS_W - 220) - 210, y - 2 + bob, .95f);   /* the label stays on screen at the edges */
   }
   if (U->prompt_use) {
     const intent_t *in = input_get();
@@ -233,28 +241,34 @@ static void draw_tasks(const story_ui_t *U) {
   if (!U->ntask) return;
   uint32_t key = 77;
   for (int i = 0; i < U->ntask; i++) key = hash_str(U->task[i].label, key * 31 + U->task[i].state * 7 + U->task[i].target * 3 + U->task[i].optional);
-  const float RH = 34; int n = U->ntask;
-  cv *c = layer_begin(&L_tasks, 500, (int)(n * RH + 40), key);
+  /* v1.3: a long label wraps to a second line rather than losing its end */
+  const float RH = 34, LH = 22, LW = 390; int n = U->ntask;
+  char lines[UI_TASKS][3][120]; int nl[UI_TASKS]; float hgt = 0;
+  cv *c = layer_begin(&L_tasks, 560, (int)(n * (RH + LH) + 40), key);
   if (c) {
-    cv_fill_hex(c, INK, .66f); cv_begin(c); cv_move(c, 0, 0); cv_line(c, 470, 0); cv_line(c, 456, n * RH + 34); cv_line(c, 0, n * RH + 34); cv_close(c); cv_fill(c);
+    cv_font(c, F_TYPE, 19);
+    for (int i = 0; i < n; i++) { nl[i] = wrap(c, U->task[i].label ? U->task[i].label : "", LW, lines[i], 2); if (nl[i] < 1) { nl[i] = 1; lines[i][0][0] = 0; } hgt += RH + (nl[i] - 1) * LH; }
+    cv_fill_hex(c, INK, .66f); cv_begin(c); cv_move(c, 0, 0); cv_line(c, 540, 0); cv_line(c, 526, hgt + 34); cv_line(c, 0, hgt + 34); cv_close(c); cv_fill(c);
     p_text(c, F_MONO, 13, 2, CV_LEFT, "HOSTING", 22, 22, ORANGE, 1);
+    float y = 30;
     for (int i = 0; i < n; i++) {
       const ui_task *t = &U->task[i];
-      float y = 30 + i * RH, cy = y + RH / 2;
+      float rh = RH + (nl[i] - 1) * LH, cy = y + RH / 2;
       bool done = t->state == UT_DONE;
       uint32_t col = done ? DIMT : t->optional ? 0xb8b2a4 : PAPER;
-      /* the box */
       cv_stroke_hex(c, done ? ORANGE : t->optional ? 0x8a867c : PAPER, 1); cv_line_width(c, 2);
       cv_begin(c); cv_move(c, 22, cy - 8); cv_line(c, 38, cy - 8); cv_line(c, 38, cy + 8); cv_line(c, 22, cy + 8); cv_close(c); cv_stroke(c);
       if (done) { cv_stroke_hex(c, ORANGE, 1); cv_line_width(c, 3); cv_begin(c); cv_move(c, 24, cy); cv_line(c, 29, cy + 5); cv_line(c, 41, cy - 10); cv_stroke(c); }
       if (t->state == UT_ACTIVE) { cv_fill_hex(c, ORANGE, 1); cv_fill_rect(c, 26, cy - 4, 8, 8); }
-      cv_font(c, F_TYPE, 19);
-      char lab[80]; snprintf(lab, sizeof lab, "%s", t->label ? t->label : "");
-      while (strlen(lab) > 4 && cv_measure(c, lab) > (t->optional ? 300 : 380)) { size_t l = strlen(lab); lab[l - 4] = '.'; lab[l - 3] = '.'; lab[l - 2] = 0; }
-      p_text(c, F_TYPE, 19, 0, CV_LEFT, lab, 50, cy + 7, col, 1); cv_font(c, F_TYPE, 19); float lw = cv_measure(c, lab);
-      if (done) { cv_fill_hex(c, DIMT, .9f); cv_fill_rect(c, 50, cy, lw, 2); }
-      if (t->optional && !done) p_text(c, F_MONO, 11, 1, CV_LEFT, "OPTIONAL", 58 + lw, cy + 5, 0x8a867c, 1);
+      float lw = 0;
+      for (int l = 0; l < nl[i]; l++) {
+        p_text(c, F_TYPE, 19, 0, CV_LEFT, lines[i][l], 50, cy + 7 + l * LH, col, 1);
+        cv_font(c, F_TYPE, 19); lw = cv_measure(c, lines[i][l]);
+        if (done) { cv_fill_hex(c, DIMT, .9f); cv_fill_rect(c, 50, cy + l * LH, lw, 2); }
+      }
+      if (t->optional && !done) p_text(c, F_MONO, 11, 1, CV_LEFT, "OPTIONAL", 58 + lw, cy + 5 + (nl[i] - 1) * LH, 0x8a867c, 1);
       if (t->target && !done) { cv_fill_hex(c, ORANGE, 1); cv_begin(c); cv_move(c, 6, cy - 7); cv_line(c, 15, cy); cv_line(c, 6, cy + 7); cv_close(c); cv_fill(c); }
+      y += rh;
     }
     layer_end(&L_tasks, c);
   }
@@ -470,11 +484,33 @@ void hud_title_draw(float t, int row, int who, bool has_save, const char *const 
   }
   const intent_t *in = input_get();
   char m[120];
-  if (row == 1) snprintf(m, sizeof m, "%s  enter the Battle Zone     %s  back to the day", in->used_pad ? "A" : "ENTER", in->used_pad ? "UP" : "UP ARROW");
+  if (row == 2) snprintf(m, sizeof m, "%s  pick a night     %s  play it     %s  back", in->used_pad ? "LEFT RIGHT" : "ARROWS", in->used_pad ? "A" : "ENTER", in->used_pad ? "UP" : "UP ARROW");
+  else if (row == 1) snprintf(m, sizeof m, "%s  enter the Battle Zone     %s  back to the day", in->used_pad ? "A" : "ENTER", in->used_pad ? "UP" : "UP ARROW");
   else snprintf(m, sizeof m, has_save ? "%s  start a new day     %s  continue" : "%s  start the day", in->used_pad ? "A" : "ENTER", in->used_pad ? "Y" : "C");
   c = layer_begin(&L_menu, 800, 40, hash_str(m, 1));
   if (c) { p_text(c, F_DISPLAY, 19, 1, CV_CENTER, m, 400, 28, PAPER, 1); layer_end(&L_menu, c); }
   hg_tex(&L_menu, 240, 642, .6f + .4f * sinf(t * 3));
+  hg_end();
+}
+
+/* v1.3: the night select, once a night has been reached: which night, and its name */
+void hud_nights_title(float t, bool sel, int night, int open_mask, int count, const char *title) {
+  if (!open_mask) return;
+  hg_begin();
+  char line[96], num[32];
+  snprintf(num, sizeof num, sel ? "<  NIGHT %d OF %d  >" : "NIGHT %d OF %d", night, count);
+  snprintf(line, sizeof line, "%s", title ? title : "");
+  cv *c = layer_begin(&L_nights, 400, 92, hash_str(line, hash_str(num, (sel ? 10 : 0) + (unsigned)open_mask)));
+  if (c) {
+    cv_fill_hex(c, sel ? ORANGE : INK, sel ? 1.f : .82f);
+    cv_begin(c); cv_move(c, 18, 0); cv_line(c, 392, 0); cv_line(c, 374, 62); cv_line(c, 0, 62); cv_close(c); cv_fill(c);
+    p_text(c, F_DISPLAY, 30, 2, CV_LEFT, "NIGHTS", 28, 47, sel ? INK : PAPER, 1);
+    p_text(c, F_MONO, 12, 2, CV_RIGHT, num, 356, 17, sel ? INK : ORANGE, 1);
+    p_text(c, F_TYPE, 14, 0, CV_RIGHT, line, 352, 50, sel ? INK : PAPER, 1);   /* the night's name, inside the panel */
+    layer_end(&L_nights, c);
+  }
+  float a = ez(t * 1.5f - .5f);
+  hg_tex(&L_nights, 846 + (sel ? -14 : 0) + (1 - a) * 60, 300, a);
   hg_end();
 }
 
@@ -512,11 +548,17 @@ void hud_pause_draw(int sel, bool music) {
 void hud_end_draw(float t, const char *title, const char *const *lines, int n, const int *stats) {
   hg_begin();
   hg_rect(0, 0, DS_W, DS_H, INK, ez(t * .5f) * .88f);
-  /* two pages: how the day went, then the credits */
-  cv *c = layer_begin(&L_end, 1100, 640, 900);
+  /* two pages: how the day (or the night) went, then the credits. v1.3: the page is keyed by what it says, since
+   * each night has its own; the credits roll only after the last night; before that it says what comes next */
+  bool more = story_more();
+  uint32_t key = hash_str(title, 900u + (unsigned)n * 7 + (more ? 1 : 0));
+  for (int i = 0; i < n; i++) key = hash_str(lines[i], key);
+  cv *c = layer_begin(&L_end, 1100, 640, key);
   if (c) {
     p_text(c, F_DISPLAY, 66, 3, CV_LEFT, title, 0, 70, PAPER, 1);
-    p_text(c, F_MONO, 20, 1, CV_LEFT, "HEATSYNC LABS. MIDNIGHT.", 4, 106, ORANGE, 1);
+    float hr = STORY_UI.hour;
+    const char *when = hr >= 23.9f ? "HEATSYNC LABS. MIDNIGHT." : hr >= 21.5f ? "HEATSYNC LABS. TEN O'CLOCK." : "HEATSYNC LABS. CLOSING TIME.";
+    p_text(c, F_MONO, 20, 1, CV_LEFT, when, 4, 106, ORANGE, 1);
     char row[120];
     snprintf(row, sizeof row, "Trust %d    Safety %d    Vibe %d    Dues %d", stats[ST_TRUST], stats[ST_SAFETY], stats[ST_VIBE], stats[ST_DUES]);
     p_text(c, F_MONO, 19, 0, CV_LEFT, row, 4, 146, PAPER, 1);
@@ -549,8 +591,16 @@ void hud_end_draw(float t, const char *title, const char *const *lines, int n, c
     for (unsigned i = 0; i < sizeof CR / sizeof CR[0]; i++) { p_text(c, F_TYPE, 21, 0, CV_LEFT, CR[i], 4, y, i == 0 ? ORANGE : PAPER, i == 0 ? 1.f : .85f); y += 34; }
     layer_end(&L_cred, c);
   }
-  float swap = ds_clamp((t - 14) * 1.2f, 0, 1);
+  float swap = more ? 0 : ds_clamp((t - 14) * 1.2f, 0, 1);
   hg_tex(&L_end, 100, 60, ez(t - 1) * (1 - swap));
   hg_tex(&L_cred, 100, 80, swap);
+  if (more && t > 6) {
+    static layer_t L_next;
+    const intent_t *in = input_get();
+    char m[96]; snprintf(m, sizeof m, "%s  on to the next night", in->used_pad ? "A" : "ENTER");
+    cv *k = layer_begin(&L_next, 600, 40, hash_str(m, 77));
+    if (k) { p_text(k, F_DISPLAY, 19, 1, CV_CENTER, m, 300, 28, PAPER, 1); layer_end(&L_next, k); }
+    hg_tex(&L_next, 340, 650, .6f + .4f * sinf(t * 3));
+  }
   hg_end();
 }

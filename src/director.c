@@ -227,9 +227,9 @@ static bool near_wall(v3 p, float r) {
 static bool same_space(const dir_spec *s, v3 pos) {
   if (world_get_stage() != STAGE_TOWN) return true;
   int nin = 0, nout = 0;
-  if (s->nsubj) for (int i = 0; i < s->nsubj; i++) { if (world_in_lab(actor_pos(s->subj[i]))) nin++; else nout++; }
-  else { if (world_in_lab(s->type == SH_INSERT ? s->fpos : s->flook)) nin++; else nout++; }
-  return world_in_lab(pos) ? nin > 0 : nout > 0;
+  if (s->nsubj) for (int i = 0; i < s->nsubj; i++) { if (world_indoors(actor_pos(s->subj[i]))) nin++; else nout++; }
+  else { if (world_indoors(s->type == SH_INSERT ? s->fpos : s->flook)) nin++; else nout++; }
+  return world_indoors(pos) ? nin > 0 : nout > 0;
 }
 static float vis_score(const dir_spec *s, v3 pos) {
   float got = 0, n = 0;
@@ -605,7 +605,7 @@ static void recheck(float dt) {
   float nsc = solve_any(&s, &bc, S.t, &here);
   frame_t f = frame_of(&s, &bc, S.t);
   /* a short move with a clear path eases; a long or blocked one cuts */
-  bool path = v3_len(v3_sub(f.pos, here)) < 1.6f && world_visible(here, f.pos) && world_in_lab(here) == world_in_lab(f.pos);   /* never sweep through the door: cut */
+  bool path = v3_len(v3_sub(f.pos, here)) < 1.6f && world_visible(here, f.pos) && world_indoors(here) == world_indoors(f.pos);   /* never sweep through the door: cut */
   for (int i = 0; path && i < NOCC; i++) {
     if (!actor_is_visible(OCC[i])) continue;
     v3 h = head(OCC[i]);

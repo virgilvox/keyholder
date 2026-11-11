@@ -3,6 +3,7 @@
  * arenas (arena.c) have their own simpler shapes. One hemisphere light, one directional. */
 #include "world.h"
 #include "city.h"
+#include "interior.h"
 #include "arena.h"
 #include "gen/lab_areas.h"
 #include <stdlib.h>
@@ -35,7 +36,7 @@ static lab_mesh lmesh[48]; static int nlmesh;
 static t3_object *door_pivot[2];
 static float door_open, door_target; static bool door_auto = true;
 static float door_call;   /* seconds the automatic door stays called by someone walking at it (world_move) */
-static t3_material *lab_mat, *lab_glow_mat, *lab_glass_mat;
+static t3_material *lab_mat, *lab_glow_mat, *lab_glass_mat, *lab_tint_mat;
 
 static inline int cx_of(float x) { int i = (int)floorf((x - LGX0) / CELL); return i < 0 ? 0 : i >= LGX ? LGX - 1 : i; }
 static inline int cz_of(float z) { int i = (int)floorf((z - LGZ0) / CELL); return i < 0 ? 0 : i >= LGZ ? LGZ - 1 : i; }
@@ -95,6 +96,8 @@ static void load_lab(void) {
   lab_mat = t3_mesh_lambert_material_new(0xffffff); lab_mat->vertex_colors = true; lab_mat->side = T3_DOUBLE_SIDE;
   lab_glow_mat = t3_mesh_basic_material_new(0xffffff); lab_glow_mat->vertex_colors = true;
   lab_glass_mat = t3_mesh_basic_material_new(0xffffff); lab_glass_mat->vertex_colors = true; lab_glass_mat->transparent = true; lab_glass_mat->opacity = .1f; lab_glass_mat->side = T3_DOUBLE_SIDE; lab_glass_mat->depth_write = false;
+  /* the printers' smoked glass: the same program, darker */
+  lab_tint_mat = t3_mesh_basic_material_new(0xffffff); lab_tint_mat->vertex_colors = true; lab_tint_mat->transparent = true; lab_tint_mat->opacity = .5f; lab_tint_mat->side = T3_DOUBLE_SIDE; lab_tint_mat->depth_write = false;
   t3_object_update_matrix_world(root, true);
   int count = 0;
   t3_object_traverse(root, count_tris, &count);
@@ -111,7 +114,7 @@ static void load_lab(void) {
     if (!m) continue;
     const char *name = o->name ? o->name : "";
     bool door = !strncmp(name, "door_", 5), glass = strstr(name, "glass") != NULL, gl = strstr(name, "glow") || strstr(name, "lamps");
-    { t3_material *nm = glass ? lab_glass_mat : gl ? lab_glow_mat : lab_mat; t3_retain(nm); t3_release(m->materials[0]); m->materials[0] = nm; }
+    { t3_material *nm = glass ? (strstr(name, "tint") ? lab_tint_mat : lab_glass_mat) : gl ? lab_glow_mat : lab_mat; t3_retain(nm); t3_release(m->materials[0]); m->materials[0] = nm; }
     if (!door) {
       bool far = strstr(name, "_far") != NULL;
       if (strcmp(name, "lab_soft") && !far) take_tris(m);
@@ -344,6 +347,7 @@ static void apply_lights(void) {
   t3_color cur_avg = {Hs.r * 1.15f + Ds.r * .35f, Hs.g * 1.15f + Ds.g * .35f, Hs.b * 1.15f + Ds.b * .35f};
   t3_color tint = {out_avg.r / cur_avg.r, out_avg.g / cur_avg.g, out_avg.b / cur_avg.b};
   city_set_time(night, tint);
+  interior_set_time(night);
   lab_night = night;
   /* the lab's lit material holds the warm light when the scene lights are the street's */
   t3_color in_avg = {lab_sky.r * LAB_H * 1.15f + lab_dir.r * LAB_D * .35f, lab_sky.g * LAB_H * 1.15f + lab_dir.g * LAB_D * .35f, lab_sky.b * LAB_H * 1.15f + lab_dir.b * LAB_D * .35f};
@@ -382,6 +386,7 @@ void world_init(t3_scene *scene) {
   sun = t3_directional_light_new(0xffffff, 1.5f); t3_object_add(&scene->base, sun);
   load_lab();
   city_init(city_root);
+  interior_init(scene); interior_attach(town);
   build_sky(scene);
   arena_init(arena_root);
   world_set_stage(STAGE_TOWN);
@@ -405,6 +410,7 @@ void world_stage_floor(world_stage s, v3 *center, float *radius) {
 #define LAB_X0 (-LAB_DOOR_Z - .1f)
 #define LAB_X1 (9.5f - LAB_DOOR_Z)
 bool world_in_lab(v3 p) { return p.x > LAB_X0 && p.x < LAB_X1 && p.z < -LAB_DOOR_X + .1f && p.z > -40.5f; }
+bool world_indoors(v3 p) { return world_in_lab(p) || interior_contains(p); }
 /* under the portico, in front of the glass and in the recessed entry: everything inside is in view */
 static bool at_storefront(v3 p) { return p.x > LAB_X0 - .5f && p.x < LAB_X1 + .5f && p.z < 1.5f && p.z > -LAB_DOOR_X - .5f && p.y < 4; }
 static v3 subj_p; static float subj_t;
@@ -435,7 +441,7 @@ void world_update(float dt, v3 focus) {
   }
   /* lights: blend to the lab's inside */
   /* the lights are the subject's: someone inside is lit by the lab wherever the lens stands */
-  bool in = world_in_lab(focus), in_s = world_in_lab(subj);
+  bool in = world_in_lab(focus), in_s = world_in_lab(subj) || interior_contains(subj);
   float nw = ds_damp(in_lab_w, in_s ? 1.f : 0.f, 5, dt);
   if (fabsf(nw - in_lab_w) > .001f) { in_lab_w = nw; apply_lights(); } else if (in_lab_w != (in_s ? 1.f : 0.f)) { in_lab_w = in_s ? 1.f : 0.f; apply_lights(); }
   /* far from the lab it does not draw, deep inside the city does not */
@@ -462,10 +468,17 @@ void world_update(float dt, v3 focus) {
     ((t3_object *)lmesh[L->twin].m)->visible = on && !near;
   }
   if (door_pivot[0]) { door_pivot[0]->visible = dl < 120; door_pivot[1]->visible = dl < 120; }
+  /* in a room behind a facade (interior.c) the windows are its own: nothing of the street or the lab draws */
+  if (interior_contains(focus)) {
+    for (int i = 0; i < nlmesh; i++) ((t3_object *)lmesh[i].m)->visible = false;
+    if (door_pivot[0]) { door_pivot[0]->visible = false; door_pivot[1]->visible = false; }
+    city_update(dt, focus, -1e9f);
+    return;
+  }
   /* from inside the lab only the storefront looks out: the street within a block or so */
   city_update(dt, focus, !in ? 1e9f : focus.z < -14 ? 70.f : 150.f);
 }
-void world_debug_counts(int *draws, int *tri) { int t = 0; int d = city_stats(&t); if (stage == STAGE_TOWN) for (int i = 0; i < nlmesh; i++) if (((t3_object *)lmesh[i].m)->visible) { d++; t += lmesh[i].tris; } if (draws) *draws = d; if (tri) *tri = t; }
+void world_debug_counts(int *draws, int *tri) { int t = 0; int d = city_stats(&t); if (stage == STAGE_TOWN) for (int i = 0; i < nlmesh; i++) if (((t3_object *)lmesh[i].m)->visible) { d++; t += lmesh[i].tris; } if (stage == STAGE_TOWN && interior_current() >= 0) { d += 5; t += interior_tris(); } if (draws) *draws = d; if (tri) *tri = t; }
 
 /* ── lab queries ── */
 static v3 closest_on_tri(v3 p, const tri_t *t) {
@@ -577,6 +590,7 @@ bool world_raycast(v3 o, v3 d, float max_dist, float *t_out, v3 *normal) {
   d = v3_norm(d);
   if (stage != STAGE_TOWN) return arena_raycast(stage, o, d, max_dist, t_out, normal);
   float t1 = 1e30f, t2 = 1e30f; v3 n1 = v3_(0, 1, 0), n2 = n1;
+  if (stage == STAGE_TOWN && interior_contains(o)) return interior_raycast(o, d, max_dist, t_out, normal);
   bool a = lab_raycast(o, d, max_dist, &t1, &n1), b = city_raycast(o, d, max_dist, &t2, &n2);
   if (!a && !b) return false;
   if (a && (!b || t1 <= t2)) { *t_out = t1; if (normal) *normal = n1; }
@@ -624,6 +638,7 @@ static float lab_floor(v3 p, float up) {
 static inline bool over_lab(v3 p) { return p.x > LAB_X0 - .2f && p.x < LAB_X1 + .2f && p.z < .6f && p.z > -40.7f; }
 float world_floor_y(v3 p) {
   if (stage != STAGE_TOWN) return 0;
+  { float y; if (interior_floor(p, .01f, &y)) return y; }
   float best = over_lab(p) ? lab_floor(p, .01f) : -1e9f;
   if (best > -1e8f) return best;
   return city_floor_y(p.x, p.z, p.y - WORLD_STEP);
@@ -636,6 +651,7 @@ static float ground_under(v3 p, float r, float up) {
     float x = p.x + OFF[i][0] * r, z = p.z + OFF[i][1] * r;
     v3 q = v3_(x, p.y, z);
     float g = -1e9f;
+    if (interior_floor(q, up, &g)) { best = fmaxf(best, g); continue; }
     if (over_lab(q)) { float t; v3 n, o = v3_(x, p.y + up, z); if (lab_raycast(o, v3_(0, -1, 0), 12, &t, &n) && n.y > .55f) g = o.y - t; }
     if (g < -1e8f) g = city_floor_y(x, z, p.y + up - WORLD_STEP);
     best = fmaxf(best, g);
@@ -674,6 +690,8 @@ void world_move(v3 *p, v3 *vel, float r, float h, float dt, bool *grounded) {
     v3 nn = v3_(0, 1, 0); bool hit = false;
     if (stage != STAGE_TOWN) arena_push(stage, p, r, h, &nn, &hit);
     else {
+      /* in a room behind a facade: its walls and furniture, nothing else */
+      if (interior_push(p, r, h, &nn, &hit)) goto moved;
       /* the body in the lab: spheres from just above a step to the head */
       float ys[3] = {WORLD_STEP + r, h * .5f, h - r};
       for (int it = 0; it < 2; it++) for (int j = 0; j < 3; j++) {
@@ -687,6 +705,7 @@ void world_move(v3 *p, v3 *vel, float r, float h, float dt, bool *grounded) {
       }
       city_push(p, r, h, &nn, &hit);
       door_push(p, r, &nn, &hit);
+      moved:
       /* the edge of the map */
       p->x = ds_clamp(p->x, CITY_X0, CITY_X1); p->z = ds_clamp(p->z, CITY_Z0, CITY_Z1);
     }
@@ -707,7 +726,7 @@ float world_lab_yaw(float plan_deg) {
   /* plan yaw 0 faces plan +z = world +x; 90 faces plan +x = world -z. World yaw 0 faces +z, pi/2 faces +x. */
   return DS_PI * .5f + plan_deg * DS_PI / 180.f;
 }
-bool world_place(const char *name, v3 *pos, float *yaw) { return city_place(name, pos, yaw); }
+bool world_place(const char *name, v3 *pos, float *yaw) { return city_place(name, pos, yaw) || interior_place(name, pos, yaw); }
 bool world_seat(int i, v3 *pos, float *yaw, bool *soft) {
   if (i < 0 || i >= LAB_SEAT_N) return false;
   if (pos) *pos = v3_(LAB_SEATS[i].x, LAB_SEATS[i].top, LAB_SEATS[i].z);
@@ -720,4 +739,5 @@ void world_door_auto(bool on) { door_auto = on; }
 float world_debug_door(void) { return door_open; }   /* for the world test */
 void world_arena_phase(int phase) { arena_set_phase(phase); }
 void world_traffic(bool on) { city_traffic(on); }
+void world_crew_truck(bool on) { city_crew_truck(on); }
 bool world_train_bell(v3 *at) { return stage == STAGE_TOWN && city_train_bell(at); }

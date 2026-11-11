@@ -3,13 +3,16 @@
 // is drawn here. Keys match the mesa_logo and mesa_name calls in src/facades_*.inc.
 //
 //   node tools/prep-signs.mjs <bikemesa/assets/signs>
+//   node tools/prep-signs.mjs --keep-logos      the logos as they are in the current atlas (no bikemesa folder
+//                                               needed): only the lettering is drawn again
 import sharp from 'sharp';
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = process.argv[2];
-if (!SRC) { console.error('usage: node tools/prep-signs.mjs <bikemesa/assets/signs>'); process.exit(2); }
+if (!SRC) { console.error('usage: node tools/prep-signs.mjs <bikemesa/assets/signs> | --keep-logos'); process.exit(2); }
+const KEEP = SRC === '--keep-logos';
 const W = 1024, H = 1024, PAD = 3;
 
 const CREAM = '#f5ebd5', INK = '#141414';
@@ -31,6 +34,10 @@ const LB = {
   'THAI CUISINE': ['#ffd27a', '#7c1f22', 0], 'THE DREW': ['#efe6d0', null, 1], '12 WEST': ['#ffe9b8', null, 0, 1], 'RIBAUDO FINE ARTS': ['#303030', null, 1], 'CHIROPRACTIC': ['#303030', null], 'NAYSAYER': ['#f2f2f2', '#17181b', 0],
   'The Boutique': ['#55443c', null, 1], 'DE CESARE DESIGN': ['#303030', null], 'SHOP': [INK, CREAM], 'OPEN': ['#ff55aa', null, 0, 1], 'CENTER / MAIN': ['#f4f4f4', '#135e6a', 0], 'METRO': ['#f4f4f4', '#135e6a', 0],
   'MESA ARTS CENTER': ['#f0f4f6', null], 'CITY PLAZA': ['#e8e6e0', null], 'DONATE': ['#f5f2e6', '#b24a18', 0],
+  // the lab's back, the Arts Center and the rooms you can walk into
+  '108 WEST MAIN': ['#2f5a3a', '#efe6cc', 1], 'EXIT': ['#ff3a2a', null, 0, 1], 'ON TAP': ['#f2e6c8', '#1c1a18', 0], 'BREAD': ['#3a2a1c', '#efe3c6', 1],
+  'HIGH SCORE': ['#3affd8', null, 0, 1], 'INSERT COIN': ['#ffe23a', null, 0, 1], 'PLAY': ['#ff4fd8', null, 0, 1], 'BOX OFFICE': ['#f2d27a', '#1a1414', 1],
+  'MESA CONTEMPORARY ARTS': ['#f0f4f6', null], 'IKEDA THEATER': ['#f0f4f6', null],
 };
 const LOGO = {
   'azdistilling.png': { neon: [255, 130, 100], max: 300 }, 'casacopal-official.png': { max: 200 }, 'chupacabra.png': { neon: [255, 85, 170], max: 200 },
@@ -52,7 +59,17 @@ for (const [text, [ink, paper, serif, neon]] of Object.entries(LB)) {
   const w = Math.min(meta.width, 360), h = Math.round((meta.height * w) / meta.width);
   items.push({ key: text, buf: await sharp(buf).resize(w, h).png().toBuffer(), w, h, neon: !!neon });
 }
-for (const [file, o] of Object.entries(LOGO)) {
+if (KEEP) {
+  // the logos cut back out of the current atlas, already scaled and tinted
+  const hdr = readFileSync(join(ROOT, 'src/gen/sign_atlas.h'), 'utf8'), atlas = readFileSync(join(ROOT, 'assets/signs/city_signs.png'));
+  for (const m of hdr.matchAll(/\{"([^"]+)",([\d.]+)f,([\d.]+)f,([\d.]+)f,([\d.]+)f,(\d)\}/g)) {
+    const [, key, u0, v0, u1, v1, neon] = m;
+    if (!(key in LOGO)) continue;
+    const left = Math.round(+u0 * W), top = Math.round(+v0 * H), w = Math.round(+u1 * W) - left, h = Math.round(+v1 * H) - top;
+    items.push({ key, buf: await sharp(atlas).extract({ left, top, width: w, height: h }).png().toBuffer(), w, h, neon: neon === '1' });
+  }
+}
+for (const [file, o] of Object.entries(KEEP ? {} : LOGO)) {
   const m = await sharp(join(SRC, file)).ensureAlpha().metadata();
   const sc = Math.min(1, o.max * 0.8 / Math.max(m.width, m.height));
   const w = Math.round(m.width * sc), h = Math.round(m.height * sc);

@@ -17,7 +17,7 @@
 static t3_scene *scene; static t3_camera *cam;
 static enum { G_TITLE, G_PLAY, G_PAUSE, G_END, G_BATTLE } mode;
 static float mode_t;
-static int who, pause_sel, title_row; static bool music_on = true;
+static int who, pause_sel, title_row, night_sel = 1; static bool music_on = true;
 static actor_t *T_A[3];
 static const char *const NAMES[3] = {"VEE", "DEX", "RUTH"};
 static const char *const BLURB[3] = {"First to look up. Runs the printers.", "Electronics bench. Tells you how it broke.", "Laser corner. Has actually read the manual."};
@@ -58,7 +58,14 @@ void game_frame(float dt) {
     case G_TITLE: {
       if (in->nav_x && title_row == 0) { int n = who + in->nav_x; if (n >= 0 && n < 3) { who = n; sfx(SFX_UI, 0, 1); } }
       /* down to the Battle Zone's entry, up to the keyholders */
-      if (in->nav_y) { int n = title_row + in->nav_y; if (n >= 0 && n < 2) { title_row = n; sfx(SFX_UI, 0, 1); } }
+      /* v1.3: and further down, the night select once a night has been reached */
+      int nights = story_nights_open();
+      if (in->nav_y) { int n = title_row + in->nav_y; if (n >= 0 && n < (nights ? 3 : 2)) { title_row = n; sfx(SFX_UI, 0, 1); } }
+      if (title_row == 2 && nights) {
+        if (!(nights & (1 << (night_sel - 1)))) for (int k = 1; k <= story_night_count(); k++) if (nights & (1 << (k - 1))) { night_sel = k; break; }
+        if (in->nav_x) for (int k = night_sel + in->nav_x; k >= 1 && k <= story_night_count(); k += in->nav_x) if (nights & (1 << (k - 1))) { night_sel = k; sfx(SFX_UI, 0, 1); break; }
+        if (in->ok) { sfx(SFX_UI_OK, 0, 1); title_leave(); story_start_night(night_sel); mode = G_PLAY; mode_t = 0; break; }
+      }
       for (int i = 0; i < 3; i++) {
         actor_expr_set(T_A[i], EX_JOY, i == who ? .7f : 0);
         actor_play(T_A[i], i == who ? "Sword_Idle" : "Idle_Loop", 1, true, .3f);
@@ -82,7 +89,7 @@ void game_frame(float dt) {
         } else sfx(SFX_CLASH, 0, .5f);
         break;
       }
-      if (in->ok || cont) {
+      if ((in->ok && title_row == 0) || cont) {
         sfx(SFX_UI_OK, 0, 1);
         title_leave();
         if (cont) story_continue(); else story_new_game(who);
@@ -110,7 +117,14 @@ void game_frame(float dt) {
       break;
     case G_END:
       world_update(dt, v3_(0, 1, 5));
-      if (mode_t > 6 && in->ok) title_enter();
+      {
+        bool ok = mode_t > 6 && in->ok;
+#ifdef KH_AUTO
+        ok = mode_t > 3;   /* the autoplay reads the epilogue for three seconds, then goes on */
+#endif
+        /* v1.3: the day's epilogue (and each night's) leads on into the next night */
+        if (ok) { if (story_resume()) { mode = G_PLAY; mode_t = 0; } else title_enter(); }
+      }
       break;
   }
 }
@@ -121,7 +135,8 @@ void game_draw(void) {
   return;   /* clean frames for the web page's backdrop */
 #endif
   switch (mode) {
-    case G_TITLE: hud_title_draw(mode_t, title_row, who, story_has_save(), NAMES, BLURB); hud_battle_title(mode_t, title_row == 1); break;
+    case G_TITLE: hud_title_draw(mode_t, title_row, who, story_has_save(), NAMES, BLURB); hud_battle_title(mode_t, title_row == 1);
+      hud_nights_title(mode_t, title_row == 2, night_sel, story_nights_open(), story_night_count(), story_night_title(night_sel)); break;
     case G_BATTLE: battle_draw(); break;
     case G_PLAY:
       if (story_state() == SR_FIGHT && !STORY_UI.retry) fight_draw_hud();

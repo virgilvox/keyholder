@@ -64,13 +64,21 @@ const rectOf = (s, grow = 0) => (s.a === 'x' ? [s.s0, s.c - s.hw - grow, s.s1, s
 // ground: coordinate compressed cells, classed, merged into rectangles
 const T = { ASPHALT: 0, PAVER: 1, CONCRETE: 2, LOT: 3, BED: 4, GRAVEL: 5 };
 const Y = { 0: -0.15, 1: 0, 2: 0, 3: 0, 4: -0.1, 5: 0.02 };
+// paved ground off the streets, later entries over earlier ones (street view Oct 2025; the plaza from the
+// Arts Center's photos): [x0, z0, x1, z1, type]
+const PAVED = [
+  [-8, -52.2, 30, -40.4, T.CONCRETE], [-8, -49.6, 30, -43.4, T.PAVER],      // the alley behind the lab: concrete either side, brick down the middle
+  [292, 39.6, 440, 232, T.PAVER], [292, 39.6, 440, 47, T.CONCRETE],         // the Arts Center's plaza and Shadow Walk
+];
 const xs = new Set([BOUNDS.x0 - 60, BOUNDS.x1 + 60]), zs = new Set([BOUNDS.z0 - 60, BOUNDS.z1 + 60]);
 for (const s of streets) { for (const g of [0, s.walk]) { const r = rectOf(s, g); xs.add(r[0]); xs.add(r[2]); zs.add(r[1]); zs.add(r[3]); } }
+for (const p of PAVED) { xs.add(p[0]); xs.add(p[2]); zs.add(p[1]); zs.add(p[3]); }
 const X = [...xs].sort((a, b) => a - b), Z = [...zs].sort((a, b) => a - b);
 const inR = (x, z, r) => x >= r[0] && x <= r[2] && z >= r[1] && z <= r[3];
 function classify(x, z) {
   for (const s of streets) if (inR(x, z, rectOf(s))) return T.ASPHALT;
   for (const s of streets) if (inR(x, z, rectOf(s, s.walk))) return s.n === 'Main' ? T.PAVER : T.CONCRETE;
+  for (let i = PAVED.length - 1; i >= 0; i--) if (inR(x, z, PAVED[i])) return PAVED[i][4];
   return T.LOT;
 }
 const cells = [];
@@ -154,10 +162,12 @@ function earclip(poly) {
 const CUTS = [-2.875, 6.725, -8, 6, 100, 228, -176];   // around the lab, the Nile, One Macdonald, Margaritas, 166 W
 const HEIGHT = [
   // [x, z inside the part, height, style]  styles: 0 stucco warm, 1 white, 2 brick, 3 beige glass office, 4 arts centre blue, 5 civic concrete
-  [0, -66, 19, 1], [-255, -82, 38, 1], [-3, 58, 11, 2], [80, -20, 18, 3], [330, -25, 11, 5], [350, -30, 29, 5],
+  [0, -66, 15, 6], [-255, -82, 38, 1], [-3, 58, 11, 2], [80, -20, 18, 3], [330, -25, 11, 5], [350, -30, 29, 5],
   [385, 137, 18, 4], [392, 97, 18, 4], [420, 140, 14, 4], [-138, -135, 9, 5], [65, -152, 12, 5], [146, -147, 14, 5], [228, -128, 9, 1],
   [328, -156, 18, 5], [429, -128, 16, 3], [424, -177, 10, 5], [468, -170, 9, 5], [238, 129, 10, 2], [236, 170, 8, 2], [135, 214, 8, 2],
   [-372, -71, 8, 0], [81, 60, 8, 2], [150, 60, 8, 2],
+  [-231, -42, 4.6, 2],                         // Chupacabra: one storey of 1949 brick
+  [320, 140, 12, 4], [430, 55, 9, 4],          // the Arts Center's studio and gallery wing, and its east pavilion
 ];
 const hash = (a, b) => { let h = (Math.round(a * 7) * 73856093) ^ (Math.round(b * 11) * 19349663); h ^= h >>> 13; h = Math.imul(h, 0x5bd1e995); h ^= h >>> 15; return h >>> 0; };
 const buildings = [];
@@ -212,7 +222,7 @@ const LOTS = [
   L('oro', 'Oro Brewing Company', '210 W Main St', 'south', -251, -242, 'oro', 'OSM number; street view'),
   L('old_brick', 'Old Brick House Vintage Market', '206 W Main St', 'south', -242, -232, 'old_brick', 'street view (OSM still has it at 220)'),
   L('ribaudo', 'Ribaudo Fine Arts / chiropractic', '202 W Main St', 'south', -232, -226, null, OSMSRC, { style: 1 }),
-  L('chupacabra', 'Chupacabra Taproom', '14 N Robson', 'east', -48, -38, 'chupacabra', 'OSM footprint; fronts Robson', { line: -226 }),
+  L('chupacabra', 'Chupacabra Taproom', '14 N Robson', 'east', -45.6, -38, 'chupacabra', 'OSM footprint; venue photos 2019 (Mouth by Southwest), street view Oct 2025', { line: -226 }),
   // 100 block west of the alley (footprints -197 to -82)
   L('boutique', 'The Boutique / De Cesare Design', '166 W Main St', 'south', -197, -164, null, OSMSRC, { style: 3 }),
   L('naysayer', 'Naysayer Tattoo', '160 W Main St', 'south', -164, -152, null, OSMSRC, { style: 2 }),
@@ -243,7 +253,7 @@ const LOTS = [
   L('az_distilling', 'Arizona Distilling Co.', '155 W Main St', 'north', -154, -119, 'az_distilling', `${WEB}; footprint`),
   L('history', 'History, by George!', '129 W Main St', 'north', -82, -72, null, OSMSRC, { style: 5 }),
   L('chiwas', 'Tacos Chiwas', '127 W Main St', 'north', -72, -64, 'chiwas', OSMSRC),
-  L('proof', 'Proof Bread', '121 W Main St', 'north', -64, -56, 'proof', OSMSRC),
+  L('proof', 'Proof Bread', '125 W Main St', 'north', -64, -56, 'proof', 'venue listing (125 W Main, beside Tacos Chiwas); OSM node at 121'),
   L('espiritu', 'Espiritu', '123 W Main St', 'north', -56, -38, 'espiritu', `${WEB} (OSM 123 is still the former tenant)`),
   L('tre_bella', 'Tre Bella', '119 W Main St', 'north', -38, -20, null, OSMSRC, { style: 4 }),
   L('west_of_nile', 'Storefront', '111 W Main St', 'north', -20, -8, null, OSMSRC, { style: 2 }),
@@ -310,6 +320,8 @@ addPlace('macdonald_main', 28.5, 0, 5.6, Math.PI / 2);
 addPlace('center_main_station', 340, 0.2, 19.5, Math.PI / 2);
 addPlace('city_plaza', 350, 0, 3, Math.PI);
 addPlace('arts_center', 385, 0, 35, 0);
+addPlace('mac_plaza', 330, 0, 52, Math.PI * .8);        // the Arts Center's plaza at Center and Main
+addPlace('shadow_walk', 345, 0, 104, Math.PI);         // on the Shadow Walk, among the masts, facing back toward Main
 // names the design uses for lots above
 const alias = { against_grain: 'against_grain' };
 for (const [a, b] of Object.entries({ haunted: 'haunted' })) void a, void b, void alias;
@@ -359,13 +371,14 @@ for (const c of XS) for (const [dx, z] of [[-1, MAIN.nCurb - 1], [1, MAIN.sCurb 
   const s = streets.find((q) => q.c === c);
   prop(PROP.SIGNAL, c + dx * (s.hw + 1), z, dx < 0 ? 0 : Math.PI);
 }
-// OSM trees and benches
+// OSM trees and benches; none where a hand placed piece stands (Chupacabra's patio, src/facades_town.inc)
+const NO_TREES = [[-225, -46.5, -215.5, -37.3]];
 for (const e of J.elements) {
   const t = e.tags || {};
   if (e.type !== 'node') continue;
   const p = project(e);
   if (!inBounds(p)) continue;
-  if (t.natural === 'tree' && !insideBuilding(p[0], p[1], 1) && !streets.some((s) => inR(p[0], p[1], rectOf(s, 0.5)))) {
+  if (t.natural === 'tree' && !insideBuilding(p[0], p[1], 1) && !streets.some((s) => inR(p[0], p[1], rectOf(s, 0.5))) && !NO_TREES.some((r) => inR(p[0], p[1], r))) {
     const palm = p[0] > 255 && p[0] < 440 && p[1] > -70 && p[1] < 60;
     prop(palm ? PROP.PALM : PROP.TREE, p[0], p[1], 0, hash(p[0], p[1]) % 3);
   }
@@ -418,8 +431,9 @@ for (const e of J.elements) {
       if (insideBuilding(px, pz) || insideBuilding(qx, qz) || streets.some((s) => inR(qx, qz, rectOf(s, s.walk)) || inR(px, pz, rectOf(s, s.walk)))) continue;
       if (Math.abs(ux) > 0.97) stripe(Math.min(px, qx) - 0.05, Math.min(pz, qz), Math.max(px, qx) + 0.05, Math.max(pz, qz), WHITE);
       else stripe(Math.min(px, qx), Math.min(pz, qz) - 0.05, Math.max(px, qx), Math.max(pz, qz) + 0.05, WHITE);
-      // a few cars in the lots
-      if (hash(px, pz) % 7 === 0) { const mx = px + -uz * sd * 2.5 + ux * 1.4, mz = pz + ux * sd * 2.5 + uz * 1.4; if (!(mx > -85 && mx < -40 && mz > -80 && mz < -50) && !insideBuilding(mx, mz, 3)) prop(PROP.CAR, mx, mz, Math.atan2(-uz * sd, ux * sd) * -1 + 0, hash(pz, px) % 6); }
+      // a few cars in the lots, nose in: the car's length (its local x) runs down the stall, away from the aisle,
+      // so yaw turns local +x onto the stall direction (-uz, ux) * sd: (cos yaw, -sin yaw) = that
+      if (hash(px, pz) % 7 === 0) { const mx = px + -uz * sd * 2.5 + ux * 1.4, mz = pz + ux * sd * 2.5 + uz * 1.4; if (!(mx > -85 && mx < -40 && mz > -80 && mz < -50) && !insideBuilding(mx, mz, 3)) prop(PROP.CAR, mx, mz, Math.atan2(-ux * sd, -uz * sd), hash(pz, px) % 6); }
     }
   }
 }
@@ -473,6 +487,55 @@ md += '| Place id | Name | Address | Side | World x | World z | Frontage m | Sou
 for (const l of lots) md += `| \`${l.place}\` | ${l.name} | ${l.addr} | ${sideOf(l)} | ${l.cx.toFixed(1)} | ${l.cz.toFixed(1)} | ${l.w.toFixed(1)} | ${l.src} |\n`;
 md += '\nOther places: ' + places.filter((p) => !lots.some((l) => l.place === p.name)).map((p) => `\`${p.name}\` (${p.x.toFixed(1)}, ${p.z.toFixed(1)})`).join(', ') + '.\n';
 md += '\n## Left out: not on the mapped stretch\n\n| Venue | Address | Why |\n|---|---|---|\n| Republica Empanada | 204 E 1st Ave, Mesa | about 900 m east of the lab, south of Main; off the map |\n| Hope\'s Frybread | 144 S Mesa Dr, Mesa | about 1.6 km east; off the map |\n| Pizza Mart | 1329 E Main St, Mesa | at Stapley, about 3 km east |\n| The Guadalupe on Main | 1526 E Main St, Mesa | past Stapley, about 3.5 km east |\n';
+md += `
+## Hand placed set pieces and their places
+
+\`src/facades_town.inc\` holds the table \`TOWN_SET\`: one line per piece, world x, z, yaw and sizes. A piece with a
+name gives places too. See the plan with \`node tools/town-map.mjs out.png x0 z0 x1 z1 4\`.
+
+| Place id | What | World x | World z | Notes |
+|---|---|---|---|---|
+| \`chupacabra_table\` | Chupacabra's patio, the middle long table | -219.6 | -43.0 | y is the tabletop (0.78); yaw along the table |
+| \`chupacabra_seat_a\` | its north bench | -219.6 | -43.65 | the ground under the bench's middle, facing the table (yaw 0) |
+| \`chupacabra_seat_b\` | its south bench | -219.6 | -42.35 | the same, facing the table (yaw pi) |
+| \`chupacabra_patio\` | standing at the table's west end | -221.7 | -43.0 | between the door and the table, facing it |
+| \`lab_back_table\` | where the welding table sits by the lab's back door | 1.4 | -42.0 | the footprint's centre on the ground, long side along the wall, yaw facing the alley |
+| \`lab_alley\` | the middle of the alley behind the lab | 2.5 | -47.0 | facing the lab |
+| \`lab_truck_tailgate\` | behind the crew's pickup (\`world_crew_truck\`) | -1.2 | -47.4 | facing it |
+
+## Rooms you can walk into (src/interior.c)
+
+Each stands behind its real facade and is built the first time someone goes in (\`interior_enter\`). The door's
+outside and inside points come from \`interior_door\`. Spots answer \`world_place\` whether or not the room is built.
+
+| Id | Name | Spots |
+|---|---|---|
+| \`proof\` | Proof Bread | \`proof_counter\`, \`proof_baker\`, \`proof_table\`, \`proof_inside\` |
+| \`chupacabra\` | Chupacabra Taproom | \`chupacabra_bar\`, \`chupacabra_bartender\`, \`chupacabra_hightop\`, \`chupacabra_inside\` |
+| \`level1\` | Level 1 Arcade Bar | \`level1_bar\`, \`level1_cabinet\`, \`level1_pinball\`, \`level1_floor\`, \`level1_inside\` |
+| \`nile\` | The Nile Theater | \`nile_stage\` (y 0.9, the deck), \`nile_floor\`, \`nile_bar\`, \`nile_box_office\`, \`nile_inside\` |
+| \`arts_center\` | Mesa Arts Center (the Ikeda Theater's glass lobby on the plaza) | \`arts_center_lobby\`, \`arts_center_box_office\`, \`arts_center_gallery\`, \`arts_center_inside\` |
+
+## Sources (looked at 2026-11-11)
+
+- Chupacabra Taproom, 14 N Robson: address and the 1949 brick building, the two doors, the bay window and the
+  sidewalk patio from Mouth by Southwest, "Chupacabra Taproom joins growing craft beer scene in downtown Mesa"
+  (2019-06-10, mouthbysouthwest.com) and its photos; still open per Phoenix Magazine (2026-05-18, Pinnacle Brewing
+  article) and Visit Mesa's Mesa Beer Week; the current front (round blade sign, tan shade sail, the steel framed
+  patio with long tables, cactus planters, the bins along the north wall) from Google Street View, October 2025.
+- The lab's back and its alley (108 West Main panel, the green steel door, the recessed glass door, barred kitchen
+  windows, conduit, the neighbour's switchgear and steel pole, the tan brick building across the brick paved alley,
+  the teal lamp): Google Street View, October 2025. The door positions are the HSL-108 model's rear exits.
+- Proof Bread: 125 W Main per its listings (ABC15 "Proof Bread finds its new home in downtown Mesa"; Visit Phoenix);
+  Main Street Harvest is at 121.
+- Mesa Arts Center: Wikimedia Commons, "Mesa Arts Center - West - 2009-09-16.JPG", "Mesa arts center.jpg" (Lockley,
+  2006, CC BY-SA 3.0), "Downtown Mesa Arizona.jpg" (2010, CC BY 3.0), "Center St Station VMR.jpg" (2016, CC BY-SA 4.0)
+  and the 2026 Mesa Contemporary Arts Museum exhibit photo; the Shadow Walk's fabric canopies on tall masts and its
+  coloured glass canopies and screens from Harvard GSD's project page, Architect magazine ("Shadow Walk, Mesa, Ariz.")
+  and Birdair's portfolio. The layout of masts, canopies and the arroyo is approximate.
+- Downtown alleys and back lots: the street view above; the rest is generic (back doors, meters, coolers, bins).
+- No photo is bundled with the game; references are kept out of the repository (build-town/refs).
+`;
 writeFileSync(join(ROOT, 'docs/PLACES.md'), md);
 console.log(`city: ${ground.length} ground rects, ${curbs.length} curbs, ${buildings.length} building parts, ${lots.length} lots, ${places.length} places, ${props.length} props, ${stripes.length} stripes; header ${(h.length / 1024).toFixed(0)} KB`);
 for (const l of lots) console.log(`  ${l.place.padEnd(16)} wall ${l.wall.toFixed(1).padStart(7)}  ${l.face}`);

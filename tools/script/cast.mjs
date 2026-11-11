@@ -54,6 +54,16 @@ export const CAST = {
             pal: NONE },
   crew:   { name: 'Scrapper', model: 'D2', voice: 'am_adam', speed: 1.0, scale: 1.0, color: 0xa06030,
             pal: NONE },
+  // v1.3: the nights. Bodies nobody in the day wears (Q, R, and the two the day's walk-ins used, M and W; the nights
+  // name everyone who walks in, so no walk-in takes them there)
+  marisol:{ name: 'Marisol', model: 'Q', voice: 'af_nova', speed: 1.06, scale: .99, color: 0xf06090,  // three weeks a member, does things
+            pal: NONE },
+  june:   { name: 'June', model: 'R', voice: 'bf_lily', speed: .94, scale: .97, color: 0xb0c8a0,      // the Treasurer, nine years of forms
+            pal: { hair: hue(0), top: hue(140, .3, .7), bottom: hue(0, .35, .55), shoes: hue(0) } },   /* the body's school vest, muted to a cardigan */
+  gordon: { name: 'Gordon', model: 'M', voice: 'bm_lewis', speed: 1.0, scale: 1.03, color: 0x9090c0,  // twelve years at the bench
+            pal: { hair: hue(0, .4, .75), top: hue(200, .6, .7), bottom: hue(0), shoes: hue(0) } },
+  del:    { name: 'Del', model: 'W', voice: 'af_sky', speed: 1.0, scale: .98, color: 0xe8b060,       // first night, a board that won't take solder
+            pal: { hair: hue(20, 1.1, .8), top: hue(150, .8, .9), bottom: hue(220, .6, .7), shoes: hue(0) } },
 };
 // who the three playable members are. Choosing one makes the other two m1 and m2.
 export const PLAYABLE = ['vee', 'dex', 'ruth'];

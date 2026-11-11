@@ -474,7 +474,17 @@ async function boot() {
   }
   await initAudio();
   let cart;
-  try { cart = b64ToBytes($('cart-data').textContent); } catch (e) { showError('The embedded cart could not be read.'); return; }
+  const embedded = $('cart-data').textContent.trim();
+  if (embedded) { try { cart = b64ToBytes(embedded); } catch (e) { showError('The embedded cart could not be read.'); return; } }
+  else {   /* the Pages build: the cart sits beside the page (one file would pass GitHub's 100 MB limit) */
+    try {
+      setStatus('downloading');
+      const r = await fetch('keyholder.wasc'); if (!r.ok) throw new Error(r.status);
+      const total = +r.headers.get('content-length') || 0, rd = r.body.getReader(), parts = []; let got = 0;
+      for (;;) { const { done, value } = await rd.read(); if (done) break; parts.push(value); got += value.length; if (total) setStatus('downloading ' + Math.round(got * 100 / total) + '%'); }
+      cart = new Uint8Array(got); let o = 0; for (const q of parts) { cart.set(q, o); o += q.length; }
+    } catch (e) { showError('The game file could not be downloaded. Check the connection and reload.'); return; }
+  }
   const ok = await startCart(cart, 'save');
   if (!ok) return;
   setStatus('ready');

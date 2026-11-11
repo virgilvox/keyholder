@@ -3,19 +3,39 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-const { DAY, FIGHTS, ENDINGS, STAT_LINES } = await import(process.env.DAY ? new URL(process.env.DAY, 'file://' + process.cwd() + '/').href : './day.mjs');
+import { readdirSync } from 'node:fs';
+const DAYMOD = await import(process.env.DAY ? new URL(process.env.DAY, 'file://' + process.cwd() + '/').href : './day.mjs');
 import { CAST, PLAYABLE, ROLES } from './cast.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
+// v1.3: the nights after the day, tools/script/night*.mjs in name order. Each exports NIGHT = { n, hour, title, sub,
+// beats, fights, endings, stat_lines }. The day ends on its epilogue; each night is a NIGHT beat (a save point and a
+// title card, and where the title's night select starts it) and ends on its own epilogue; one END closes it all.
+const HERE = dirname(fileURLToPath(import.meta.url));
+const NIGHTS = [];
+if (!process.env.DAY_ONLY) for (const f of readdirSync(HERE).filter((f) => /^night.*\.mjs$/.test(f)).sort()) NIGHTS.push((await import('./' + f)).NIGHT);
+NIGHTS.sort((a, b) => a.n - b.n);
+const FIGHTS = { ...DAYMOD.FIGHTS };
+for (const N of NIGHTS) for (const [k, v] of Object.entries(N.fights || {})) { if (FIGHTS[k]) throw new Error('fight id twice: ' + k); FIGHTS[k] = v; }
+const ENDINGS = [...DAYMOD.ENDINGS.map((e) => ({ part: 0, ...e })), ...NIGHTS.flatMap((N) => (N.endings || []).map((e) => ({ part: N.n, ...e })))];
+const STAT_LINES = [...DAYMOD.STAT_LINES.map((e) => ({ part: 0, ...e })), ...NIGHTS.flatMap((N) => (N.stat_lines || []).map((e) => ({ part: N.n, ...e })))];
+const DAY = [...DAYMOD.DAY];
+if (DAY.length && DAY[DAY.length - 1].op === 'end') DAY.pop();
+for (const N of NIGHTS) DAY.push({ op: 'night', n: N.n, hour: N.hour, title: N.title, sub: N.sub }, ...N.beats.flat(), { op: 'epilogue', part: N.n });
+DAY.push({ op: 'end' });
+// flags keep the order v1.2 saved them in, so a v1.2 save's flags still mean the same things; new ones follow
+const PINNED_FLAGS = ['cocky', 'asked_help', 'looked_up', 'did_not_look', 'promised_laser', 'wes_invited', 'met_lou', 'met_jo', 'hal_teaches', 'hal_stays', 'explained_pvc', 'pvc_cut', 'kai_coming', 'invited_morgan', 'beat_champ', 'got_tube', 'owned_strip', 'found_binder', 'inspect_ok', 'passed_inspection', 'milo_glasses', 'red_tag', 'helped_bex', 'bex_proposal', 'tested_props', 'fixed_gerald', 'hal_mentor', 'fixed_joint', 'backup_lot', 'told_root', 'root_returns', 'lipo_demo', 'sam_joins', 'gloria_quiet', 'gloria_visits', 'asked_kai', 'ending_friends', 'ending_alone',
+  'has_bike'];   /* has_bike: story.c keeps it in step with the loaner bike */
 const WHO = ['me', 'm1', 'm2', 'shadow', ...Object.keys(CAST).filter((c) => !PLAYABLE.includes(c)), ...PLAYABLE];
 const whoId = (w) => { const i = WHO.indexOf(w); if (i < 0) throw new Error('unknown actor ' + w); return i; };
 const cstr = (s) => (s === null || s === undefined ? 'NULL' : JSON.stringify(s));
 const STATS = ['trust', 'safety', 'vibe', 'dues', 'energy', 'aff_sam', 'aff_kai', 'aff_morgan', 'aff_m1', 'aff_m2'];
 const WEAP = { ARC: 0, MAUL: 1, TWIN: 2, SPEAR: 3, STAFF: 4 };
-const OPS = ['chapter', 'clock', 'place', 'hide', 'walk', 'waitwalk', 'say', 'shot', 'wait', 'face', 'look', 'clip', 'emote', 'objective', 'roam', 'fight', 'choice', 'option', 'jump', 'jump_not', 'flag', 'add', 'card', 'music', 'stage', 'give', 'draw', 'door', 'fx', 'note', 'epilogue', 'end', 'ret', 'bark'];
+const OPS = ['chapter', 'clock', 'place', 'hide', 'walk', 'waitwalk', 'say', 'shot', 'wait', 'face', 'look', 'clip', 'emote', 'objective', 'roam', 'fight', 'choice', 'option', 'jump', 'jump_not', 'flag', 'add', 'card', 'music', 'stage', 'give', 'draw', 'door', 'fx', 'note', 'epilogue', 'end', 'ret', 'bark', 'night', 'bike', 'prop'];
 const FIGHT_IDS = Object.keys(FIGHTS);
 const BARK_ON = ['start', 'phase2', 'foe_low', 'player_low', 'assist', 'obj_warn', 'hazard', 'finish', 'parry'];
-const flags = new Set();
+const flags = new Set(PINNED_FLAGS);
+const longLabels = [];   // task labels over 34 characters run past the HUD list
 const EMOTES = { joy: 'EX_JOY', fun: 'EX_FUN', angry: 'EX_ANGRY', sorrow: 'EX_SORROW', relaxed: 'EX_FUN' };
 
 const beats = [];
@@ -80,6 +100,7 @@ function one(b) {
         if (t.before && t.before.length) { start = beats.length; flat(t.before); emit({ op: 'ret' }); }
         if (t.after && t.after.length) { done = beats.length; flat(t.after); emit({ op: 'ret' }); }
         if (t.requires && !names.includes(t.requires)) throw new Error('task requires ' + t.requires);
+        if (t.label && t.label.length > 34) longLabels.push(t.label);
         tasks.push({ ...t, start, done, req: t.requires ? beats[entry].t0 + names.indexOf(t.requires) : -1 });
       }
       for (const k of bl) banter.push(k);
@@ -95,6 +116,7 @@ function one(b) {
   }
 }
 flat(DAY);
+if (longLabels.length) { console.log('task labels over 34 characters:\n  ' + longLabels.join('\n  ')); if (!process.env.LABELS_OK) process.exit(1); }
 for (const F of Object.values(FIGHTS)) for (const a of F.assists || []) if (a.flag) flags.add(a.flag);
 for (const e of ENDINGS) flags.add(e.flag);
 for (const s of STAT_LINES) { flags.add(s.flag); if (s.not) flags.add(s.not); }
@@ -130,7 +152,11 @@ beats.forEach((b, i) => {
     case 'clip': f.who = whoId(b.who); f.s = cstr(b.clip); f.i = b.loop ? 1 : 0; f.f = b.speed || 1; break;
     case 'emote': f.who = whoId(b.who); f.i = EMOTES[b.emote]; f.f = b.amount; break;
     case 'objective': f.s = cstr(b.text); break;
-    case 'roam': f.s = cstr(b.place); f.f = b.radius || 0; f.s2 = cstr(b.prompt); f.f2 = b.hour || 0; f.i = b.side0; f.i2 = b.nside; f.who = b.follow ? whoId(b.follow) : -1; f.t0 = b.t0; f.nt = b.nt; f.need = b.need; f.k0 = b.k0; f.nk = b.nk; f.f3 = b.until || 0; f.flag = b.indoors ? 1 : 0; break;
+    case 'roam': f.s = cstr(b.place); f.f = b.radius || 0; f.s2 = cstr(b.prompt); f.f2 = b.hour || 0; f.i = b.side0; f.i2 = b.nside; f.who = b.follow ? whoId(b.follow) : -1; f.t0 = b.t0; f.nt = b.nt; f.need = b.need; f.k0 = b.k0; f.nk = b.nk; f.f3 = b.until || 0; f.flag = b.indoors ? 1 : 0; f.target = Math.round((b.auto || 0) * 10); break;
+    case 'night': f.i = b.n; f.f = b.hour || 19; f.s = cstr(b.title); f.s2 = cstr(b.sub); break;
+    case 'epilogue': f.i = b.part || 0; break;
+    case 'bike': f.i = b.mode; f.who = b.who ? whoId(b.who) : -1; f.mark = markC(b.mark); break;
+    case 'prop': f.s = cstr(b.name); f.i = { hide: 0, still: 1, circle: 2, straight: 3 }[b.mode]; f.mark = markC(b.mark); if (f.i === undefined) throw new Error('prop mode ' + b.mode); break;
     case 'bark': f.who = whoId(b.who); f.s = cstr(b.text); break;
     case 'fight': f.i = 'FI_' + b.id.toUpperCase(); f.i2 = (b.tutorial ? 1 : 0) | (b.cant_lose ? 2 : 0) | (b.lose_ok ? 4 : 0); f.flag = flagId(b.win_flag); f.target = flagId(b.easier_flag); break;
     case 'choice': f.s = cstr(b.prompt); f.i = b.n; break;
@@ -153,7 +179,7 @@ beats.forEach((b, i) => {
 out += '};\n';
 out += `const int SCRIPT_COUNT = ${beats.length};\n\n`;
 const stat2 = (r = {}) => { const e = Object.entries(r); if (e.length > 2) throw new Error('reward has more than two stats'); const st = [0, 1].map((i) => (e[i] ? STATS.indexOf(e[i][0]) : -1)); if (st.some((x, i) => e[i] && x < 0)) throw new Error('reward stat'); return { st, n: [0, 1].map((i) => (e[i] ? e[i][1] : 0)) }; };
-out += 'const sc_task TASKS[] = {\n' + tasks.map((t) => { const r = stat2(t.reward); return `  {${cstr(t.name)}, TK_${t.kind.toUpperCase()}, ${t.mode ? FIX_MODES.indexOf(t.mode) : 0}, ${t.who ? whoId(t.who) : -1}, ${markC(t.at)}, ${markC(t.to)}, ${cstr(t.prompt || null)}, ${cstr(t.label || null)}, ${t.n || 1}, {${r.st}}, {${r.n}}, ${t.start}, ${t.done}, ${t.optional ? 'true' : 'false'}, ${t.req}, ${(+(t.delay || 0)).toFixed(2)}f},`; }).join('\n') + '\n  {0}\n};\n';
+out += 'const sc_task TASKS[] = {\n' + tasks.map((t) => { const r = stat2(t.reward); return `  {${cstr(t.name)}, TK_${t.kind.toUpperCase()}, ${t.mode ? FIX_MODES.indexOf(t.mode) : 0}, ${t.who ? whoId(t.who) : -1}, ${markC(t.at)}, ${markC(t.to)}, ${cstr(t.prompt || null)}, ${cstr(t.label || null)}, ${t.n || 1}, {${r.st}}, {${r.n}}, ${t.start}, ${t.done}, ${t.optional ? 'true' : 'false'}, ${t.req}, ${(+(t.delay || 0)).toFixed(2)}f, ${t.with ? whoId(t.with) : -1}, ${cstr(t.where || null)}, ${cstr(t.where2 || null)}},`; }).join('\n') + '\n  {0}\n};\n';
 out += 'const sc_banter BANTER[] = {\n' + banter.map((k) => `  {${whoId(k.who)}, ${cstr(k.text)}, ${(+(k.delay || 0)).toFixed(2)}f, ${markC(k.near)}},`).join('\n') + '\n  {0}\n};\n\n';
 out += 'const sc_side SIDES[] = {\n' + sides.map((s) => `  {${cstr(s.name)}, ${whoId(s.who)}, ${markC(s.mark)}, ${cstr(s.prompt)}, ${s.start}},`).join('\n') + '\n  {0}\n};\n\n';
 // cast
@@ -178,17 +204,18 @@ for (const id of FIGHT_IDS) {
   out += `}, FT_${(F.twist || 'none').toUpperCase()}, ${(+(F.twist_a || 0)).toFixed(2)}f, ${(+(F.twist_b || 0)).toFixed(2)}f, ${(+(F.obj ? F.obj[0] : 0)).toFixed(2)}f, ${(+(F.obj ? F.obj[1] : 0)).toFixed(2)}f, ${cstr(F.obj_label || null)}, ${F.protect ? whoId(F.protect) : -1}, `;
   out += `${barks.length}, {${barks.map((k) => `{FB_${k.on.toUpperCase()}, ${whoId(k.who)}, ${cstr(k.text)}}`).join(', ') || '{0}'}}, `;
   out += `${as.length}, {${as.map((a) => `{${whoId(a.who)}, ${flagId(a.flag)}, ${(+(a.trust || 0)).toFixed(1)}f}`).join(', ') || '{0}'}}, `;
-  out += `${(+(F.phase2 || 0)).toFixed(3)}f, ${F.qte ? 'true' : 'false'}, ${F.tier || 1}},\n`;
+  out += `${(+(F.phase2 || 0)).toFixed(3)}f, ${F.qte ? 'true' : 'false'}, ${F.tier || 1}, ${{ welding_table: 1 }[F.obj_prop] || 0}},\n`;
 }
 out += '};\n\n';
-out += 'const sc_ending ENDINGS[] = {\n' + ENDINGS.map((e) => `  {${flagId(e.flag)}, ${cstr(e.title)}, {${e.lines.map(cstr).join(', ')}}},`).join('\n') + '\n  {-1}\n};\n';
-out += 'const sc_statline STAT_LINES[] = {\n' + STAT_LINES.map((s) => `  {${flagId(s.flag)}, ${flagId(s.not)}, ${cstr(s.text)}},`).join('\n') + '\n  {-1}\n};\n';
+out += 'const sc_ending ENDINGS[] = {\n' + ENDINGS.map((e) => `  {${flagId(e.flag)}, ${cstr(e.title)}, {${e.lines.map(cstr).join(', ')}}, ${e.part}},`).join('\n') + '\n  {-1}\n};\n';
+out += 'const sc_statline STAT_LINES[] = {\n' + STAT_LINES.map((s) => `  {${flagId(s.flag)}, ${flagId(s.not)}, ${cstr(s.text)}, ${s.part}},`).join('\n') + '\n  {-1}\n};\n';
+out += `const int NIGHT_COUNT = ${NIGHTS.length};\n`;
 const GEN = process.env.GEN ? join(process.cwd(), process.env.GEN) : join(ROOT, 'src/gen');
 mkdirSync(GEN, { recursive: true });
 writeFileSync(join(GEN, 'script.c'), process.env.GEN ? out.replace('#include "script.h"', '#include "script.h"') : out);
 let hdr = `/* GENERATED by tools/script/compile.mjs. */\n#ifndef SCRIPT_GEN_H\n#define SCRIPT_GEN_H\n`;
 hdr += `enum { ${WHO.map((w, i) => `W_${w.toUpperCase()} = ${i}`).join(', ')}, WHO_COUNT = ${WHO.length} };\n`;
-hdr += `enum { FLAG_COUNT = ${flagList.length} };\n`;
+hdr += `enum { FLAG_COUNT = ${flagList.length}, FLAG_V12 = 38 };\n`;
 hdr += `enum { ${FIGHT_IDS.map((f) => 'FI_' + f.toUpperCase()).join(', ')}, FI_COUNT };\n`;
 hdr += `enum { ${OPS.map((o) => 'OP_' + o.toUpperCase()).join(', ')} };\n`;
 hdr += `enum { ${TASK_KINDS.map((k) => 'TK_' + k.toUpperCase()).join(', ')}, TK_COUNT };\n`;

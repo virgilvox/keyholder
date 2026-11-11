@@ -1,0 +1,2438 @@
+[
+ {
+  "speaker": "st_commuter",
+  "voice": "bm_lewis",
+  "speed": 1.02,
+  "text": "The sign at the station says four minutes. It has said four minutes for ten minutes."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Listen for the bell at Macdonald. Then you have a minute."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Listen for the bell at Macdonald. Then you have a minute."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Listen for the bell at Macdonald. Then you have a minute."
+ },
+ {
+  "speaker": "st_commuter",
+  "voice": "bm_lewis",
+  "speed": 1.02,
+  "text": "A bell. That's better than the sign. The bell doesn't lie to me."
+ },
+ {
+  "speaker": "st_commuter",
+  "voice": "bm_lewis",
+  "speed": 1.02,
+  "text": "Were you the one out here with the sword? Over a bicycle? With a bag of bread?"
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "It was the lab's bike. We got it back."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "It was the lab's bike. We got it back."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "It was the lab's bike. We got it back."
+ },
+ {
+  "speaker": "st_commuter",
+  "voice": "bm_lewis",
+  "speed": 1.02,
+  "text": "Good. People should leave bikes alone. I say that as a man who has lost three."
+ },
+ {
+  "speaker": "st_commuter",
+  "voice": "bm_lewis",
+  "speed": 1.02,
+  "text": "Fair. I didn't see anything. I was reading my phone. Like a citizen."
+ },
+ {
+  "speaker": "st_commuter",
+  "voice": "bm_lewis",
+  "speed": 1.02,
+  "text": "You're still in your lanyard. Long shift?"
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Nine to midnight. I'm about halfway, I think."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Nine to midnight. I've stopped checking the clock."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Nine until midnight. The clock and I aren't speaking."
+ },
+ {
+  "speaker": "st_commuter",
+  "voice": "bm_lewis",
+  "speed": 1.02,
+  "text": "I do eight hours at a desk and I feel like a raisin. Go easy on yourself."
+ },
+ {
+  "speaker": "st_commuter",
+  "voice": "bm_lewis",
+  "speed": 1.02,
+  "text": "Last eastbound's soon. I always end up running for it, and I always make it, and I never learn."
+ },
+ {
+  "speaker": "st_commuter",
+  "voice": "bm_lewis",
+  "speed": 1.02,
+  "text": "Your lab still has the lights on. Does anybody over there ever go home?"
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Eventually. Somebody has to lock up, and tonight that's me."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Eventually. Somebody has to lock up, and tonight that's me."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Eventually. Somebody has to lock up, and tonight that's me."
+ },
+ {
+  "speaker": "st_commuter",
+  "voice": "bm_lewis",
+  "speed": 1.02,
+  "text": "Still waiting on the train. Me and the pigeons. Have a good one."
+ },
+ {
+  "speaker": "st_retiree",
+  "voice": "am_echo",
+  "speed": 0.92,
+  "text": "I drove a bus down this street for twenty two years. Before the train. Before the trees, even."
+ },
+ {
+  "speaker": "st_retiree",
+  "voice": "am_echo",
+  "speed": 0.92,
+  "text": "Now there's a place that lets people use a laser on purpose. What exactly goes on in there?"
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Come in and see. It's open to the public."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Come in and see. It's open to the public."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Come in and see. It's open to the public."
+ },
+ {
+  "speaker": "st_retiree",
+  "voice": "am_echo",
+  "speed": 0.92,
+  "text": "Just walk in? Nobody checks if I belong?"
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "If the lab's open, you belong. We'll show you around."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "If the lab's open, you belong. We'll show you around."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "If the lab's open, you belong. We'll show you around."
+ },
+ {
+  "speaker": "st_retiree",
+  "voice": "am_echo",
+  "speed": 0.92,
+  "text": "Huh. I might. My grandson thinks I can't work a printer."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "People build things. Furniture, robots, costumes."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "People build things. Furniture, robots, costumes."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "People build things. Furniture, robots, costumes."
+ },
+ {
+  "speaker": "st_retiree",
+  "voice": "am_echo",
+  "speed": 0.92,
+  "text": "Costumes. Well. There's a man over there in a cape every Wednesday. That explains it."
+ },
+ {
+  "speaker": "st_retiree",
+  "voice": "am_echo",
+  "speed": 0.92,
+  "text": "I walked past your door twice today. Third time, I'm going in."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Ask for the lathe. Somebody will light up."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Ask for the lathe. Somebody will light up."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Ask for the lathe. Somebody will light up."
+ },
+ {
+  "speaker": "st_retiree",
+  "voice": "am_echo",
+  "speed": 0.92,
+  "text": "Saw some commotion out front at lunch. In my day, we settled things with a strongly worded letter."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "We don't settle anything by sword. That was about a bike."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "We don't settle anything by sword. That was about a bike."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "We don't settle anything by sword. That was about a bike."
+ },
+ {
+  "speaker": "st_retiree",
+  "voice": "am_echo",
+  "speed": 0.92,
+  "text": "That's what they all say."
+ },
+ {
+  "speaker": "st_retiree",
+  "voice": "am_echo",
+  "speed": 0.92,
+  "text": "Don't let the heat get you. Drink some water. A bus driver's advice, free."
+ },
+ {
+  "speaker": "st_student",
+  "voice": "bf_lily",
+  "speed": 1.06,
+  "text": "Sorry, is that a HeatSync lanyard? I have a studio project due Friday and I need a laser cutter."
+ },
+ {
+  "speaker": "st_student",
+  "voice": "bf_lily",
+  "speed": 1.06,
+  "text": "Do I need to know somebody? Like, does someone have to vouch for me?"
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "No vouch needed. Come in during open hours."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "No vouch needed. Come in during open hours."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "No vouch needed. Come in during open hours."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Joining is a donation and one form. Nobody approves it."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Joining is a donation and one form. Nobody approves it."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Joining is a donation and one form. Nobody approves it."
+ },
+ {
+  "speaker": "st_student",
+  "voice": "bf_lily",
+  "speed": 1.06,
+  "text": "Wait. That's it? Our school shop has a three page waiver and a guy named Doug."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "We have a waiver too. And a laser checkout first."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "We have a waiver too. And a laser checkout first."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "We have a waiver too. And a laser checkout first."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Come tonight. Arduino Night is at seven."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Come tonight. Arduino Night is at seven."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Come tonight. Arduino Night is at seven."
+ },
+ {
+  "speaker": "st_student",
+  "voice": "bf_lily",
+  "speed": 1.06,
+  "text": "I don't know anything about Arduino."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Perfect. No experience needed. That's the whole point of it."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Perfect. No experience needed. That's the whole point of it."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Perfect. No experience needed. That's the whole point of it."
+ },
+ {
+  "speaker": "st_student",
+  "voice": "bf_lily",
+  "speed": 1.06,
+  "text": "I came by! Well. I stood outside and watched someone blink an LED for ten minutes."
+ },
+ {
+  "speaker": "st_student",
+  "voice": "bf_lily",
+  "speed": 1.06,
+  "text": "It was weirdly beautiful. I'm going in next time."
+ },
+ {
+  "speaker": "st_student",
+  "voice": "bf_lily",
+  "speed": 1.06,
+  "text": "I asked my professor about the laser. She said she's a member too. Small world. Small, laser cut world."
+ },
+ {
+  "speaker": "st_student",
+  "voice": "bf_lily",
+  "speed": 1.06,
+  "text": "Is it true there's a twenty four hour card? I'm a night person. Like, aggressively."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "That one needs a nomination. Come around. People will know you."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "That one needs a nomination. Come around. People will know you."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "That one needs a nomination. Come around. People will know you."
+ },
+ {
+  "speaker": "st_student",
+  "voice": "bf_lily",
+  "speed": 1.06,
+  "text": "So I have to be a regular first. Okay. I can be a regular. I'm a regular at three cafes."
+ },
+ {
+  "speaker": "st_student",
+  "voice": "bf_lily",
+  "speed": 1.06,
+  "text": "Friday. The project is due Friday. Wish me luck."
+ },
+ {
+  "speaker": "st_barista",
+  "voice": "af_river",
+  "speed": 0.98,
+  "text": "You're from the lab. I can tell. You all order cold brew like it's a structural material."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Sometimes it is. A cup once shimmed a print bed."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Sometimes it is. A cup once shimmed a print bed."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Sometimes it is. A cup once shimmed a print bed."
+ },
+ {
+  "speaker": "st_barista",
+  "voice": "af_river",
+  "speed": 0.98,
+  "text": "I'm going to pretend you didn't tell me that."
+ },
+ {
+  "speaker": "st_barista",
+  "voice": "af_river",
+  "speed": 0.98,
+  "text": "Was that you at lunch? Swords, a bike, and a sack of sandwiches? The whole patio stopped talking."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Just a normal Wednesday."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Just a normal Wednesday."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Just a normal Wednesday."
+ },
+ {
+  "speaker": "st_barista",
+  "voice": "af_river",
+  "speed": 0.98,
+  "text": "If that's normal, I want to see a weird one."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "We don't usually do that. Truly."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "We don't usually do that. Truly."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "We don't usually do that. Truly."
+ },
+ {
+  "speaker": "st_barista",
+  "voice": "af_river",
+  "speed": 0.98,
+  "text": "Sure. And I don't usually give free refills. Here we are."
+ },
+ {
+  "speaker": "st_barista",
+  "voice": "af_river",
+  "speed": 0.98,
+  "text": "One of your people comes in every morning and draws circuits on the napkins. We keep the good ones."
+ },
+ {
+  "speaker": "st_barista",
+  "voice": "af_river",
+  "speed": 0.98,
+  "text": "Break's over in five. The milk steamer waits for no one."
+ },
+ {
+  "speaker": "st_crew",
+  "voice": "am_fenrir",
+  "speed": 0.95,
+  "text": "This lamp post has been blinking since Tuesday. I've been up and down it four times."
+ },
+ {
+  "speaker": "st_crew",
+  "voice": "am_fenrir",
+  "speed": 0.95,
+  "text": "It's a hundred and four degrees and I'm in long sleeves. Don't go into public works, kid."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Want a cold soda from the lab fridge?"
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Want a cold soda from the lab fridge?"
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Want a cold soda from the lab fridge?"
+ },
+ {
+  "speaker": "st_crew",
+  "voice": "am_fenrir",
+  "speed": 0.95,
+  "text": "You'd do that? Yeah. That's nice of you. Just one. I'm on the clock."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Sounds like a loose neutral."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Sounds like a loose neutral."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Sounds like a loose neutral."
+ },
+ {
+  "speaker": "st_crew",
+  "voice": "am_fenrir",
+  "speed": 0.95,
+  "text": "That's what I said. My boss said it's the photocell. We have a bet."
+ },
+ {
+  "speaker": "st_crew",
+  "voice": "am_fenrir",
+  "speed": 0.95,
+  "text": "That soda saved my afternoon. And it was the neutral. I won twenty bucks."
+ },
+ {
+  "speaker": "st_crew",
+  "voice": "am_fenrir",
+  "speed": 0.95,
+  "text": "My kid's got a remote control car with a busted motor. You people fix stuff like that?"
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "We'll show you how. Bring the car and the kid."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "We'll show you how. Bring the car and the kid."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "We'll show you how. Bring the car and the kid."
+ },
+ {
+  "speaker": "st_crew",
+  "voice": "am_fenrir",
+  "speed": 0.95,
+  "text": "Huh. Teach a man to fix a car. I like that."
+ },
+ {
+  "speaker": "st_crew",
+  "voice": "am_fenrir",
+  "speed": 0.95,
+  "text": "Back up the pole. Wish me luck."
+ },
+ {
+  "speaker": "st_usher",
+  "voice": "af_sarah",
+  "speed": 0.95,
+  "text": "I usher at the Arts Center on show nights. I've walked past your window for years and never asked."
+ },
+ {
+  "speaker": "st_usher",
+  "voice": "af_sarah",
+  "speed": 0.95,
+  "text": "What is a hackerspace, exactly? My nephew says it's a gym for nerds."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "A shared workshop the members run together."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "A shared workshop the members run together."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "A shared workshop the members run together."
+ },
+ {
+  "speaker": "st_usher",
+  "voice": "af_sarah",
+  "speed": 0.95,
+  "text": "Like a co-op. With saws."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "With saws, and people who want to show you how."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "With saws, and people who want to show you how."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "With saws, and people who want to show you how."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Your nephew isn't wrong."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Your nephew isn't wrong."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Your nephew isn't wrong."
+ },
+ {
+  "speaker": "st_usher",
+  "voice": "af_sarah",
+  "speed": 0.95,
+  "text": "He usually isn't. Don't tell him I said so."
+ },
+ {
+  "speaker": "st_usher",
+  "voice": "af_sarah",
+  "speed": 0.95,
+  "text": "Intermission. I came out for air. The show is a musical about a lighthouse. Everyone cried."
+ },
+ {
+  "speaker": "st_usher",
+  "voice": "af_sarah",
+  "speed": 0.95,
+  "text": "Including the lighthouse, I think. It had a very good monologue."
+ },
+ {
+  "speaker": "st_usher",
+  "voice": "af_sarah",
+  "speed": 0.95,
+  "text": "If you ever want to see the show, find me at the side door. I'll find you a seat."
+ },
+ {
+  "speaker": "st_tourist",
+  "voice": "am_liam",
+  "speed": 1,
+  "text": "Hi. I'm visiting my sister, and she's at work, so I'm doing what she called a downtown walk."
+ },
+ {
+  "speaker": "st_tourist",
+  "voice": "am_liam",
+  "speed": 1,
+  "text": "Which so far has been a bakery line and a train that rang its bell at me. Is there more?"
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Come see the lab. We do tours."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Come see the lab. We do tours."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Come see the lab. We do tours."
+ },
+ {
+  "speaker": "st_tourist",
+  "voice": "am_liam",
+  "speed": 1,
+  "text": "A tour! Of what?"
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Lasers, printers, a woodshop, and somebody's robot that only drives left."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Lasers, printers, a woodshop, and somebody's robot that only drives left."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Lasers, printers, a woodshop, and somebody's robot that only drives left."
+ },
+ {
+  "speaker": "st_tourist",
+  "voice": "am_liam",
+  "speed": 1,
+  "text": "Sold. I love a robot with a flaw."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Walk east to the Arts Center. It's worth it."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Walk east to the Arts Center. It's worth it."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Walk east to the Arts Center. It's worth it."
+ },
+ {
+  "speaker": "st_tourist",
+  "voice": "am_liam",
+  "speed": 1,
+  "text": "East? That way? Okay. I trust a person with a clipboard."
+ },
+ {
+  "speaker": "st_tourist",
+  "voice": "am_liam",
+  "speed": 1,
+  "text": "Hey, you're from the lab, right? Two guys on the Chupacabra patio talked my ear off about it."
+ },
+ {
+  "speaker": "st_tourist",
+  "voice": "am_liam",
+  "speed": 1,
+  "text": "One had a laptop. One had a beer. Both had opinions about solder."
+ },
+ {
+  "speaker": "st_tourist",
+  "voice": "am_liam",
+  "speed": 1,
+  "text": "They said if I wanted the real downtown, I should find the hackerspace. So, here I am."
+ },
+ {
+  "speaker": "st_tourist",
+  "voice": "am_liam",
+  "speed": 1,
+  "text": "My sister is not going to believe the robot. I'm going to tell her anyway."
+ },
+ {
+  "speaker": "st_busker",
+  "voice": "am_eric",
+  "speed": 0.96,
+  "text": "I play outside the Nile on show nights. My guitar's in the car. Tonight I'm scouting the good corner."
+ },
+ {
+  "speaker": "st_busker",
+  "voice": "am_eric",
+  "speed": 0.96,
+  "text": "The good corner has shade, foot traffic, and nobody's speaker next door playing the same song."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "We've got a busted amp you could fix up."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "We've got a busted amp you could fix up."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "We've got a busted amp you could fix up."
+ },
+ {
+  "speaker": "st_busker",
+  "voice": "am_eric",
+  "speed": 0.96,
+  "text": "You'd let me? I'd need to know a soldering iron from a curling iron."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Somebody will show you. Bring it to Arduino Night, seven tonight."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Somebody will show you. Bring it to Arduino Night, seven tonight."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Somebody will show you. Bring it to Arduino Night, seven tonight."
+ },
+ {
+  "speaker": "st_busker",
+  "voice": "am_eric",
+  "speed": 0.96,
+  "text": "In front of the hackerspace? Do you get foot traffic, or just people carrying plywood?"
+ },
+ {
+  "speaker": "st_busker",
+  "voice": "am_eric",
+  "speed": 0.96,
+  "text": "I keep thinking about that amp. If I build my own pedal, am I a musician or an engineer?"
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Both. That's the good news."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Both. That's the good news."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Both. That's the good news."
+ },
+ {
+  "speaker": "st_busker",
+  "voice": "am_eric",
+  "speed": 0.96,
+  "text": "Corner's still free. I'm going to stand on it a while, so it knows it's mine."
+ },
+ {
+  "speaker": "st_neighbor",
+  "voice": "af_aoede",
+  "speed": 0.98,
+  "text": "I live behind you, on the third floor. I work from home, so I hear your shop vac at ten every morning."
+ },
+ {
+  "speaker": "st_neighbor",
+  "voice": "af_aoede",
+  "speed": 0.98,
+  "text": "I'm not complaining. It's like a rooster. A rooster with a filter bag."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "You could work from our coworking tables."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "You could work from our coworking tables."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "You could work from our coworking tables."
+ },
+ {
+  "speaker": "st_neighbor",
+  "voice": "af_aoede",
+  "speed": 0.98,
+  "text": "Is that allowed? I'm not a member."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Anyone can come in. If you stay, membership is a donation."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Anyone can come in. If you stay, membership is a donation."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Anyone can come in. If you stay, membership is a donation."
+ },
+ {
+  "speaker": "st_neighbor",
+  "voice": "af_aoede",
+  "speed": 0.98,
+  "text": "A change of scenery. With a rooster. I'll think about it."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Sorry about the shop vac."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Sorry about the shop vac."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Sorry about the shop vac."
+ },
+ {
+  "speaker": "st_neighbor",
+  "voice": "af_aoede",
+  "speed": 0.98,
+  "text": "Don't be. It means somebody cleaned up. That's rare in a building."
+ },
+ {
+  "speaker": "st_neighbor",
+  "voice": "af_aoede",
+  "speed": 0.98,
+  "text": "Gloria from my floor says you're posting quiet hours. She told the whole elevator."
+ },
+ {
+  "speaker": "st_neighbor",
+  "voice": "af_aoede",
+  "speed": 0.98,
+  "text": "She's been rehearsing that speech for a month. You took it from her. She seems happy anyway."
+ },
+ {
+  "speaker": "st_neighbor",
+  "voice": "af_aoede",
+  "speed": 0.98,
+  "text": "Ten o'clock tomorrow. The rooster. I'll be listening."
+ },
+ {
+  "speaker": "st_courier",
+  "voice": "bm_daniel",
+  "speed": 1.04,
+  "text": "That orange loaner by your door is yours, right? I saw two guys try to walk it off at lunch."
+ },
+ {
+  "speaker": "st_courier",
+  "voice": "bm_daniel",
+  "speed": 1.04,
+  "text": "I was going to step in. Then you stepped in. With a sword. So I stepped back out."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "It's a shared bike. It goes on the rack, not in a van."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "It's a shared bike. It goes on the rack, not in a van."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "It's a shared bike. It goes on the rack, not in a van."
+ },
+ {
+  "speaker": "st_courier",
+  "voice": "bm_daniel",
+  "speed": 1.04,
+  "text": "Respect. Put a better lock on it, though. I can recommend one. I've lost four bikes on this street."
+ },
+ {
+  "speaker": "st_courier",
+  "voice": "bm_daniel",
+  "speed": 1.04,
+  "text": "I do forty miles a day on Main and Broadway. You know what I want? A bike repair stand that's in the shade."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "We have one inside. It's in the shade, because it's indoors."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "We have one inside. It's in the shade, because it's indoors."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "We have one inside. It's in the shade, because it's indoors."
+ },
+ {
+  "speaker": "st_courier",
+  "voice": "bm_daniel",
+  "speed": 1.04,
+  "text": "Don't tempt me. I'll move in."
+ },
+ {
+  "speaker": "st_courier",
+  "voice": "bm_daniel",
+  "speed": 1.04,
+  "text": "Got a drop at Center and Main. Later."
+ },
+ {
+  "speaker": "st_teen",
+  "voice": "af_nicole",
+  "speed": 1.12,
+  "text": "Wait. Wait wait wait. Are you the one who beat High Score at Level 1 today?"
+ },
+ {
+  "speaker": "st_teen",
+  "voice": "af_nicole",
+  "speed": 1.12,
+  "text": "Everybody at the arcade is losing their minds. She's never lost on that cabinet."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "It was a close game."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "It was a close game."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "It was a close game."
+ },
+ {
+  "speaker": "st_teen",
+  "voice": "af_nicole",
+  "speed": 1.12,
+  "text": "That is the coolest thing a grown up has ever said to me."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Come learn to build a cabinet at the lab."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Come learn to build a cabinet at the lab."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Come learn to build a cabinet at the lab."
+ },
+ {
+  "speaker": "st_teen",
+  "voice": "af_nicole",
+  "speed": 1.12,
+  "text": "You can build an arcade cabinet? Like, from wood? Like, legally?"
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "From wood, with help, legally. Bring a parent the first time."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "From wood, with help, legally. Bring a parent the first time."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "From wood, with help, legally. Bring a parent the first time."
+ },
+ {
+  "speaker": "st_teen",
+  "voice": "af_nicole",
+  "speed": 1.12,
+  "text": "My board's got a bad wheel. It sounds like a shopping cart. Everybody can hear me coming."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Swap the bearings. We have a press for it at the lab."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Swap the bearings. We have a press for it at the lab."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Swap the bearings. We have a press for it at the lab."
+ },
+ {
+  "speaker": "st_teen",
+  "voice": "af_nicole",
+  "speed": 1.12,
+  "text": "A bearing press. That sounds so official. Okay. Maybe."
+ },
+ {
+  "speaker": "st_teen",
+  "voice": "af_nicole",
+  "speed": 1.12,
+  "text": "Gotta go. Arcade closes at ten and I'm saving up for a high score of my own."
+ },
+ {
+  "speaker": "st_cook",
+  "voice": "am_onyx",
+  "speed": 1.02,
+  "text": "Ten minute break. The kitchen is a hundred and twenty degrees, so out here feels like a fridge."
+ },
+ {
+  "speaker": "st_cook",
+  "voice": "am_onyx",
+  "speed": 1.02,
+  "text": "My knife needs sharpening and our sharpening guy retired. You people have a grinder?"
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Bring it in. Someone will show you how."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Bring it in. Someone will show you how."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Bring it in. Someone will show you how."
+ },
+ {
+  "speaker": "st_cook",
+  "voice": "am_onyx",
+  "speed": 1.02,
+  "text": "Show me how. Not do it for me. I like that. I'm going to be insufferable about it."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Don't learn on your good knife."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Don't learn on your good knife."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Don't learn on your good knife."
+ },
+ {
+  "speaker": "st_cook",
+  "voice": "am_onyx",
+  "speed": 1.02,
+  "text": "Wise words. I'll bring the bad knife. I have a lot of bad knives."
+ },
+ {
+  "speaker": "st_cook",
+  "voice": "am_onyx",
+  "speed": 1.02,
+  "text": "Kitchen's closing. I'm going to eat a whole sleeve of crackers on the train and nobody can stop me."
+ },
+ {
+  "speaker": "st_cook",
+  "voice": "am_onyx",
+  "speed": 1.02,
+  "text": "Back to the line. Order up, as they say. They do say it. Constantly."
+ },
+ {
+  "speaker": "st_owl",
+  "voice": "am_puck",
+  "speed": 0.98,
+  "text": "I like Main this late. The train's quieter, the lights hum. It feels like the street is thinking."
+ },
+ {
+  "speaker": "st_owl",
+  "voice": "am_puck",
+  "speed": 0.98,
+  "text": "Your lab is the only window still lit on this block. Somebody inside is working on something."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "You're welcome to look in. We're open a bit longer."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "You're welcome to look in. We're open a bit longer."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "You're welcome to look in. We're open a bit longer."
+ },
+ {
+  "speaker": "st_owl",
+  "voice": "am_puck",
+  "speed": 0.98,
+  "text": "Not tonight. But it's nice to know the light is on. Somebody's always building something in there."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Mostly it's me, turning things off."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Mostly it's me, turning things off."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Mostly it's me, turning things off."
+ },
+ {
+  "speaker": "st_owl",
+  "voice": "am_puck",
+  "speed": 0.98,
+  "text": "Somebody has to be the last one. That's its own kind of work."
+ },
+ {
+  "speaker": "st_owl",
+  "voice": "am_puck",
+  "speed": 0.98,
+  "text": "Saw you walking someone to the train. She was talking about cardboard the whole way. Very happy about it."
+ },
+ {
+  "speaker": "st_owl",
+  "voice": "am_puck",
+  "speed": 0.98,
+  "text": "Good night, keyholder. Lock the door twice. Everybody forgets once."
+ },
+ {
+  "speaker": "st_counter",
+  "voice": "af_jessica",
+  "speed": 0.98,
+  "text": "You're here for the lab order? Fourteen sandwiches. One of them just says surprise."
+ },
+ {
+  "speaker": "st_counter",
+  "voice": "af_jessica",
+  "speed": 0.98,
+  "text": "We don't know who ordered surprise. The baker made something. It's the baker's secret."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Somebody at the lab is going to be very happy, or very confused."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Somebody at the lab is going to be very happy, or very confused."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Somebody at the lab is going to be very happy, or very confused."
+ },
+ {
+  "speaker": "st_counter",
+  "voice": "af_jessica",
+  "speed": 0.98,
+  "text": "We get a lot of your people in here. You can tell them by the sawdust on their shoes."
+ },
+ {
+  "speaker": "st_counter",
+  "voice": "af_jessica",
+  "speed": 0.98,
+  "text": "And the questions about how the ovens work. One of them asked for a schematic."
+ },
+ {
+  "speaker": "st_counter",
+  "voice": "af_jessica",
+  "speed": 0.98,
+  "text": "There's a show tonight, so it'll be packed down here in an hour. Grab a coffee now, while you can."
+ },
+ {
+  "speaker": "st_counter",
+  "voice": "af_jessica",
+  "speed": 0.98,
+  "text": "Tokens are at the machine. The claw game is fair. I'm required to say that."
+ },
+ {
+  "speaker": "st_counter",
+  "voice": "af_jessica",
+  "speed": 0.98,
+  "text": "Welcome in. Take your time. You look like you've been on your feet since this morning."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Nine o'clock, and I'm hosting the hackerspace till midnight."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Nine o'clock, and I'm hosting the hackerspace till midnight."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Nine o'clock, and I'm hosting the hackerspace till midnight."
+ },
+ {
+  "speaker": "st_counter",
+  "voice": "af_jessica",
+  "speed": 0.98,
+  "text": "Then sit for a minute. Nobody's timing you in here."
+ },
+ {
+  "speaker": "st_counter",
+  "voice": "af_jessica",
+  "speed": 0.98,
+  "text": "Anything else? No rush. Seriously, sit down."
+ },
+ {
+  "speaker": "st_patron",
+  "voice": "bm_george",
+  "speed": 0.96,
+  "text": "I've had this same seat every week for six years. They put a little plaque on it. Well, a sticky note."
+ },
+ {
+  "speaker": "st_patron",
+  "voice": "bm_george",
+  "speed": 0.96,
+  "text": "You're from the hackerspace, aren't you? Could you people make me a real plaque?"
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Come in and engrave it yourself."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Come in and engrave it yourself."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Come in and engrave it yourself."
+ },
+ {
+  "speaker": "st_patron",
+  "voice": "bm_george",
+  "speed": 0.96,
+  "text": "On the laser? Me? I can't program a microwave."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "We'll walk you through it. It's mostly picking a font."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "We'll walk you through it. It's mostly picking a font."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "We'll walk you through it. It's mostly picking a font."
+ },
+ {
+  "speaker": "st_patron",
+  "voice": "bm_george",
+  "speed": 0.96,
+  "text": "It's a good note. It's been through a lot."
+ },
+ {
+  "speaker": "st_patron",
+  "voice": "bm_george",
+  "speed": 0.96,
+  "text": "Same seat next week. You'll know where to find me."
+ },
+ {
+  "speaker": "st_m_cowork",
+  "voice": "bm_fable",
+  "speed": 1,
+  "text": "Morning, keyholder. I'm writing firmware, which means I'm mostly staring at a wall and sighing."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Want a coffee for the sighing?"
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Want a coffee for the sighing?"
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Want a coffee for the sighing?"
+ },
+ {
+  "speaker": "st_m_cowork",
+  "voice": "bm_fable",
+  "speed": 1,
+  "text": "No. The sighing is part of the process. The coffee comes after the first bug."
+ },
+ {
+  "speaker": "st_m_cowork",
+  "voice": "bm_fable",
+  "speed": 1,
+  "text": "The tables are loud today. I love it. At home it's me, a cat, and a compiler that hates me."
+ },
+ {
+  "speaker": "st_m_cowork",
+  "voice": "bm_fable",
+  "speed": 1,
+  "text": "Back to it. Sixty three warnings. Sixty two. Progress."
+ },
+ {
+  "speaker": "st_m_jewelry",
+  "voice": "af_kore",
+  "speed": 1.02,
+  "text": "I'm setting a stone the size of a sesame seed. If you sneeze, we're both looking for it on the floor."
+ },
+ {
+  "speaker": "st_m_jewelry",
+  "voice": "af_kore",
+  "speed": 1.02,
+  "text": "Thank you. Got it. You can breathe now. That was a team effort."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Need the loupe from the drawer?"
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Need the loupe from the drawer?"
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Need the loupe from the drawer?"
+ },
+ {
+  "speaker": "st_m_jewelry",
+  "voice": "af_kore",
+  "speed": 1.02,
+  "text": "I'm wearing two already. I look like a beetle. A focused beetle."
+ },
+ {
+  "speaker": "st_m_jewelry",
+  "voice": "af_kore",
+  "speed": 1.02,
+  "text": "Ring's nearly done. I'll show you when it's set. Don't sneeze."
+ },
+ {
+  "speaker": "st_m_fixer",
+  "voice": "am_santa",
+  "speed": 1,
+  "text": "Somebody leveled this bench with a coaster and a dream. I'm fixing it properly. With shims and a grudge."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Leave a note on it when you're done, so it stays fixed."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Leave a note on it when you're done, so it stays fixed."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Leave a note on it when you're done, so it stays fixed."
+ },
+ {
+  "speaker": "st_m_fixer",
+  "voice": "am_santa",
+  "speed": 1,
+  "text": "I'll leave three. One will survive."
+ },
+ {
+  "speaker": "st_m_fixer",
+  "voice": "am_santa",
+  "speed": 1,
+  "text": "Almost level. Almost is a whole profession, you know."
+ },
+ {
+  "speaker": "st_m_printer",
+  "voice": "af_nova",
+  "speed": 1,
+  "text": "Third print of the same bracket. The first one warped, the second one I printed at the wrong scale."
+ },
+ {
+  "speaker": "st_m_printer",
+  "voice": "af_nova",
+  "speed": 1,
+  "text": "It was very small. It was adorable. It was useless."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Keep it. Put it on a keychain."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Keep it. Put it on a keychain."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Keep it. Put it on a keychain."
+ },
+ {
+  "speaker": "st_m_printer",
+  "voice": "af_nova",
+  "speed": 1,
+  "text": "A souvenir of my shame. Yes. Absolutely."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Did you level the bed today?"
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Did you level the bed today?"
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Did you level the bed today?"
+ },
+ {
+  "speaker": "st_m_printer",
+  "voice": "af_nova",
+  "speed": 1,
+  "text": "I did not. I'm going to go do that now, and we will never speak of this."
+ },
+ {
+  "speaker": "st_m_printer",
+  "voice": "af_nova",
+  "speed": 1,
+  "text": "Print four. This is the one. I can feel it."
+ },
+ {
+  "speaker": "st_m_elec",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "The scope says my signal is clean. My circuit says otherwise. One of them is lying."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Check your ground. It's always the ground."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Check your ground. It's always the ground."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Check your ground. It's always the ground."
+ },
+ {
+  "speaker": "st_m_elec",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "It is always the ground. Why is it always the ground? Don't answer. I know why."
+ },
+ {
+  "speaker": "st_m_elec",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "It was the ground. Don't say anything."
+ },
+ {
+  "speaker": "st_m_lathe",
+  "voice": "bf_isabella",
+  "speed": 0.96,
+  "text": "I'm turning a handle for my grandmother's old kettle. The original cracked in nineteen ninety one."
+ },
+ {
+  "speaker": "st_m_lathe",
+  "voice": "bf_isabella",
+  "speed": 0.96,
+  "text": "She's been holding it with an oven mitt ever since. Thirty years of oven mitt."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Safety glasses on, and keep your sleeves clear of the chuck."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Safety glasses on, and keep your sleeves clear of the chuck."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Safety glasses on, and keep your sleeves clear of the chuck."
+ },
+ {
+  "speaker": "st_m_lathe",
+  "voice": "bf_isabella",
+  "speed": 0.96,
+  "text": "Always. You sound like the woman who checked me out on this. Good. She was right."
+ },
+ {
+  "speaker": "st_m_lathe",
+  "voice": "bf_isabella",
+  "speed": 0.96,
+  "text": "One more pass. Then it's a handle. Then it's a kettle again."
+ },
+ {
+  "speaker": "st_a_first",
+  "voice": "af_sky",
+  "speed": 1.06,
+  "text": "This is my first Arduino Night. My LED is blinking. I didn't think it would actually blink."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Now make it blink faster."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Now make it blink faster."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Now make it blink faster."
+ },
+ {
+  "speaker": "st_a_first",
+  "voice": "af_sky",
+  "speed": 1.06,
+  "text": "Change the number? This number? Oh. Oh, it's frantic now. I did that."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Welcome. Come back next month."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Welcome. Come back next month."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Welcome. Come back next month."
+ },
+ {
+  "speaker": "st_a_first",
+  "voice": "af_sky",
+  "speed": 1.06,
+  "text": "Next month I want two LEDs. I'm getting ambitious."
+ },
+ {
+  "speaker": "st_a_first",
+  "voice": "af_sky",
+  "speed": 1.06,
+  "text": "It's still blinking. I can't stop watching it."
+ },
+ {
+  "speaker": "st_a_parent",
+  "voice": "am_liam",
+  "speed": 0.98,
+  "text": "My daughter dragged me here. Now she's showing me how a servo works. I'm the student tonight."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "That's the best kind of Arduino Night."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "That's the best kind of Arduino Night."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "That's the best kind of Arduino Night."
+ },
+ {
+  "speaker": "st_a_parent",
+  "voice": "am_liam",
+  "speed": 0.98,
+  "text": "She says I hold the screwdriver wrong. She's nine. She's right."
+ },
+ {
+  "speaker": "st_a_parent",
+  "voice": "am_liam",
+  "speed": 0.98,
+  "text": "She wants to come back. So I guess I'm coming back too. I'm fine with it."
+ },
+ {
+  "speaker": "st_a_kid",
+  "voice": "af_alloy",
+  "speed": 1.12,
+  "text": "Look! It turns when I turn the knob! I made it a robot arm. It's a very small arm."
+ },
+ {
+  "speaker": "st_a_kid",
+  "voice": "af_alloy",
+  "speed": 1.12,
+  "text": "It can hold one pretzel. That's its whole job."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "That's a great job for an arm."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "That's a great job for an arm."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "That's a great job for an arm."
+ },
+ {
+  "speaker": "st_a_kid",
+  "voice": "af_alloy",
+  "speed": 1.12,
+  "text": "I know! Next I'm making a second arm. For a second pretzel."
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Show your dad how the knob works."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Show your dad how the knob works."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Show your dad how the knob works."
+ },
+ {
+  "speaker": "st_a_kid",
+  "voice": "af_alloy",
+  "speed": 1.12,
+  "text": "I did. Twice. He's slow, but he's trying."
+ },
+ {
+  "speaker": "st_a_kid",
+  "voice": "af_alloy",
+  "speed": 1.12,
+  "text": "Pretzel delivery! Beep!"
+ },
+ {
+  "speaker": "luis",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "You've been typing for an hour. Is it the game, or is it email?",
+  "kyutai": "luis"
+ },
+ {
+  "speaker": "moheeb",
+  "voice": "am_michael",
+  "speed": 1,
+  "text": "It's the game. The emails are in another tab, being ignored with dignity.",
+  "kyutai": "moheeb"
+ },
+ {
+  "speaker": "moheeb",
+  "voice": "am_michael",
+  "speed": 1,
+  "text": "I think the enemies in Coffee and Kill need a coffee break animation.",
+  "kyutai": "moheeb"
+ },
+ {
+  "speaker": "luis",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "They're made of coffee. That's a little dark.",
+  "kyutai": "luis"
+ },
+ {
+  "speaker": "moheeb",
+  "voice": "am_michael",
+  "speed": 1,
+  "text": "Dark roast.",
+  "kyutai": "moheeb"
+ },
+ {
+  "speaker": "luis",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "I'm leaving.",
+  "kyutai": "luis"
+ },
+ {
+  "speaker": "luis",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "The lab's lights are still on.",
+  "kyutai": "luis"
+ },
+ {
+  "speaker": "moheeb",
+  "voice": "am_michael",
+  "speed": 1,
+  "text": "They're always on. Somebody is printing a hinge.",
+  "kyutai": "moheeb"
+ },
+ {
+  "speaker": "luis",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "Somebody is always printing a hinge. It's the hinge that never ends.",
+  "kyutai": "luis"
+ },
+ {
+  "speaker": "moheeb",
+  "voice": "am_michael",
+  "speed": 1,
+  "text": "I ordered a microcontroller that's smaller than the stamp on the box it came in.",
+  "kyutai": "moheeb"
+ },
+ {
+  "speaker": "luis",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "That's how they get you. The box is the real product.",
+  "kyutai": "luis"
+ },
+ {
+  "speaker": "luis",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "Remember when the scariest thing at the lab was the soldering iron?",
+  "kyutai": "luis"
+ },
+ {
+  "speaker": "moheeb",
+  "voice": "am_michael",
+  "speed": 1,
+  "text": "Then the laser cutter showed up, and everybody had a cardboard phase.",
+  "kyutai": "moheeb"
+ },
+ {
+  "speaker": "luis",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "Some of us never left the cardboard phase.",
+  "kyutai": "luis"
+ },
+ {
+  "speaker": "moheeb",
+  "voice": "am_michael",
+  "speed": 1,
+  "text": "Every time I sit at this table, I end up drawing a circuit board on a napkin.",
+  "kyutai": "moheeb"
+ },
+ {
+  "speaker": "luis",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "Mine's on the coaster. It's my best work. It has a cup ring through the ground plane.",
+  "kyutai": "luis"
+ },
+ {
+  "speaker": "luis",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "Downtown's busy for a Wednesday.",
+  "kyutai": "luis"
+ },
+ {
+  "speaker": "moheeb",
+  "voice": "am_michael",
+  "speed": 1,
+  "text": "It's the train. The train brings everybody.",
+  "kyutai": "moheeb"
+ },
+ {
+  "speaker": "luis",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "And then it takes them all home again. That's the dream.",
+  "kyutai": "luis"
+ },
+ {
+  "speaker": "moheeb",
+  "voice": "am_michael",
+  "speed": 1,
+  "text": "This is my third coffee.",
+  "kyutai": "moheeb"
+ },
+ {
+  "speaker": "luis",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "It's eight o'clock at night.",
+  "kyutai": "luis"
+ },
+ {
+  "speaker": "moheeb",
+  "voice": "am_michael",
+  "speed": 1,
+  "text": "Then it's a nightcap.",
+  "kyutai": "moheeb"
+ },
+ {
+  "speaker": "luis",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "That is not what that word means.",
+  "kyutai": "luis"
+ },
+ {
+  "speaker": "luis",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "Somebody at the lab asked me if Coffee and Kill was a cafe.",
+  "kyutai": "luis"
+ },
+ {
+  "speaker": "moheeb",
+  "voice": "am_michael",
+  "speed": 1,
+  "text": "We should open one. Espresso and a boss fight.",
+  "kyutai": "moheeb"
+ },
+ {
+  "speaker": "luis",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "I'm pretty sure the health code says no boss fights.",
+  "kyutai": "luis"
+ },
+ {
+  "speaker": "moheeb",
+  "voice": "am_michael",
+  "speed": 1,
+  "text": "The new board boots, but only if I hold it at an angle.",
+  "kyutai": "moheeb"
+ },
+ {
+  "speaker": "luis",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "That's a cold joint. Or the board has opinions.",
+  "kyutai": "luis"
+ },
+ {
+  "speaker": "moheeb",
+  "voice": "am_michael",
+  "speed": 1,
+  "text": "Everything I build has opinions.",
+  "kyutai": "moheeb"
+ },
+ {
+  "speaker": "luis",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "We've said one more since six o'clock.",
+  "kyutai": "luis"
+ },
+ {
+  "speaker": "moheeb",
+  "voice": "am_michael",
+  "speed": 1,
+  "text": "That's also how every project at the lab works.",
+  "kyutai": "moheeb"
+ },
+ {
+  "speaker": "luis",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "Did you hear somebody beat High Score at the arcade today?",
+  "kyutai": "luis"
+ },
+ {
+  "speaker": "moheeb",
+  "voice": "am_michael",
+  "speed": 1,
+  "text": "I heard. I'm choosing to believe it was a keyholder.",
+  "kyutai": "moheeb"
+ },
+ {
+  "speaker": "moheeb",
+  "voice": "am_michael",
+  "speed": 1,
+  "text": "Wait. Did a guy with a paper map send you here?",
+  "kyutai": "moheeb"
+ },
+ {
+  "speaker": "luis",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "We told him to find the real downtown. We didn't think he'd send it back to us.",
+  "kyutai": "luis"
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "He said you both had opinions about solder."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "He said you both had opinions about solder."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "He said you both had opinions about solder."
+ },
+ {
+  "speaker": "moheeb",
+  "voice": "am_michael",
+  "speed": 1,
+  "text": "Strong ones. More flux. It's always more flux.",
+  "kyutai": "moheeb"
+ },
+ {
+  "speaker": "luis",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "Sit for a minute. You look like you've been hosting since nine.",
+  "kyutai": "luis"
+ },
+ {
+  "speaker": "luis",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "Hey, you're hosting today, right? You've got the clipboard face.",
+  "kyutai": "luis"
+ },
+ {
+  "speaker": "moheeb",
+  "voice": "am_michael",
+  "speed": 1,
+  "text": "Sit for a minute. Nobody's setting the lab on fire in the next five minutes.",
+  "kyutai": "moheeb"
+ },
+ {
+  "speaker": "luis",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "Probably.",
+  "kyutai": "luis"
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "How do you two know the lab?"
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "How do you two know the lab?"
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "How do you two know the lab?"
+ },
+ {
+  "speaker": "moheeb",
+  "voice": "am_michael",
+  "speed": 1,
+  "text": "We made a game there. Long nights, cold pizza, a whole lot of hot glue.",
+  "kyutai": "moheeb"
+ },
+ {
+  "speaker": "luis",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "It's called Coffee and Kill. It's exactly what it sounds like.",
+  "kyutai": "luis"
+ },
+ {
+  "speaker": "moheeb",
+  "voice": "am_michael",
+  "speed": 1,
+  "text": "Come by sometime when it's slow. We'll show you the build.",
+  "kyutai": "moheeb"
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "I can only stay a minute."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "I can only stay a minute."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "I can only stay a minute."
+ },
+ {
+  "speaker": "luis",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "A minute is plenty. That's a whole break, if you do it right.",
+  "kyutai": "luis"
+ },
+ {
+  "speaker": "moheeb",
+  "voice": "am_michael",
+  "speed": 1,
+  "text": "Here's the trick. Sit, breathe, then go back and fix whatever's on fire.",
+  "kyutai": "moheeb"
+ },
+ {
+  "speaker": "moheeb",
+  "voice": "am_michael",
+  "speed": 1,
+  "text": "We heard the fire inspector came by. Did the lab pass?",
+  "kyutai": "moheeb"
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "We passed. Every extinguisher tagged. I may have hugged one."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "We passed. She even said the shop looked organized."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "We passed. I labeled the label maker, just in case."
+ },
+ {
+  "speaker": "luis",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "Of course you did. Cheers to the lab.",
+  "kyutai": "luis"
+ },
+ {
+  "speaker": "luis",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "You okay? You look like you've been carrying the whole lab on your back.",
+  "kyutai": "luis"
+ },
+ {
+  "speaker": "moheeb",
+  "voice": "am_michael",
+  "speed": 1,
+  "text": "Sit. There's a chair. Hosting isn't a sprint. It's a long walk with a lot of doors.",
+  "kyutai": "moheeb"
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Thanks. Just for a minute."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Thanks. Just for a minute."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Thanks. Just for a minute."
+ },
+ {
+  "speaker": "moheeb",
+  "voice": "am_michael",
+  "speed": 1,
+  "text": "You look like the day's going well.",
+  "kyutai": "moheeb"
+ },
+ {
+  "speaker": "luis",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "Or the coffee's going well. Hard to tell from here.",
+  "kyutai": "luis"
+ },
+ {
+  "speaker": "vee",
+  "voice": "af_heart",
+  "speed": 1.06,
+  "text": "Both, I think. The lab's buzzing tonight."
+ },
+ {
+  "speaker": "dex",
+  "voice": "am_michael",
+  "speed": 1.05,
+  "text": "Both, I think. The lab's buzzing tonight."
+ },
+ {
+  "speaker": "ruth",
+  "voice": "bf_emma",
+  "speed": 1.02,
+  "text": "Both, I think. The lab's buzzing tonight."
+ },
+ {
+  "speaker": "luis",
+  "voice": "am_adam",
+  "speed": 1.04,
+  "text": "Back again? Must be quiet at the lab.",
+  "kyutai": "luis"
+ },
+ {
+  "speaker": "moheeb",
+  "voice": "am_michael",
+  "speed": 1,
+  "text": "Or loud. Loud is also a good reason to sit out here.",
+  "kyutai": "moheeb"
+ },
+ {
+  "speaker": "moheeb",
+  "voice": "am_michael",
+  "speed": 1,
+  "text": "We'll be here a while. Tell the lab we said hi.",
+  "kyutai": "moheeb"
+ }
+]

@@ -61,3 +61,22 @@ export const BT = (who, text, o = {}) => ({ who, text, ...o });
 export const BARK = (who, text) => ({ op: 'bark', who, text });
 // SHOT types added: push react insert hero whip top. o.part: 'rhand' | 'lhand' | 'head' | 'point'; o.at: a mark for 'point'
 // MUSIC moods added: hosting tension night zone final
+
+// ---- v1.3: the bike in scenes, the nights
+// BIKE(mark): the lab's loaner bike parked at a mark in a scene; BIKE(null) puts it away. BIKE_WITH(who): someone
+// pushes it along beside them. BIKE_BACK(): it is the player's to ride again (the loaner, after it is won back).
+// The flag 'has_bike' is set while the player has the loaner (taken at the bike station by 9 am, or given back).
+export const BIKE = (mark) => ({ op: 'bike', mode: mark ? 1 : 0, mark });
+export const BIKE_WITH = (who) => ({ op: 'bike', mode: 2, who });
+export const BIKE_BACK = () => ({ op: 'bike', mode: 3 });
+// ROAM o.prompt is the goal's label once the work is done ("Head back to the lab"): the objective line and the
+// marker show it, and the roam ends when the player gets within the radius (no button). o.auto: seconds after the
+// work is done before it moves on by itself, for a roam whose walk adds nothing.
+// TASK o.with: who stays by the task's person (a parent by a kid). o.where, o.where2: short names of the task's
+// places for the wayfinder ("Kitchen", "Soda fridge"; a carry shows pick up at where, drop off at where2).
+// Task labels stay under 35 characters (the HUD list); the compiler checks.
+// A night file exports NIGHT = { n, hour, title, sub, beats, fights, endings, stat_lines }; see night1.mjs.
+export const EPILOGUE = () => ({ op: 'epilogue' });
+// PROP(name, mark, mode): a small prop the story moves. 'gerald' (Ines's robot): mode 'still', 'circle' (one motor
+// wired backwards: slow circles to the left), 'straight' (out and back), 'hide'. mark null keeps it where it is.
+export const PROP = (name, mark, mode = 'still') => ({ op: 'prop', name, mark, mode });

@@ -39,6 +39,7 @@ typedef struct {
   int stats[ST_COUNT];
   const char *prompt_use;
   bool marker_on, marker_behind, marker_task; float marker_x, marker_y, marker_dist;
+  const char *marker_label; bool marker_corner;   /* v1.3: what it points at; aiming at a corner of the route */
   float letterbox, fade, flash, dim;
   float skip;
   /* retry */
@@ -67,6 +68,15 @@ void story_update(float dt, const intent_t *in);
 story_run story_state(void);
 const char *story_player_name(void);
 /* the epilogue's text */
+/* v1.3: the nights. The epilogue's screen done, story_resume goes on into the next night (false: the story is
+ * over); story_more says whether there is one. The title's night select: story_nights_open is a mask (bit n-1
+ * for night n) of the nights the save can start, story_start_night(n) starts one. */
+bool story_resume(void);
+bool story_more(void);
+int story_nights_open(void);
+int story_night_count(void);
+const char *story_night_title(int n);
+void story_start_night(int n);
 const char *story_end_title(void);
 int story_end_lines(const char **out, int cap);
 #endif

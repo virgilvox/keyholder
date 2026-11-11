@@ -84,7 +84,9 @@ typedef struct {
   bool finisher_qte;           /* the last blow is a cinematic with a button prompt */
   unsigned mods;               /* MOD_ bits (Battle Zone) */
   bool battle_zone;            /* no story after: show the result screen in fight_draw_hud */
+  int obj_kind;                /* v1.3: the twist object's look: 0 the twist's own, 1 a welding table on casters (FT_DEFEND) */
 } fight_def;
+const char *fight_obj_name(void);   /* the defended object's short name: TABLE or BINS */
 
 /* the player's actor comes from game.c. Takes over the camera and the player until it ends. */
 void fight_init(t3_scene *scene, t3_camera *cam);

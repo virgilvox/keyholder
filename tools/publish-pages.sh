@@ -16,7 +16,7 @@ else
   git -C "$WT" checkout -q --orphan gh-pages
   git -C "$WT" rm -rq --cached . && git -C "$WT" clean -fdxq
 fi
-cp "$ROOT/web/keyholder.html" "$WT/index.html"
+node "$ROOT/tools/inline-html.mjs" "$ROOT/web/index.src.html" "$ROOT/web/vendor/host-bundle.js" - "$WT/index.html" >/dev/null   # a loader page: the cart is fetched beside it
 cp "$ROOT/build/keyholder.wasc" "$WT/keyholder.wasc"
 touch "$WT/.nojekyll"   # serve the files as they are
 git -C "$WT" add -A

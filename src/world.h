@@ -38,6 +38,9 @@ bool world_raycast(v3 origin, v3 dir, float max_dist, float *t, v3 *normal);
 bool world_visible(v3 a, v3 b);
 float world_floor_y(v3 p);                     /* the first surface at or below p, or -1e9 */
 bool world_in_lab(v3 p);
+/* indoors: in the lab, or in the room you are in behind a facade (interior.h); the camera keeps under the
+ * ceiling there (interior_ceiling, 3 m in the lab) */
+bool world_indoors(v3 p);
 /* v1.1: who the frame is about (the player in a roam, the people in a cutscene). The lab's lights, its
  * interior and the front door follow the subject, not the lens: a lens outside the glass looking in at
  * someone inside still sees the lab. Call it each frame before world_update; it lapses after half a
@@ -59,7 +62,9 @@ v3 world_lab(float plan_x, float plan_z);
 float world_lab_yaw(float plan_deg);
 
 /* named places: "lab_door", "nile", "worth", "proof", "level1", "center_main_station", ... see
- * docs/DESIGN.md. Standing point on the sidewalk in front, and the yaw that faces the place. */
+ * docs/PLACES.md. Standing point on the sidewalk in front, and the yaw that faces the place. Also the
+ * hand-placed spots (chupacabra_seat_a, lab_back_table, ...) and the spots inside the rooms (proof_counter,
+ * level1_bar, ...), which answer whether or not the room has been built. */
 bool world_place(const char *name, v3 *pos, float *yaw);
 /* the door's open amount, 0..1, driven by the director. Calling it turns the automatic door off */
 void world_door(float open);
@@ -76,4 +81,7 @@ bool world_train_bell(v3 *at);
 /* v1.1: cars in Main's through lanes (on by default). They wait short of the focus when it is on their half of
  * the road; a shot that frames people across the street can turn them off */
 void world_traffic(bool on);
+/* the crew's pickup parked down the alley behind the lab, its tailgate toward the back door (lab_truck_tailgate).
+ * On by default; a scene that should not have it there turns it off */
+void world_crew_truck(bool on);
 #endif

@@ -1777,6 +1777,23 @@ static t3_object *build_cage(void) {
   fxp_layer(FXP_HALO); fxp_disc(v3_(0, .03f, 0), 2.f, 12, 0x30200c, 0);
   return fxp_end();
 }
+/* v1.3: the lab's welding table, rolled out to the back lot: a steel top on four legs and casters, a vise, the
+ * welder on its cart beside it with a gas bottle */
+static t3_object *build_weld_table(void) {
+  fxp_begin();
+  uint32_t st = 0x5a5e66, dk = 0x2a2c30;
+  fxp_box(v3_(0, .86f, 0), v3_(1.5f, .06f, .9f), 0x7a7f88);                 /* the top */
+  for (int i = 0; i < 4; i++) { float x = i & 1 ? .66f : -.66f, z = i & 2 ? .36f : -.36f;
+    fxp_bar(v3_(x, .1f, z), v3_(x, .84f, z), .07f, st); fxp_cyl(v3_(x, 0, z), .1f, .05f, .05f, 8, dk); }
+  fxp_bar(v3_(-.66f, .3f, -.36f), v3_(.66f, .3f, -.36f), .05f, st); fxp_bar(v3_(-.66f, .3f, .36f), v3_(.66f, .3f, .36f), .05f, st);
+  fxp_box(v3_(.62f, .96f, .3f), v3_(.18f, .14f, .14f), 0x3a5a8a);           /* the vise */
+  fxp_box(v3_(-.3f, .92f, -.1f), v3_(.5f, .05f, .08f), 0xb87838);           /* a bracket mid weld */
+  fxp_box(v3_(-1.1f, .45f, 0), v3_(.4f, .5f, .55f), 0x2a6a9a);              /* the welder on its cart */
+  fxp_cyl(v3_(-1.25f, 0, .35f), 1.1f, .11f, .11f, 10, 0x3a7a3a);            /* the gas bottle */
+  fxp_layer(FXP_GLOW); fxp_box(v3_(-.88f, .62f, 0), v3_(.02f, .05f, .08f), 0xffb040);
+  fxp_layer(FXP_HALO); fxp_disc(v3_(0, .03f, 0), 2.f, 12, 0x30200c, 0);
+  return fxp_end();
+}
 /* a bike along +x, wheels standing */
 static t3_object *build_bike(void) {
   fxp_begin();
@@ -1831,11 +1848,13 @@ static t3_object *build_gantry(void) {
 }
 
 /* ---- twist rules ---- */
+/* the defended object's short name for the tags over it */
+const char *fight_obj_name(void) { return FG.def.obj_kind == 1 ? "TABLE" : "BINS"; }
 static const char *twist_label(void) {
   if (FG.def.obj_label) return FG.def.obj_label;
   switch (FG.tw.kind) {
     case FT_TIMER: return "STOP THE CUT"; case FT_RETRIEVE: return "GET THE BIKE BACK"; case FT_SCORE: return "BEAT THE HIGH SCORE";
-    case FT_HOLD: return "KEEP THE DOOR SHUT"; case FT_DEFEND: return "GUARD THE CAGE"; case FT_PROTECT: return "KEEP SAM SAFE";
+    case FT_HOLD: return "KEEP THE DOOR SHUT"; case FT_DEFEND: return FG.def.obj_kind == 1 ? "GUARD THE WELDING TABLE" : "GUARD THE BINS"; case FT_PROTECT: return "KEEP SAM SAFE";
     default: return NULL;
   }
 }
@@ -2268,7 +2287,7 @@ static void twist_start(void) {
       T->obj_hp = T->obj_hpmax = FG.def.twist_a > 0 ? FG.def.twist_a : 70;
       T->obj = given ? FG.def.obj_pos : v3_add(c, v3_(0, 0, -(R * .55f)));
       T->obj.y = floor_at(T->obj);
-      PROP[PR_OBJ] = build_cage(); prop_at(PR_OBJ, T->obj, yaw_to(T->obj, c));
+      PROP[PR_OBJ] = FG.def.obj_kind == 1 ? build_weld_table() : build_cage(); prop_at(PR_OBJ, T->obj, yaw_to(T->obj, c));
       for (int i = 0; i < FG.nfoe; i++) if (FG.foe[i].d.ai != AI_BRUISER && FG.foe[i].d.ai != AI_BOSS) FG.foe[i].goal = true;
       T->step_t = 8;
       break;
@@ -2444,7 +2463,7 @@ static void twist_update(float dt) {
           T->step_t -= dt;
           if (T->step_t <= 0) { FG.foe[0].goal = !FG.foe[0].goal; T->step_t = FG.foe[0].goal ? 7 : 11; }
         }
-        if (T->obj_hp < T->obj_hpmax * .35f && T->warn_t <= 0) { twist_warn("THE CAGE IS GIVING", 2.5f); bark(FB_OBJ_WARN); }
+        if (T->obj_hp < T->obj_hpmax * .35f && T->warn_t <= 0) { twist_warn(FG.def.obj_kind == 1 ? "THE TABLE IS GOING" : "THE BINS ARE GOING", 2.5f); bark(FB_OBJ_WARN); }
         if (T->obj_hp <= 0) { T->obj_hp = 0; fx_burst(v3_add(T->obj, v3_(0, 1, 0)), 0xd88040, 1.2f); twist_end(false, "THE SCRAP WALKED OFF"); }
       }
       break; }

@@ -5,6 +5,7 @@
 #include "world.h"
 #include "input.h"
 #include "city.h"
+#include "interior.h"
 #include "actor.h"
 #include <stdio.h>
 #include <string.h>
@@ -81,8 +82,41 @@ static const shot_t SHOTS[] = {
   ST("door_cross_4", 9.2f, 0.3f, 1.6f, -6.0f, 0.6f, 1.3f, -12, 50),
   /* the Tech Tear Apart bin, from the hall (place lab_teardown) */
   ST("teardown_bin_13", 13, 2.2f, 1.55f, -19.1f, 1.1f, 1.0f, -19.1f, 55),
+  /* the town build out: the lab's back from the alley, the alley west, Chupacabra and its patio, the
+   * Arts Center's plaza and Shadow Walk, the back lots */
+  ST("lab_back_13", 13, 9.5f, 1.7f, -50.5f, 2.0f, 2.6f, -42.5f, 55),
+  ST("lab_back_alley_13", 13, 12.f, 1.7f, -47.f, -20.f, 2.5f, -47.f, 55),
+  ST("lab_back_table_17", 17, -1.5f, 1.6f, -48.5f, 3.7f, 1.0f, -44.0f, 50),
+  ST("lab_back_21", 21, 9.5f, 1.7f, -50.5f, 2.0f, 2.6f, -42.5f, 55),
+  ST("chupa_front_13", 13, -207.5f, 1.7f, -41.5f, -224.f, 2.2f, -42.f, 55),
+  ST("chupa_patio_13", 13, -216.8f, 1.6f, -36.6f, -221.f, 1.0f, -43.f, 55),
+  ST("chupa_front_21", 21, -207.5f, 1.7f, -41.5f, -224.f, 2.2f, -42.f, 55),
+  ST("mac_plaza_13", 13, 300.f, 1.8f, 36.f, 352.f, 6.f, 90.f, 60),
+  ST("shadow_walk_13", 13, 344.f, 1.7f, 70.f, 346.f, 7.f, 140.f, 60),
+  ST("shadow_walk_21", 21, 344.f, 1.7f, 70.f, 346.f, 7.f, 140.f, 60),
+  ST("back_lot_north_13", 13, -120.f, 1.7f, -60.f, -60.f, 3.f, -42.f, 55),
+  ST("back_lot_south_13", 13, -120.f, 1.7f, 98.f, -60.f, 3.f, 86.f, 55),
+  ST("high_lab_back_13", 13, -30.f, 30.f, -95.f, 0.f, 0.f, -45.f, 55),
+  /* the print farm on the west wall (plan x 6.8 to 8.1): close, and from across the room */
+  ST("printers_close_13", 13, -1.2f, 1.35f, -7.45f, -2.45f, 1.0f, -7.45f, 60),
+  ST("printers_far_13", 13, 3.6f, 1.6f, -9.5f, -2.4f, 1.0f, -7.3f, 55),
+  ST("printers_brenda_13", 13, -1.75f, 1.3f, -7.9f, -2.45f, 1.25f, -7.9f, 50),
+  /* the cars: a lot from above (stalls, nose in), the street, the crew's truck in the alley */
+  ST("lot_above_13", 13, -100.f, 34.f, -78.f, -100.f, 0.f, -70.f, 60),
+  ST("lot_east_above_13", 13, 120.f, 34.f, -80.f, 120.f, 0.f, -72.f, 60),
+  ST("street_cars_13", 13, -150.f, 1.7f, 4.5f, -110.f, 1.f, 9.f, 55),
+  ST("crew_truck_13", 13, 6.f, 1.8f, -45.f, -5.f, 1.f, -47.5f, 55),
 };
 #define NSHOT (int)(sizeof SHOTS / sizeof SHOTS[0])
+/* after the list: the rooms behind the facades, a lens at one spot looking at another (both world_place names) */
+static const struct { const char *room, *eye, *at; float t, fov; } IN_SHOTS[] = {
+  {"proof", "proof_inside", "proof_baker", 13, 60}, {"proof", "proof_baker", "proof_inside", 13, 60},
+  {"chupacabra", "chupacabra_inside", "chupacabra_bartender", 19, 62}, {"chupacabra", "chupacabra_bartender", "chupacabra_inside", 19, 62},
+  {"level1", "level1_inside", "level1_bar", 21, 60}, {"level1", "level1_bar", "level1_inside", 21, 60},
+  {"nile", "nile_floor", "nile_stage", 21, 58}, {"nile", "nile_stage", "nile_inside", 21, 58},
+  {"arts_center", "arts_center_inside", "arts_center_box_office", 13, 62}, {"arts_center", "arts_center_lobby", "arts_center_gallery", 13, 62},
+};
+#define NIN (int)(sizeof IN_SHOTS / sizeof IN_SHOTS[0])
 static int frame; static int cur = -1;
 #define FRAMES_PER 10
 static v3 walker = {0, 0, 2.4f}; static v3 wvel; static bool wgnd = true;
@@ -112,6 +146,30 @@ void game_frame(float dt) {
       city_push(&b, .3f, 1.6f, &nn, &hit);
       float fy = world_floor_y(v3_(a.x, a.y + .3f, a.z));
       if (hit || fabsf(fy - a.y) > .05f) ds_log("place %s: pushed %.2f, floor %.2f vs %.2f", q->name, v3_len(v3_sub(b, a)), fy, a.y);
+    }
+    for (int i = 0; i < city_set_place_count(); i++) {
+      const char *nm = city_set_place_name(i); v3 a; float yw; world_place(nm, &a, &yw);
+      v3 b = a, nn = a; bool hit = false; city_push(&b, .25f, 1.6f, &nn, &hit);
+      ds_log("set place %s (%.2f, %.2f, %.2f) yaw %.2f%s", nm, a.x, a.y, a.z, yw, hit ? " PUSHED" : "");
+    }
+    for (int i = 0; i < interior_count(); i++) {
+      v3 o, in; float yo, yi; interior_door(i, &o, &yo, &in, &yi);
+      v3 b = o, nn = o; bool hit = false; city_push(&b, .3f, 1.6f, &nn, &hit);
+      interior_enter(i);
+      /* walk three seconds straight in from the door, and try to leave through the front wall */
+      v3 p = in, v; bool g = true;
+      for (int k = 0; k < 180; k++) { v = v3_(-sinf(yi) * 0 + sinf(yi) * 3.f, -1, cosf(yi) * 3.f); world_move(&p, &v, .3f, 1.6f, 1.f / 60, &g); }
+      v3 q = in;
+      for (int k = 0; k < 120; k++) { v = v3_(-sinf(yi) * 3.f, -1, -cosf(yi) * 3.f); world_move(&q, &v, .3f, 1.6f, 1.f / 60, &g); }
+      float t; v3 n; bool wall = world_raycast(v3_(in.x, 1.5f, in.z), v3_(-sinf(yi), 0, -cosf(yi)), 20, &t, &n);
+      ds_log("interior %s (%s): outside (%.1f, %.1f)%s, inside (%.1f, %.1f); walked in to %.1f m, out stopped at %.2f m, ray out hits %s %.2f, indoors %d, ceiling %.1f",
+        interior_id(i), interior_name(i), o.x, o.z, hit ? " PUSHED" : "", in.x, in.z, hypotf(p.x - in.x, p.z - in.z), hypotf(q.x - in.x, q.z - in.z), wall ? "wall" : "NOTHING", wall ? t : 0, world_indoors(p), interior_ceiling());
+      for (int k = 0; k < interior_spot_count(i); k++) {
+        const char *nm = interior_spot_name(i, k); v3 a; float yw; world_place(nm, &a, &yw);
+        v3 c2 = a, n2; bool h2 = false; interior_push(&c2, .25f, 1.6f, &n2, &h2);
+        ds_log("  spot %s (%.2f, %.2f, %.2f) yaw %.2f floor %.2f%s%s", nm, a.x, a.y, a.z, yw, world_floor_y(v3_(a.x, a.y + .3f, a.z)), h2 ? " PUSHED" : "", interior_contains(a) ? "" : " OUTSIDE");
+      }
+      interior_exit();
     }
     const char *names[] = {"lab_door","lab_back_door","lab_lot","nile","proof","chiwas","worth","burritoholics","gus","oro","chupacabra","main_burger","az_distilling","phantom_fox","que_chevere","espiritu","haunted","against_grain","organic_bean","casa_copal","diamond_dons","level1","mad_candy","mangos","republica","margaritas","lost_dutchman","hopes","pizza_mart","guadalupe","one_macdonald","macdonald_main","center_main_station","city_plaza","arts_center","mid_block","lot_fight"};
     for (int i = 0; i < (int)(sizeof names / sizeof names[0]); i++) if (!world_place(names[i], NULL, NULL)) ds_log("no place: %s", names[i]);
@@ -176,7 +234,26 @@ void game_frame(float dt) {
     }
   }
   int s = frame / FRAMES_PER;
-  if (s >= NSHOT) s = NSHOT - 1;
+  if (s >= NSHOT + NIN) s = NSHOT + NIN - 1;
+  if (s >= NSHOT) {
+    static int icur = -1; static shot_t ish;
+    int k = s - NSHOT;
+    if (k != icur) {
+      icur = k;
+      interior_enter(interior_find(IN_SHOTS[k].room));
+      v3 a, b; float y; world_place(IN_SHOTS[k].eye, &a, &y); world_place(IN_SHOTS[k].at, &b, &y);
+      ish = (shot_t){IN_SHOTS[k].eye, IN_SHOTS[k].t, STAGE_TOWN, v3_(a.x, a.y + 1.6f, a.z), v3_(b.x, b.y + 1.2f, b.z), 0, IN_SHOTS[k].fov};
+      world_set_stage(STAGE_TOWN); world_set_time(ish.t);
+      if (cam->fov != ish.fov) { cam->fov = ish.fov; t3_camera_update_projection_matrix(cam); }
+      int d, t; world_update(.016f, ish.eye); world_debug_counts(&d, &t);
+      ds_log("shot %d in_%s %s: chunks %d tris %d", s, IN_SHOTS[k].room, IN_SHOTS[k].eye, d, t);
+    }
+    t3_object_set_position(cam, ish.eye.x, ish.eye.y, ish.eye.z);
+    t3_object_look_at(cam, ish.at.x, ish.at.y, ish.at.z);
+    world_update(dt, ish.eye);
+    actor_place(A, v3_(-9999, 0, 0), 0); actor_place(B2, v3_(-9999, 0, 0), 0);
+    return;
+  }
   if (s != cur) {
     cur = s;
     world_set_stage(SHOTS[s].st);

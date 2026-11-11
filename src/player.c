@@ -4,6 +4,7 @@
  * lets back out slowly once the way stays clear, tight in the lab and wide outdoors. */
 #include "player.h"
 #include "world.h"
+#include "interior.h"
 #include "audio.h"
 #include "weapon.h"
 #include "bike.h"
@@ -33,6 +34,7 @@ static bool cam_ok;
 #define RIDE_FAST_V 13.f   /* sprint held: standing on the pedals */
 #define RIDE_TURN_R 3.6f   /* the tightest turn at speed, metres: wider than on foot */
 #define RIDE_R .4f
+#define RIDE_BACK_V 1.6f   /* pushed backwards with the feet down */
 #define RIDER_HIP .47f     /* the sitting clip's hips over its feet: the rider's origin sits this far under the saddle */
 #define RIDER_BACK -.09f   /* and this far along the bike from it (the driving clip's hips sit ahead of its origin) */
 #define RIDER_PITCH .22f   /* leaning into the bars */
@@ -74,12 +76,12 @@ void player_zoom(int wheel, bool step) {
   if (wheel) cam_zoom = ds_clamp(cam_zoom - wheel * .12f, .55f, 1.7f);
   if (step) cam_zoom = cam_zoom < .8f ? 1.f : cam_zoom < 1.25f ? 1.45f : .65f;
 }
-static float want_dist(void) { return (world_in_lab(pos) ? 3.1f : 4.2f) * cam_zoom; }
+static float want_dist(void) { return (world_indoors(pos) ? 3.1f : 4.2f) * cam_zoom; }
 static v3 cam_dir_lift(float lift) {   /* from the pivot out to the camera, raised by lift */
   float pt = fminf(1.25f, cam_pitch + lift), cp = cosf(pt);
   return v3_(-sinf(cam_yaw) * cp, sinf(pt), -cosf(cam_yaw) * cp);
 }
-static v3 pivot_at(void) { return v3_(pos.x, pos.y + (world_in_lab(pos) ? 1.3f : 1.36f), pos.z); }
+static v3 pivot_at(void) { return v3_(pos.x, pos.y + (world_indoors(pos) ? 1.3f : 1.36f), pos.z); }
 static void cam_apply(float dt, bool snap) {
   if (!cam) return;
   v3 pivot = pivot_at();
@@ -125,9 +127,9 @@ static void cam_apply(float dt, bool snap) {
   if (snap || arm < cam_dist) { cam_dist = arm; cam_hold = 0; }
   else { cam_hold += dt; if (cam_hold > .3f) cam_dist = ds_damp(cam_dist, arm, 2.6f, dt); }
   v3 p = v3_add(pivot, v3_scale(d, cam_dist));
-  /* indoors the boom stays under the ceiling (3 m): risen and zoomed out, it shortens instead of
-   * climbing into the dark above the walls */
-  if (world_in_lab(pos)) { float top = pos.y + 2.6f; if (p.y > top && p.y - pivot.y > 1e-3f) p = v3_add(pivot, v3_scale(v3_sub(p, pivot), (top - pivot.y) / (p.y - pivot.y))); }
+  /* indoors the boom stays under the ceiling (the lab's 3 m, or the room's: interior_ceiling): risen and
+   * zoomed out, it shortens instead of climbing into the dark above the walls */
+  if (world_indoors(pos)) { float top = world_in_lab(pos) ? pos.y + 2.6f : interior_ceiling() - .4f; if (p.y > top && p.y - pivot.y > 1e-3f) p = v3_add(pivot, v3_scale(v3_sub(p, pivot), (top - pivot.y) / (p.y - pivot.y))); }
   /* last resort: still behind a shelf after rising, come in to the near side of it */
   { v3 dd = v3_sub(p, pivot); float l = v3_len(dd);
     if (l > 1e-3f) { float c = world_cam_clear_all(pivot, p, CAM_R * .5f); if (c < l - .05f) p = v3_add(pivot, v3_scale(dd, fmaxf(CAM_MIN, c) / l)); } }
@@ -180,7 +182,7 @@ bool player_riding(void) { return riding; }
 /* off at once with no step aside (a teleport, a new actor): the bike stays where it was */
 static void ride_drop(void) {
   if (!riding) { swing_t = 0; swing_queue = 0; if (A) weapon_trail(A, false); return; }
-  riding = false;
+  riding = false; speed = fmaxf(0, speed);
   if (A) actor_reach(A, pos, pos, 0);
   t3_object *r = actor_root(); if (r) t3_object_set_rotation(r, 0, yaw, 0);
   if (bike_shown()) park(bike_pos(), bike_yaw());
@@ -240,20 +242,25 @@ void player_swing(bool heavy) {
 /* the bike: the stick steers toward where it points, at a rate the turning circle allows; pushing it
  * back brakes; letting go coasts on the freewheel */
 static void ride_step(float dt, const intent_t *in, v3 wish, float mag) {
-  float want = 0, d = 0; bool brake = false;
+  float want = 0, d = 0; bool brake = false, back = false;
   full_t = (in->used_pad && mag > .95f) ? full_t + dt : 0;
   if (mag > .02f) {
     d = ds_wrap_pi(atan2f(wish.x, wish.z) - yaw);
-    if (fabsf(d) > 2.3f && speed > 1.2f) brake = true;
+    /* the stick behind the bike: rolling forward it brakes; stopped, the feet go down and push it back */
+    if (fabsf(d) > 2.3f && speed > .4f) brake = true;
+    else if (fabsf(d) > 2.3f) back = true;
     else want = (in->sprint || full_t > .8f ? RIDE_FAST_V : RIDE_V) * (in->used_pad ? fmaxf(.3f, mag) : 1) * (1 - .45f * fminf(1, fabsf(d) / 1.6f));
   }
-  if (brake) speed = fmaxf(0, speed - 11 * dt);
+  if (back) speed = fmaxf(-RIDE_BACK_V, speed - 2.5f * dt);
+  else if (brake) speed = fmaxf(0, speed - 11 * dt);
   else if (speed < want) speed = fminf(want, speed + 4.2f * dt);
   else speed = fmaxf(want, speed - (want > 0 ? 3.f : 1.4f) * dt);
   float max_rate = speed > .6f ? fminf(2.4f, speed / RIDE_TURN_R) : 1.4f;   /* at a crawl it still turns round, slowly */
-  float rate = mag > .02f && !brake ? ds_clamp(d * 3.f, -max_rate, max_rate) : 0;
+  float rate = mag > .02f && !brake && !back && speed >= 0 ? ds_clamp(d * 3.f, -max_rate, max_rate) : 0;
+  /* backing up, the rear swings toward where the stick points */
+  if (back) rate = ds_clamp(ds_wrap_pi(atan2f(wish.x, wish.z) - (yaw + DS_PI)) * 2.f, -.9f, .9f);
   yaw = ds_wrap_pi(yaw + rate * dt);
-  steer = ds_damp(steer, ds_clamp(rate / fmaxf(speed, 1.2f) * 2.f, -.55f, .55f), 10, dt);
+  steer = ds_damp(steer, ds_clamp(rate / fmaxf(fabsf(speed), 1.2f) * (speed < 0 ? -2.f : 2.f), -.55f, .55f), 10, dt);
   lean = ds_damp(lean, ds_clamp(rate * speed * .05f, -.45f, .45f), 6, dt);
   v3 fwd = v3_(sinf(yaw), 0, cosf(yaw));
   vel.x = fwd.x * speed; vel.z = fwd.z * speed;
@@ -265,14 +272,14 @@ static void ride_step(float dt, const intent_t *in, v3 wish, float mag) {
   if (!was && grounded && air_t > .15f) { sfx(SFX_LAND, 0, .5f); fx_dust(pos, .5f, 5); }
   if (grounded) air_t = 0;
   float real = sqrtf(vel.x * vel.x + vel.z * vel.z);
-  if (real < speed - .3f) speed = real;   /* into a wall or a bench: the speed goes with it */
+  if (real < fabsf(speed) - .3f) speed = copysignf(real, speed);   /* into a wall or a bench: the speed goes with it */
   /* the door: off at the threshold, the bike stays outside */
   if (world_in_lab(pos)) {
     if (A) actor_play(A, "Idle_Loop", 1, true, .2f);
     riding = false; actor_reach(A, pos, pos, 0);
     park(last_out, last_out_yaw);
     t3_object *r = actor_root(); if (r) t3_object_set_rotation(r, 0, yaw, 0);
-    speed = fminf(speed, 1.5f);
+    speed = ds_clamp(speed, 0, 1.5f);
     sfx(SFX_PICKUP, 0, .4f);
     return;
   }
