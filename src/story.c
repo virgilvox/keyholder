@@ -1179,6 +1179,9 @@ static void step(void) {
           actor_t *ac = actor_of(sd->who);
           float yy; bool hy; v3 q = resolve(&sd->mark, &yy, &hy);
           actor_visible(ac, true); actor_place(ac, q, yy);
+          /* a sitter keeps sitting only on a real seat: the mark itself may be on the floor beside it */
+          slot_t *ss = &A[canon(sd->who)];
+          if (ss->base && !strncmp(ss->base, "Sitting", 7)) { const char *c = sit_snap(ac, ss->base); if (c != ss->base) { actor_play(ac, c, 1, true, .2f); ss->base = c; } }
         }
         tasks_begin(b);
         memset(banter_done, 0, sizeof banter_done);
@@ -1341,8 +1344,8 @@ static void extras_reset(void) { for (int i = 0; i < EXTRAS; i++) if (X[i].a) ac
 static void spot_put(extra_t *e, const spot_t *s, int i) {
   actor_visible(e->a, true); e->w.on = false; e->role = 1;
   actor_place(e->a, world_lab(s->x, s->z), world_lab_yaw(s->yaw));
-  actor_play(e->a, s->clip, .9f + (i % 4) * .05f, true, 0);
   actor_set_floor(e->a, 0);
+  actor_play(e->a, sit_snap(e->a, s->clip), .9f + (i % 4) * .05f, true, 0);
 }
 static void extras_update(float dt) {
   if (!X[0].a) return;
