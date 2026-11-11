@@ -1,6 +1,6 @@
 # KEYHOLDER handoff
 
-State as of 2026-11-10: v1.1.0 (the polish pass) is on GitHub (github.com/virgilvox/keyholder), on Pages (virgilvox.github.io/keyholder), in the v1.1.0 release, and on the game station (`/userdata/roms/wasmcart/keyholder.wasc`; md5 and the change log row are in `HeatSync Labs Operations 2026/docs/06-change-log.md`).
+State as of 2026-11-10: v1.1.0 (the polish pass) is on GitHub (github.com/virgilvox/keyholder), on Pages (virgilvox.github.io/keyholder), and in the v1.1.0 release (cart md5 `7c1eed841a3ab7541817731a6c077593`). The game station still runs 1.0.2: on 2026-11-10 it did not answer at 172.22.111.83. To update it, wait until `pidof retroarch` is empty, back up the old cart, copy the new one to `.incoming/` and `mv` it into place, check the md5, and add a row to `HeatSync Labs Operations 2026/docs/06-change-log.md`.
 
 Read `docs/DESIGN.md` for the module contract and the art rules, and `docs/PLACES.md` for every downtown address.
 
