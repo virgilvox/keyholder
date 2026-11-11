@@ -34,4 +34,6 @@ bool interior_raycast(v3 o, v3 d, float max_dist, float *t, v3 *normal);
 void interior_set_time(float night);              /* the daylight in the windows */
 int interior_tris(void);                          /* the current room's triangles (the debug counts) */
 void interior_attach(t3_object *parent);          /* hang the rooms under the town group (world_init) */
+/* a lot wall (a to b) that a placed room's front stands on: its door's middle (city.c glazes it and frames the door) */
+bool interior_front_on(float ax, float az, float bx, float bz, float *dx, float *dz);
 #endif

@@ -885,19 +885,19 @@
   "speaker": "vee",
   "voice": "af_heart",
   "speed": 1.06,
-  "text": "Somebody will show you. Bring it to Arduino Night, seven tonight."
+  "text": "Somebody will show you. Bring it by the lab on any open night."
  },
  {
   "speaker": "dex",
   "voice": "am_michael",
   "speed": 1.05,
-  "text": "Somebody will show you. Bring it to Arduino Night, seven tonight."
+  "text": "Somebody will show you. Bring it by the lab on any open night."
  },
  {
   "speaker": "ruth",
   "voice": "bf_emma",
   "speed": 1.02,
-  "text": "Somebody will show you. Bring it to Arduino Night, seven tonight."
+  "text": "Somebody will show you. Bring it by the lab on any open night."
  },
  {
   "speaker": "st_busker",
@@ -1353,7 +1353,7 @@
   "speaker": "st_owl",
   "voice": "am_puck",
   "speed": 0.98,
-  "text": "Somebody has to be the last one. That's its own kind of work."
+  "text": "Then I'll walk till your light goes out. That's how I know the block's asleep."
  },
  {
   "speaker": "st_owl",
@@ -1431,19 +1431,19 @@
   "speaker": "vee",
   "voice": "af_heart",
   "speed": 1.06,
-  "text": "Nine o'clock, and I'm hosting the hackerspace till midnight."
+  "text": "Since nine this morning, and I'm hosting the hackerspace till midnight."
  },
  {
   "speaker": "dex",
   "voice": "am_michael",
   "speed": 1.05,
-  "text": "Nine o'clock, and I'm hosting the hackerspace till midnight."
+  "text": "Since nine this morning, and I'm hosting the hackerspace till midnight."
  },
  {
   "speaker": "ruth",
   "voice": "bf_emma",
   "speed": 1.02,
-  "text": "Nine o'clock, and I'm hosting the hackerspace till midnight."
+  "text": "Since nine this morning, and I'm hosting the hackerspace till midnight."
  },
  {
   "speaker": "st_counter",
@@ -1719,19 +1719,19 @@
   "speaker": "vee",
   "voice": "af_heart",
   "speed": 1.06,
-  "text": "Check your ground. It's always the ground."
+  "text": "Check your ground first. Nine times out of ten, that's it."
  },
  {
   "speaker": "dex",
   "voice": "am_michael",
   "speed": 1.05,
-  "text": "Check your ground. It's always the ground."
+  "text": "Check your ground first. Nine times out of ten, that's it."
  },
  {
   "speaker": "ruth",
   "voice": "bf_emma",
   "speed": 1.02,
-  "text": "Check your ground. It's always the ground."
+  "text": "Check your ground first. Nine times out of ten, that's it."
  },
  {
   "speaker": "st_m_elec",
@@ -2216,7 +2216,7 @@
   "speaker": "moheeb",
   "voice": "am_michael",
   "speed": 1,
-  "text": "Strong ones. More flux. It's always more flux.",
+  "text": "Strong ones. More flux. And if that doesn't work, more flux.",
   "kyutai": "moheeb"
  },
  {
@@ -2230,7 +2230,7 @@
   "speaker": "luis",
   "voice": "am_adam",
   "speed": 1.04,
-  "text": "Hey, you're hosting today, right? You've got the clipboard face.",
+  "text": "Hey, you're the host over at the lab, right? You've got the clipboard face.",
   "kyutai": "luis"
  },
  {
@@ -2361,7 +2361,7 @@
   "speaker": "moheeb",
   "voice": "am_michael",
   "speed": 1,
-  "text": "Sit. There's a chair. Hosting isn't a sprint. It's a long walk with a lot of doors.",
+  "text": "Sit. There's a chair. Luis is buying you a water whether you sit or not.",
   "kyutai": "moheeb"
  },
  {

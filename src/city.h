@@ -15,7 +15,9 @@ bool city_place(const char *name, v3 *pos, float *yaw);
 int city_stats(int *tris);
 bool city_train_bell(v3 *at);
 void city_traffic(bool on);                        /* see world_train_bell */
-void city_crew_truck(bool on);                     /* see world_crew_truck */
+void city_train_hold(bool on);                     /* see world_train_hold */
+void city_crew_truck(bool on);
+void city_solid(int slot, bool on, v3 at, float hx, float hz, float yaw, float top);   /* see world_solid */                     /* see world_crew_truck */
 /* for interior.c: a lot's facade (the centre of its front on the wall line, the yaw it faces, its width),
  * the sign atlas (a key's rectangle, the shared sign material) and the brick texture */
 bool city_lot_front(const char *place, v3 *front, float *yaw, float *width);

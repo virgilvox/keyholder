@@ -37,6 +37,7 @@ struct room_s {
   const room_def *def;
   float cx, cz, yaw, c, s;        /* room space to world: rotate by yaw about the front centre */
   bool built;
+  bool door_ok; v3 door_out;      /* the outside door point, found once (interior_door) */
   t3_object *root;
   sink sk[RM_N];
   ibox *col; int ncol, ccol;
@@ -223,20 +224,20 @@ static void furnish_proof(room_t *R) {
   for (int k = 0; k < 3; k++) { float y = .45f + k * .52f; rb_box(R, RM_LIT, -1.4f, y, Z0 + 1.4f, 1.4f, y + .36f, Z0 + 1.43f, rgb(.15f, .15f, .15f), 0); rb_box(R, RM_GLOW, -1.2f, y + .14f, Z0 + 1.43f, 1.2f, y + .2f, Z0 + 1.44f, rgb(1, .55f, .2f), 0); }
   for (int k = 0; k < 4; k++) rb_cbox(R, RM_LIT, W - .6f, k * .22f, Z0 + .6f + (k % 2) * .1f, .7f, .2f, .45f, rgb(.92f, .9f, .85f), k == 0 ? RB_SOLID : 0);
   rb_box(R, RM_LIT, W - 1.0f, 0, Z0 + 2.0f, W - .3f, 1.8f, Z0 + 2.7f, steel, RB_SOLID);
-  /* two cafe tables at the windows */
+  /* two cafe tables at the windows, either side of the door */
   for (int k = 0; k < 2; k++) {
-    float x = -W + 1.2f + k * 2.2f, z = -1.9f;
+    float x = k ? W - 1.4f : -W + 1.2f, z = -1.9f;
     rb_drum(R, RM_LIT, x, z, .35f, .72f, .76f, wood, 0); rb_drum(R, RM_LIT, x, z, .05f, 0, .72f, dark, RB_SOLID);
     for (int s = -1; s <= 1; s += 2) { rb_cbox(R, RM_LIT, x + s * .6f, 0, z, .4f, .45f, .4f, dark, 0); rb_cbox(R, RM_LIT, x + s * .78f, .45f, z, .05f, .45f, .4f, dark, 0); }
   }
   for (int k = 0; k < 4; k++) rb_pendant(R, -2.2f + k * 1.4f, cz - .1f, .9f, rgb(.2f, .2f, .2f));
-  rb_pendant(R, -1.0f, -2.0f, 1.0f, rgb(.2f, .2f, .2f));
+  for (int k = 0; k < 2; k++) rb_pendant(R, k ? W - 1.4f : -W + 1.2f, -1.9f, 1.0f, rgb(.2f, .2f, .2f));
 }
 static const spot_t SPOTS_PROOF[] = {
   {"proof_counter", -.9f, 0, -5.1f, 3.14159f},      /* in front of the register, facing it */
   {"proof_baker", -.9f, 0, -7.0f, 0},                /* behind the counter, facing the shop */
   {"proof_table", -2.4f, 0, -2.8f, 0},                /* by the window table, facing it */
-  {"proof_inside", 2.0f, 0, -1.6f, 3.14159f},
+  {"proof_inside", .3f, 0, -1.6f, 3.14159f},
   {NULL, 0, 0, 0, 0}};
 
 /* Chupacabra Taproom: red brick, the old rafters and a spiral duct, the steel bar along the south wall
@@ -392,24 +393,78 @@ static const spot_t SPOTS_NILE[] = {
  * walls with the work on them, the box office, benches (the museum's 2026 photos) */
 static void furnish_mac(room_t *R) {
   const room_def *D = R->def; const float W = D->w * .5f, Z0 = -D->back - D->d, Z1 = -D->back, H = D->h;
-  t3_color conc = rgb(.62f, .6f, .57f), wood = rgb(.82f, .7f, .52f), lav = rgb(.6f, .62f, .84f);
-  for (int k = 0; k < 4; k++) rb_cbox(R, RM_LIT, -W + 2.5f + k * (D->w - 5) / 3, 0, (Z0 + Z1) * .5f, .7f, H, .7f, conc, RB_SOLID);
+  t3_color conc = rgb(.62f, .6f, .57f), wood = rgb(.82f, .7f, .52f), lav = rgb(.6f, .62f, .84f), ink = rgb(.12f, .12f, .14f),
+           door = rgb(.36f, .24f, .16f), steel = rgb(.72f, .74f, .76f), stone = rgb(.55f, .52f, .48f), white = rgb(.94f, .93f, .9f);
+  static const float AC[6][3] = {{.15f, .3f, .7f}, {.95f, .7f, .15f}, {.85f, .25f, .2f}, {.2f, .6f, .45f}, {.6f, .25f, .6f}, {.95f, .93f, .88f}};
+  /* the columns stand just inside the glass, clear of the door and of every line from the way in to the
+   * signs (across the middle they cut BOX OFFICE and the gallery's name in half) */
+  static const float CX[4] = {-7.0f, -3.4f, 3.4f, 7.0f};
+  for (int k = 0; k < 4; k++) rb_cbox(R, RM_LIT, CX[k], 0, Z1 - .9f, .6f, H, .6f, conc, RB_SOLID);
   /* the box office on the east side */
   rb_box(R, RM_LIT, W - 4.5f, 0, Z0 + 2.0f, W - .5f, 1.1f, Z0 + 2.8f, wood, RB_SOLID);
+  rb_box(R, RM_LIT, W - 4.6f, 1.1f, Z0 + 1.95f, W - .4f, 1.16f, Z0 + 2.85f, ink, 0);
   rb_box(R, RM_LIT, W - 4.5f, 2.6f, Z0 + .1f, W - .5f, 3.2f, Z0 + .3f, lav, 0);
   rb_sign(R, "BOX OFFICE", W - 2.5f, 2.9f, Z0 + .32f, 2.2f, .45f, 0);
+  /* the theater's doors under its name: two pairs of tall timber doors in dark frames, push bars, slot windows */
   rb_sign(R, "IKEDA THEATER", -2.0f, 4.6f, Z0 + .02f, 4.2f, .6f, 0);
-  rb_sign(R, "MESA CONTEMPORARY ARTS", -W + .02f, 3.6f, (Z0 + Z1) * .5f, 5.0f, .5f, 2);
-  /* works on the gallery wall: bright discs and panels */
-  static const float AC[5][3] = {{.15f, .3f, .7f}, {.95f, .7f, .15f}, {.85f, .25f, .2f}, {.2f, .6f, .45f}, {.6f, .25f, .6f}};
-  for (int k = 0; k < 5; k++) rb_box(R, RM_LIT, -W + .02f, 1.3f + (k % 2) * .3f, Z1 - 2.0f - k * 2.2f - 1.4f, -W + .06f, 2.4f + (k % 2) * .3f, Z1 - 2.0f - k * 2.2f, rgb(AC[k][0], AC[k][1], AC[k][2]), 0);
-  /* a tall figure on a plinth and a carved stone head, after the 2026 show */
-  rb_cbox(R, RM_LIT, -2.0f, 0, -4.0f, 1.0f, .5f, 1.0f, conc, RB_SOLID);
-  rb_cbox(R, RM_LIT, -2.0f, .5f, -4.0f, .8f, .9f, .7f, rgb(.55f, .5f, .45f), 0);
+  for (int k = 0; k < 2; k++) {
+    float cx = k ? -.4f : -3.6f;
+    rb_box(R, RM_LIT, cx - 1.15f, 0, Z0, cx + 1.15f, 2.95f, Z0 + .06f, ink, 0);
+    for (int s = -1; s <= 1; s += 2) {
+      float x0 = cx + (s < 0 ? -1.05f : .03f), x1 = cx + (s < 0 ? -.03f : 1.05f);
+      rb_box(R, RM_LIT, x0, 0, Z0 + .06f, x1, 2.8f, Z0 + .1f, door, 0);
+      rb_box(R, RM_LIT, cx + s * .62f - .08f, 1.45f, Z0 + .1f, cx + s * .62f + .08f, 2.35f, Z0 + .11f, ink, 0);
+      rb_box(R, RM_LIT, cx + s * .15f, 1.0f, Z0 + .1f, cx + s * .9f, 1.06f, Z0 + .17f, steel, 0);
+    }
+  }
+  /* show posters either side: a dark frame, a ground and a bold block of colour */
+  static const float PX[2] = {-6.4f, 2.2f};
+  for (int k = 0; k < 2; k++) {
+    float x = PX[k];
+    rb_box(R, RM_LIT, x - .65f, .9f, Z0, x + .65f, 2.85f, Z0 + .04f, ink, 0);
+    rb_box(R, RM_LIT, x - .58f, .97f, Z0 + .04f, x + .58f, 2.78f, Z0 + .05f, rgb(AC[k + 1][0], AC[k + 1][1], AC[k + 1][2]), 0);
+    rb_box(R, RM_LIT, x - .4f, 1.5f + k * .3f, Z0 + .05f, x + .25f, 2.4f + k * .1f, Z0 + .06f, rgb(AC[k * 3][0], AC[k * 3][1], AC[k * 3][2]), 0);
+    rb_box(R, RM_LIT, x - .45f, 1.1f, Z0 + .05f, x + .45f, 1.22f, Z0 + .06f, white, 0);
+  }
+  rb_sign(R, "MESA CONTEMPORARY ARTS", -W + .02f, 3.6f, Z0 + 2.8f, 5.0f, .5f, 2);   /* the gallery's wall, seen from the lobby */
+  /* works on the gallery wall: framed canvases, each with a second colour laid over its ground */
+  for (int k = 0; k < 5; k++) {
+    float z1 = Z1 - 2.0f - k * 2.2f, z0 = z1 - 1.4f, y0 = 1.3f + (k % 2) * .3f, y1 = 2.4f + (k % 2) * .3f;
+    const float *c = AC[k], *o = AC[(k + 2) % 6];
+    rb_box(R, RM_LIT, -W + .01f, y0 - .06f, z0 - .06f, -W + .04f, y1 + .06f, z1 + .06f, k % 2 ? white : ink, 0);
+    rb_box(R, RM_LIT, -W + .04f, y0, z0, -W + .07f, y1, z1, rgb(c[0], c[1], c[2]), 0);
+    if (k % 2) rb_box(R, RM_LIT, -W + .07f, y0 + .2f, z0 + .25f, -W + .08f, y1 - .35f, z1 - .55f, rgb(o[0], o[1], o[2]), 0);
+    else rb_box(R, RM_LIT, -W + .07f, y0 + (y1 - y0) * .55f, z0 + .1f, -W + .08f, y0 + (y1 - y0) * .7f, z1 - .1f, rgb(o[0], o[1], o[2]), 0);
+  }
+  /* a carved stone head on a plinth, after the 2026 show, looking at the door: a narrow chin, broad cheeks,
+   * a high forehead rounded off at the crown, a brow ridge over the eyes, the nose and the ears */
+  {
+    const float hx = -2.0f, hz = -4.0f, y = 1.05f;
+    t3_color dk = rgb(.47f, .44f, .4f);
+    rb_cbox(R, RM_LIT, hx, 0, hz, .9f, y, .9f, conc, RB_SOLID);
+    rb_cbox(R, RM_LIT, hx, y, hz - .02f, .22f, .14f, .24f, stone, 0);              /* neck */
+    rb_cbox(R, RM_LIT, hx, y + .14f, hz + .02f, .3f, .12f, .36f, stone, 0);        /* chin and jaw */
+    rb_cbox(R, RM_LIT, hx, y + .26f, hz, .4f, .28f, .46f, stone, 0);               /* cheeks */
+    rb_cbox(R, RM_LIT, hx, y + .54f, hz - .01f, .38f, .18f, .44f, stone, 0);       /* forehead */
+    rb_cbox(R, RM_LIT, hx, y + .72f, hz - .02f, .28f, .07f, .34f, stone, 0);       /* crown */
+    rb_cbox(R, RM_LIT, hx, y + .5f, hz + .24f, .34f, .05f, .05f, dk, 0);           /* brow ridge */
+    rb_cbox(R, RM_LIT, hx, y + .3f, hz + .25f, .08f, .2f, .08f, stone, 0);         /* nose */
+    rb_cbox(R, RM_LIT, hx, y + .2f, hz + .235f, .14f, .03f, .03f, dk, 0);          /* the line of the mouth */
+    for (int s2 = -1; s2 <= 1; s2 += 2) rb_cbox(R, RM_LIT, hx + s2 * .215f, y + .32f, hz - .02f, .04f, .16f, .1f, stone, 0);   /* ears */
+  }
+  /* a tall figure, its head a pale block */
   rb_drum(R, RM_LIT, 3.0f, -5.0f, .3f, 0, 2.6f, rgb(.2f, .3f, .7f), RB_SOLID);
   rb_cbox(R, RM_LIT, 3.0f, 2.6f, -5.0f, .45f, .5f, .4f, rgb(.92f, .88f, .8f), 0);
+  /* and up in the height of the room, a hanging work: coloured plates on wires at different heights */
+  static const float HP[6][5] = {{-1.6f, -6.2f, 5.6f, 1.1f, .7f}, {-.2f, -7.4f, 4.6f, .8f, .8f}, {1.3f, -6.6f, 5.2f, .6f, 1.2f},
+                                 {.4f, -8.8f, 5.9f, 1.3f, .6f}, {-1.0f, -9.4f, 4.9f, .7f, .7f}, {2.0f, -8.4f, 4.4f, .9f, .5f}};
+  for (int k = 0; k < 6; k++) {
+    const float *h = HP[k], *c = AC[(k + 1) % 6];
+    rb_cbox(R, RM_LIT, h[0], h[2], h[1], h[3], .05f, h[4], rgb(c[0], c[1], c[2]), 0);
+    rb_cbox(R, RM_LIT, h[0], h[2] + .05f, h[1], .015f, H - h[2] - .05f, .015f, ink, 0);
+  }
   /* benches */
-  for (int k = 0; k < 3; k++) rb_cbox(R, RM_LIT, -3.0f + k * 3.0f, 0, Z1 - 3.0f, 2.0f, .45f, .5f, wood, RB_SOLID);
+  for (int k = -1; k <= 1; k += 2) rb_cbox(R, RM_LIT, k * 5.5f, 0, Z1 - 3.0f, 2.0f, .45f, .5f, wood, RB_SOLID);   /* either side of the way in */
   /* linear lights */
   for (float z = Z1 - 1.5f; z > Z0 + 1; z -= 3) rb_box(R, RM_GLOW, -W + 1, H - .04f, z - .1f, W - 1, H - .01f, z + .1f, rgb(1, .97f, .9f), 0);
 }
@@ -422,7 +477,7 @@ static const spot_t SPOTS_MAC[] = {
 
 /* id, sign, (free placement), door x, w, d, h, back, look, glaze, furnish, spots */
 static const room_def ROOMS[] = {
-  {"proof", "Proof Bread", 0, 0, 0, 2.2f, 7.2f, 13.f, 4.2f, .3f, LOOK_BAKERY, .9f, furnish_proof, SPOTS_PROOF},
+  {"proof", "Proof Bread", 0, 0, 0, 0, 7.2f, 13.f, 4.2f, .3f, LOOK_BAKERY, .9f, furnish_proof, SPOTS_PROOF},
   {"chupacabra", "Chupacabra Taproom", 0, 0, 0, .6f, 7.0f, 11.f, 4.3f, .35f, LOOK_TAPROOM, .8f, furnish_chupacabra, SPOTS_CHUPA},
   {"level1", "Level 1 Arcade Bar", 0, 0, 0, -3.0f, 11.4f, 21.f, 4.6f, .4f, LOOK_ARCADE, .6f, furnish_level1, SPOTS_LEVEL1},
   {"nile", "The Nile Theater", 0, 0, 0, 0, 13.2f, 36.f, 9.f, .4f, LOOK_THEATER, .5f, furnish_nile, SPOTS_NILE},
@@ -430,6 +485,21 @@ static const room_def ROOMS[] = {
   {"arts_center", "Mesa Arts Center", 381.07f, 62.63f, 2.786f, 0, 17.f, 13.f, 7.f, .3f, LOOK_GALLERY, 1.f, furnish_mac, SPOTS_MAC},
 };
 #define NROOM (int)(sizeof ROOMS / sizeof ROOMS[0])
+/* the lot wall a placed room's front stands on (the Arts Center lobby): city.c glazes that wall whatever its
+ * hash says and frames the door there, so the way in is a door from outside too. The door's middle, or false */
+bool interior_front_on(float ax, float az, float bx, float bz, float *dx, float *dz) {
+  for (int i = 0; i < NROOM; i++) {
+    const room_def *D = &ROOMS[i];
+    if (D->cx == 0 && D->cz == 0) continue;   /* a room behind a facade: the facade has its door */
+    float ex = bx - ax, ez = bz - az, l2 = ex * ex + ez * ez;
+    if (l2 < 1e-6f) continue;
+    float t = ((D->cx - ax) * ex + (D->cz - az) * ez) / l2, px = ax + ex * t - D->cx, pz = az + ez * t - D->cz;
+    if (t < 0 || t > 1 || px * px + pz * pz > .36f) continue;
+    *dx = D->cx + cosf(D->yaw) * D->door_x; *dz = D->cz - sinf(D->yaw) * D->door_x;
+    return true;
+  }
+  return false;
+}
 static room_t RM[NROOM];
 static int current = -1;
 static t3_scene *SC;
@@ -459,15 +529,20 @@ const char *interior_id(int i) { return i >= 0 && i < NROOM ? ROOMS[i].id : ""; 
 int interior_find(const char *id) { for (int i = 0; i < NROOM; i++) if (!strcmp(ROOMS[i].id, id)) return i; return -1; }
 bool interior_door(int i, v3 *outside, float *yaw_out, v3 *inside, float *yaw_in) {
   if (i < 0 || i >= NROOM) return false;
-  const room_t *R = &RM[i]; const room_def *D = R->def;
-  /* outside: on the street in front of the door, a step clear of whatever stands at the facade */
-  v3 o = to_world(R, D->door_x, 0, 1.2f);
-  for (float out = 1.2f; out < 4.5f; out += .3f) {
-    v3 q = to_world(R, D->door_x, 0, out), p = q, n; bool hit = false;
-    city_push(&p, .3f, 1.6f, &n, &hit);
-    if (!hit) { o = q; break; }
+  room_t *R = &RM[i]; const room_def *D = R->def;
+  /* outside: on the street in front of the door, a step clear of whatever stands at the facade, and far
+   * enough out that the follow camera behind someone coming out has room before the shopfront. The town
+   * does not move there, so it is found once (this is asked for every room many times a frame) */
+  if (!R->door_ok) {
+    v3 o = to_world(R, D->door_x, 0, 1.8f);
+    for (float out = 1.8f; out < 4.5f; out += .3f) {
+      v3 q = to_world(R, D->door_x, 0, out), p = q, n; bool hit = false;
+      city_push(&p, .3f, 1.6f, &n, &hit);
+      if (!hit) { o = q; break; }
+    }
+    R->door_out = o; R->door_ok = true;
   }
-  if (outside) *outside = o;
+  if (outside) *outside = R->door_out;
   if (yaw_out) *yaw_out = R->yaw + 3.14159265f;
   if (inside) *inside = to_world(R, D->door_x, 0, -D->back - 1.0f);
   if (yaw_in) *yaw_in = R->yaw + 3.14159265f;

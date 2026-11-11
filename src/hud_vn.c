@@ -55,7 +55,7 @@ static void draw_dialogue(const story_ui_t *U) {
     done += n + 1;
   }
   key = hash_str(U->speaker ? U->speaker : "", U->speaker_col);
-  c = layer_begin(&L_name, 320, 44, key);
+  c = layer_begin(&L_name, 600, 44, key);   /* the widest tag: an 18 character stranger's name, letter spaced, and its slant */
   if (c) {
     cv_font(c, F_DISPLAY, 21); cv_letter_spacing(c, 2);
     char up[64]; int k = 0; for (const char *p = U->speaker; p && *p && k < 63; p++) up[k++] = (*p >= 'a' && *p <= 'z') ? (char)(*p - 32) : *p; up[k] = 0;
@@ -106,8 +106,11 @@ static void fmt_hour(char *b, size_t n, float h) {
   int d = hh % 12 ? hh % 12 : 12;
   snprintf(b, n, "%d:%02d %s", d, mm / 5 * 5, hh < 12 ? "AM" : "PM");
 }
+static float chapter_alpha(const story_ui_t *U) { return U->chapter ? ez(U->ch_t * 2.5f) * ds_clamp((U->ch_dur - U->ch_t) * 2.5f, 0, 1) : 0; }
+static float note_alpha(const story_ui_t *U) { return U->note && !U->chapter ? ds_clamp(U->note_t * 2, 0, 1) * ds_clamp((4 - U->note_t) * 3, 0, 1) : 0; }
+static float got_alpha(const story_ui_t *U) { return U->got_t > 0 && U->got ? ds_clamp(U->got_t * 2, 0, 1) * ds_clamp((3 - U->got_t) * 5, 0, 1) : 0; }
 static void draw_chapter(const story_ui_t *U) {
-  float t = U->ch_t, a = ez(t * 2.5f) * ds_clamp((U->ch_dur - t) * 2.5f, 0, 1);
+  float t = U->ch_t, a = chapter_alpha(U);
   cv *c = layer_begin(&L_ch, 900, 150, hash_str(U->ch_title, hash_str(U->ch_sub ? U->ch_sub : "", 5)));
   if (c) {
     char tm[32]; fmt_hour(tm, sizeof tm, U->ch_hour);
@@ -133,7 +136,7 @@ static void draw_card(const story_ui_t *U) {
   hg_tex(&L_card, 40, 270 + (1 - ez(t * 3)) * 14, a);
 }
 static void draw_note(const story_ui_t *U) {
-  float a = ds_clamp(U->note_t * 2, 0, 1) * ds_clamp((4 - U->note_t) * 3, 0, 1);
+  float a = note_alpha(U);
   cv *c = layer_begin(&L_note, 1120, 72, hash_str(U->note, 13));
   if (c) {
     cv_font(c, F_TYPE, 21); char lines[3][120]; int n = wrap(c, U->note, 1040, lines, 2);
@@ -172,8 +175,9 @@ static void draw_roam(const story_ui_t *U) {
       p_text(c, F_TYPE, 20, 0, CV_LEFT, U->objective, 22, 27, PAPER, 1);
       layer_end(&L_obj, c);
     }
-    hg_tex(&L_obj, 0, 24, 1);
+    hg_tex(&L_obj, 0, 24, 1 - chapter_alpha(U));   /* a chapter card takes the top left: the old goal steps aside */
   }
+  if (chapter_alpha(U) > .01f) return;   /* and the pins and the wayfinder wait for the card to go */
   for (int i = 0; i < U->npin; i++) { hg_rect_m(U->pin_x[i], U->pin_y[i], 10, 10, .785f, 0x9a968c, .8f); hg_rect_m(U->pin_x[i], U->pin_y[i], 4, 4, .785f, INK, .8f); }
   if (U->marker_on) {
     float x = U->marker_x, y = U->marker_y;
@@ -272,7 +276,9 @@ static void draw_tasks(const story_ui_t *U) {
     }
     layer_end(&L_tasks, c);
   }
-  hg_tex(&L_tasks, 0, U->objective ? 74 : 24, 1);
+  /* the announcements (a chapter card, a note, the weapon banner) take the top of the screen: the list steps aside */
+  float under = fmaxf(chapter_alpha(U), fmaxf(note_alpha(U), got_alpha(U)));
+  if (under < .99f) hg_tex(&L_tasks, 0, U->objective ? 74 : 24, 1 - under);
 }
 /* the hosting minigames: a panel low in the middle; the greet window and the pointing reticle in the scene */
 static void draw_minigame(const story_ui_t *U) {
@@ -411,12 +417,16 @@ static void draw_toasts(const story_ui_t *U) {
       hg_tex(&L_toast2, DS_W - 250, 154, a);
     }
   }
-  if (U->got_t > 0 && U->got) {
+  if (got_alpha(U) > 0) {
     char s[60]; snprintf(s, sizeof s, "NEW WEAPON  %s", U->got);
     cv *c = layer_begin(&L_got, 620, 56, hash_str(s, 7));
     if (c) { cv_fill_hex(c, ORANGE, 1); cv_fill_rect(c, 0, 0, 620, 52); p_text(c, F_DISPLAY, 25, 2, CV_CENTER, s, 310, 36, INK, 1); layer_end(&L_got, c); }
-    float a = ds_clamp(U->got_t * 2, 0, 1) * ds_clamp((3 - U->got_t) * 5, 0, 1);
-    hg_tex(&L_got, 330, 100, a);
+    /* under a chapter card, not across it; once low, it stays low until it is gone */
+    static float last_t; static bool low;
+    if (U->got_t > last_t) low = false;
+    if (U->chapter) low = true;
+    last_t = U->got_t;
+    hg_tex(&L_got, 330, low ? 292 : 100, got_alpha(U));
   }
 }
 static void draw_retry(const story_ui_t *U) {
@@ -444,7 +454,7 @@ void hud_vn_draw(void) {
   if (U->roam) { draw_roam(U); draw_tasks(U); draw_gear(U); if (U->mg) draw_minigame(U); }
   if (U->sub_text && U->sub_t > 0 && !U->talking) draw_sub(U);
   if (U->chapter) draw_chapter(U);
-  if (U->note) draw_note(U);
+  if (note_alpha(U) > 0) draw_note(U);   /* after the chapter card, never over it */
   if (U->talking && U->line) draw_dialogue(U);
   if (U->choosing) draw_choice(U);
   draw_toasts(U);

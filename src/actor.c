@@ -5,6 +5,7 @@
 #include "actor.h"
 #include "anim.h"
 #include "gen/cast_meta.h"
+#include "three.c/third_party/cgltf.h"   /* declarations only: three.c's gltf.c compiles it */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,12 +53,17 @@ struct actor {
 };
 
 static ck_rig *RIG;
-/* each model parsed once (actor_preload); actors are clones that share its geometry and face atlas */
+/* each model parsed once (actor_preload); actors are clones that share its geometry and face atlas.
+ * Memory: a 1024 x 1024 atlas is 4 MB decoded and about 0.15 MB as the glb's PNG, and 42 bodies are
+ * parsed at boot. So a template keeps its two atlases compressed: the body is decoded for each new
+ * palette (body_tex), the face once by the model's first actor. A texture's own copy of its pixels goes
+ * as soon as the GPU has it (drop_pixels): nothing reads them back. */
 typedef struct {
   t3_gltf *gltf;
-  uint8_t *pristine; int tw, th;      /* the body atlas before any palette */
-  t3_texture *face_tex;
+  uint8_t *png[2]; size_t png_n[2];   /* the body and face atlases, as the glb holds them */
+  t3_texture *face_tex;               /* made by the first actor; shared */
   char *spr;                          /* the spring bone text */
+  int live;                           /* actors of this model alive */
 } model_tpl;
 static model_tpl TPL[AM_COUNT];
 /* body atlases by palette: actors in the same clothes share one texture (and one upload) */
@@ -142,41 +148,75 @@ static void atlas_setup(t3_texture *T) {
   T->generate_mipmaps = true; T->min_filter = T3_LINEAR_MIPMAP_LINEAR; T->mag_filter = T3_LINEAR;
   T->version++;
 }
+/* a copy of the image bytes a glb mesh's base colour texture points at (a PNG in the binary chunk) */
+static uint8_t *glb_image(const cgltf_data *d, const char *mesh, size_t *len) {
+  *len = 0;
+  for (cgltf_size i = 0; i < d->meshes_count; i++) {
+    const cgltf_mesh *me = &d->meshes[i];
+    if (!me->name || strcmp(me->name, mesh) || !me->primitives_count || !me->primitives[0].material) continue;
+    const cgltf_texture *t = me->primitives[0].material->pbr_metallic_roughness.base_color_texture.texture;
+    const cgltf_buffer_view *bv = t && t->image ? t->image->buffer_view : NULL;
+    if (!bv || !d->bin || bv->offset + bv->size > d->bin_size) return NULL;
+    uint8_t *o = malloc(bv->size);
+    if (o) { memcpy(o, (const uint8_t *)d->bin + bv->offset, bv->size); *len = bv->size; }
+    return o;
+  }
+  return NULL;
+}
 bool actor_preload(actor_model model) {
   if ((unsigned)model >= AM_COUNT) return false;
   model_tpl *P = &TPL[model];
   if (P->gltf) return true;
   if (!RIG) RIG = rig_load("rig.bin");
   size_t n; uint8_t *b = ds_asset(CAST_META[model].glb, &n);
-  if (b) { P->gltf = t3_gltf_parse(b, n, NULL, NULL); free(b); }
-  if (!P->gltf) { ds_log("actor: cannot parse %s", CAST_META[model].glb); return false; }
-  t3_texture *B = find_map(P->gltf->scene, "body");
-  if (B && B->pixels) {
-    P->tw = B->width; P->th = B->height;
-    P->pristine = malloc((size_t)B->width * B->height * 4);
-    memcpy(P->pristine, B->pixels, (size_t)B->width * B->height * 4);
-    /* the template never draws: let its copy of the body atlas go (actors get theirs from body_tex) */
-    static const char *USE[2] = {"body", "far"};
-    for (int i = 0; i < 2; i++) { t3_object *o = t3_object_get_by_name(P->gltf->scene, USE[i]); if (o && ((t3_mesh *)o)->materials[0]) t3_material_set_map(((t3_mesh *)o)->materials[0], NULL); }
+  if (b) {
+    cgltf_options o = {0}; cgltf_data *d = NULL;
+    if (cgltf_parse(&o, b, n, &d) == cgltf_result_success) {
+      P->png[0] = glb_image(d, "body", &P->png_n[0]);
+      P->png[1] = glb_image(d, "face", &P->png_n[1]);
+      cgltf_free(d);
+    }
+    P->gltf = t3_gltf_parse(b, n, NULL, NULL); free(b);
   }
-  P->face_tex = find_map(P->gltf->scene, "face");
-  if (P->face_tex) { t3_retain(P->face_tex); atlas_setup(P->face_tex); }
+  if (!P->gltf) { ds_log("actor: cannot parse %s", CAST_META[model].glb); return false; }
+  /* the template never draws: its decoded atlases go now (actors get theirs from the PNGs) */
+  static const char *USE[4] = {"body", "far", "face", "farface"};
+  for (int i = 0; i < 4; i++) {
+    t3_object *ob = t3_object_get_by_name(P->gltf->scene, USE[i]);
+    if (ob && (ob->type == T3_MESH || ob->type == T3_SKINNED_MESH) && ((t3_mesh *)ob)->materials[0]) t3_material_set_map(((t3_mesh *)ob)->materials[0], NULL);
+  }
   P->spr = (char *)ds_asset(CAST_META[model].spr, &n);
   return true;
+}
+/* a model with no actor left: its parse and atlases go; actor_new makes it again on demand */
+void actor_unload(actor_model model) {
+  if ((unsigned)model >= AM_COUNT) return;
+  model_tpl *P = &TPL[model];
+  if (P->live > 0 || !P->gltf) return;
+  for (int i = 0; i < PALC_N; i++) if (PALC[i].T && PALC[i].m == model) { t3_release(PALC[i].T); PALC[i].T = NULL; }
+  if (P->face_tex) t3_release(P->face_tex);
+  t3_release(P->gltf);
+  free(P->png[0]); free(P->png[1]); free(P->spr);
+  memset(P, 0, sizeof *P);
+}
+/* the GPU has the texels once a texture has been drawn: the CPU copy is 4 MB nobody reads again */
+static void drop_pixels(t3_texture *T) {
+  if (T && T->pixels && T->_gl && !T->gpu_made) { free(T->pixels); T->pixels = NULL; }
 }
 void actor_preload_all(void) { for (int m = 0; m < AM_COUNT; m++) actor_preload((actor_model)m); }
 
 /* the body atlas in a palette: shared by every actor of this model in the same palette */
 static t3_texture *body_tex(actor_model model, const actor_palette *pal) {
   model_tpl *P = &TPL[model];
-  if (!P->pristine) return NULL;
+  if (!P->png[0]) return NULL;
   if (!pal) pal = &ACTOR_PAL_NONE;
   int slot = -1;
   for (int i = 0; i < PALC_N; i++) {
     if (PALC[i].T && PALC[i].m == model && !memcmp(&PALC[i].p, pal, sizeof *pal)) { t3_retain(PALC[i].T); return PALC[i].T; }
     if (slot < 0 && (!PALC[i].T || PALC[i].T->_refs <= 1)) slot = i;   /* empty, or no actor uses it any more */
   }
-  t3_texture *T = t3_texture_new(P->tw, P->th, P->pristine);
+  t3_texture *T = t3_texture_load_memory(P->png[0], P->png_n[0]);
+  if (!T) return NULL;
   apply_palette(T, model, pal);
   atlas_setup(T);
   if (slot >= 0) {
@@ -359,6 +399,8 @@ actor_t *actor_new(actor_model model, const actor_palette *pal, float scale, t3_
   a->root = t3_object_new();
   if (!actor_preload(model)) { t3_object_add(&scene->base, a->root); return a; }
   model_tpl *P = &TPL[model];
+  P->live++;
+  if (!P->face_tex && P->png[1]) { P->face_tex = t3_texture_load_memory(P->png[1], P->png_n[1]); if (P->face_tex) atlas_setup(P->face_tex); }
   node_map *M = calloc(1, sizeof *M);
   a->gltf_scene = clone_node(P->gltf->scene, M);
   bind_clones(M);
@@ -430,6 +472,26 @@ actor_t *actor_new(actor_model model, const actor_palette *pal, float scale, t3_
   actor_play(a, "Idle_Loop", 1, true, 0);
   actor_place(a, v3_(0, 0, 0), 0);
   return a;
+}
+/* everything actor_new made: the clone of the node tree (bones, the skinned meshes over the template's
+ * geometry, the LOD levels, the hand sockets), the two materials, its reference to the palette atlas, the
+ * blob shadow. The template stays (actor_unload). Whatever hangs off a socket goes with it: weapon.c lets
+ * go of its props first (weapon_equip(a, -1)) */
+void actor_free(actor_t *a) {
+  if (!a) return;
+  if (a->root) {
+    if (a->root->parent) t3_object_remove(a->root->parent, a->root);
+    if (a->gltf_scene) t3_release(a->gltf_scene);
+    if (a->s_rhand) t3_release(a->s_rhand);
+    if (a->s_lhand) t3_release(a->s_lhand);
+    t3_release(a->root);
+  }
+  if (a->shadow) { if (a->shadow->base.parent) t3_object_remove(a->shadow->base.parent, &a->shadow->base); t3_release(a->shadow); }
+  if (a->m_body) t3_release(a->m_body);
+  if (a->m_face) t3_release(a->m_face);
+  if (a->tex) t3_release(a->tex);
+  if (a->gltf_scene && (unsigned)a->model < AM_COUNT && TPL[a->model].live > 0) TPL[a->model].live--;
+  free(a);
 }
 
 void actor_move(actor_t *a, v3 pos, float yaw) {
@@ -536,7 +598,10 @@ static void apply_hands(actor_t *a, float dt) {
 
 
 /* ---- reach: the hands onto two world points over whatever the clip plays (a bike's grips) ---- */
-void actor_reach(actor_t *a, v3 right, v3 left, float amount) { a->reach[0] = right; a->reach[1] = left; a->reach_t = amount; }
+void actor_reach(actor_t *a, v3 right, v3 left, float amount) {
+  a->reach[0] = right; a->reach[1] = left; a->reach_t = amount;
+  if (amount <= 0) a->reach_w = 0;   /* letting go is at once: off the bike the arms are the clip's again this frame */
+}
 static void qconj(float *o, const float *q) { o[0] = -q[0]; o[1] = -q[1]; o[2] = -q[2]; o[3] = q[3]; }
 static void qfrom_to(float *o, v3 u, v3 v) {   /* the shortest turn taking unit u onto unit v */
   float d = v3_dot(u, v);
@@ -585,6 +650,8 @@ static void apply_reach(actor_t *a, float dt) {
 }
 
 void actor_update(actor_t *a, float dt) {
+  drop_pixels(a->tex);
+  if ((unsigned)a->model < AM_COUNT) drop_pixels(TPL[a->model].face_tex);
   if (!a->gltf_scene || !a->root->visible) return;
   if (a->lod && a->lod->level_count == 3) { float k = lod_scale(); a->lod->levels[1].distance = LOD_NEAR * k; a->lod->levels[2].distance = LOD_FAR * k; }
   mixer_update(&a->mixer, dt);

@@ -192,90 +192,163 @@ static void fk_generic(t3_object *r, const whimsy_parts *p, t3_material *brick, 
 }
 
 /* ── the street ── */
-typedef struct { t3_geometry *body, *cabin, *tire, *disc; t3_material *paint[10], *glass, *rubber, *alloy, *head, *tail; } car_parts;
-static t3_geometry *car_shell(bool cabin) {
-  static const float body[][4] = {{-2.3f, .45f, .75f, .75f}, {-2.23f, .40f, .83f, .82f}, {-2.05f, .35f, .91f, .88f}, {-1.25f, .35f, 1, .91f}, {1.15f, .35f, .96f, .91f}, {2.05f, .39f, .83f, .86f}, {2.23f, .43f, .76f, .79f}, {2.3f, .47f, .69f, .72f}};
-  static const float roof[][4] = {{-1.35f, .94f, .98f, .8f}, {-.75f, .96f, 1.48f, .74f}, {.48f, .94f, 1.48f, .74f}, {1.18f, .92f, .96f, .8f}};
-  static const float body_x[] = {-2.3f, -2.05f, -1.85f, -1.70f, -1.43f, -1.15f, -1.01f, -.6f, .6f, 1.01f, 1.15f, 1.43f, 1.70f, 1.85f, 2.05f, 2.3f};
-  int count = cabin ? 4 : (int)(sizeof body_x / sizeof body_x[0]);
-  t3_vec3 rings[16][8]; mb b = {0};
+/* Cars: rounded shells of rings along the length (x, the front at +x), each ring a chamfered box section
+ * given as x, its bottom, its top and its half width. Three bodies: a sedan with a trunk; a box tail for the
+ * hatchback, SUV and minivan; a pickup, its cab stepping down to the bed floor. Three glass cabins: the
+ * sedan's raked back glass, the hatchback's sloped hatch, and the near upright back of the boxier kinds.
+ * The shells are in units the kinds scale (body by length L and height Hb, the cabin to its own span). */
+typedef struct { const float (*p)[4]; int n; const float *xs; int nx; } car_profile;
+static const float CB_SEDAN[][4] = {{-2.3f, .45f, .75f, .75f}, {-2.23f, .40f, .83f, .82f}, {-2.05f, .35f, .91f, .88f}, {-1.25f, .35f, 1, .91f}, {1.15f, .35f, .96f, .91f}, {2.05f, .39f, .83f, .86f}, {2.23f, .43f, .76f, .79f}, {2.3f, .47f, .69f, .72f}};
+static const float CB_BOX[][4] = {{-2.3f, .45f, .90f, .80f}, {-2.25f, .40f, .97f, .86f}, {-2.12f, .35f, 1, .90f}, {-1.25f, .35f, 1, .91f}, {1.15f, .35f, .96f, .91f}, {2.05f, .39f, .83f, .86f}, {2.23f, .43f, .76f, .79f}, {2.3f, .47f, .69f, .72f}};
+/* the pickup: the bed floor at .80 behind the cab's back wall at x -.87, the tall hood of a truck */
+static const float CB_PICKUP[][4] = {{-2.3f, .45f, .80f, .89f}, {-2.25f, .38f, .80f, .89f}, {-.88f, .35f, .80f, .90f}, {-.86f, .35f, 1.18f, .90f}, {1.15f, .35f, 1.16f, .90f}, {2.05f, .40f, 1.06f, .86f}, {2.23f, .45f, .94f, .80f}, {2.3f, .50f, .86f, .74f}};
+static const float CBX_SEDAN[] = {-2.3f, -2.05f, -1.85f, -1.70f, -1.43f, -1.15f, -1.01f, -.6f, .6f, 1.01f, 1.15f, 1.43f, 1.70f, 1.85f, 2.05f, 2.3f};
+static const float CBX_BOX[] = {-2.3f, -2.25f, -2.12f, -1.85f, -1.70f, -1.43f, -1.15f, -1.01f, -.6f, .6f, 1.01f, 1.15f, 1.43f, 1.70f, 1.85f, 2.05f, 2.23f, 2.3f};
+static const float CBX_PICKUP[] = {-2.3f, -2.25f, -1.85f, -1.70f, -1.43f, -1.15f, -1.01f, -.88f, -.86f, -.6f, .6f, 1.01f, 1.15f, 1.43f, 1.70f, 1.85f, 2.05f, 2.23f, 2.3f};
+static const float CC_SEDAN[][4] = {{-1.35f, .94f, .98f, .8f}, {-.75f, .96f, 1.48f, .74f}, {.48f, .94f, 1.48f, .74f}, {1.18f, .92f, .96f, .8f}};
+static const float CC_HATCH[][4] = {{-1.35f, .94f, 1.18f, .79f}, {-1.02f, .96f, 1.48f, .74f}, {.48f, .94f, 1.48f, .74f}, {1.18f, .92f, .96f, .8f}};
+static const float CC_BOX[][4] = {{-1.35f, .94f, 1.38f, .79f}, {-1.22f, .96f, 1.48f, .74f}, {.48f, .94f, 1.48f, .74f}, {1.18f, .92f, .96f, .8f}};
+static const float CCX_SEDAN[] = {-1.35f, -.75f, .48f, 1.18f}, CCX_HATCH[] = {-1.35f, -1.02f, .48f, 1.18f}, CCX_BOX[] = {-1.35f, -1.22f, .48f, 1.18f};
+enum { CAR_BODY_SEDAN, CAR_BODY_BOX, CAR_BODY_PICKUP, CAR_BODY_N };
+enum { CAR_CAB_SEDAN, CAR_CAB_HATCH, CAR_CAB_BOX, CAR_CAB_N };
+#define CAR_PROF(a, x) {a, (int)(sizeof a / sizeof a[0]), x, (int)(sizeof x / sizeof x[0])}
+static const car_profile CAR_BODY[CAR_BODY_N] = {CAR_PROF(CB_SEDAN, CBX_SEDAN), CAR_PROF(CB_BOX, CBX_BOX), CAR_PROF(CB_PICKUP, CBX_PICKUP)};
+static const car_profile CAR_CAB[CAR_CAB_N] = {CAR_PROF(CC_SEDAN, CCX_SEDAN), CAR_PROF(CC_HATCH, CCX_HATCH), CAR_PROF(CC_BOX, CCX_BOX)};
+typedef struct { t3_geometry *body[CAR_BODY_N], *cabin[CAR_CAB_N], *disc; t3_material *paint[10], *glass, *rubber, *alloy, *head, *tail; } car_parts;
+/* a profile's section at x: bottom, top and half width, between its rings (no wheel arches) */
+static void car_section(const car_profile *P, float x, float *lo, float *hi, float *w) {
+  int s = 0;
+  while (s < P->n - 2 && x > P->p[s + 1][0]) s++;
+  float u = (x - P->p[s][0]) / (P->p[s + 1][0] - P->p[s][0]);
+  u = u < 0 ? 0 : u > 1 ? 1 : u;
+  if (lo) *lo = P->p[s][1] + u * (P->p[s + 1][1] - P->p[s][1]);
+  if (hi) *hi = P->p[s][2] + u * (P->p[s + 1][2] - P->p[s][2]);
+  if (w) *w = P->p[s][3] + u * (P->p[s + 1][3] - P->p[s][3]);
+}
+static t3_geometry *car_shell(const car_profile *P, bool cabin) {
+  t3_vec3 rings[24][8]; mb b = {0};
+  int count = P->nx < 24 ? P->nx : 24;
   for (int i = 0; i < count; i++) {
-    float x, lo, hi, w, ch = cabin ? .025f : .065f;
-    if (cabin) { x = roof[i][0]; lo = roof[i][1]; hi = roof[i][2]; w = roof[i][3]; }
-    else {
-      x = body_x[i]; int section = 0;
-      while (section < 6 && x > body[section + 1][0]) section++;
-      float u = (x - body[section][0]) / (body[section + 1][0] - body[section][0]);
-      lo = body[section][1] + u * (body[section + 1][1] - body[section][1]);
-      hi = body[section][2] + u * (body[section + 1][2] - body[section][2]);
-      w = body[section][3] + u * (body[section + 1][3] - body[section][3]);
+    float x = P->xs[i], lo, hi, w;
+    car_section(P, x, &lo, &hi, &w);
+    if (!cabin) {   /* the wheel arches, cut up from below round each axle */
       float dx = fabsf(x) - 1.43f;
       if (fabsf(dx) < .42f) lo = fmaxf(lo, .35f + sqrtf(.42f * .42f - dx * dx));
+      if (lo > hi - .02f) lo = hi - .02f;
     }
+    float ch = fminf(cabin ? .025f : .065f, (hi - lo) * .3f);
     t3_vec3 rr[] = {{x, lo, -w + ch}, {x, lo + ch, -w}, {x, hi - ch, -w}, {x, hi, -w + ch}, {x, hi, w - ch}, {x, hi - ch, w}, {x, lo + ch, w}, {x, lo, w - ch}};
     memcpy(rings[i], rr, sizeof rr);
   }
   for (int i = 1; i < count; i++) for (int j = 0; j < 8; j++) circus_quad(&b, rings[i - 1][j], rings[i - 1][(j + 1) % 8], rings[i][(j + 1) % 8], rings[i][j]);
+  /* the end caps, wound to face out (back and front): they used to face in, and both ends were open */
   for (int j = 1; j < 7; j++) {
-    circus_quad(&b, rings[0][0], rings[0][j], rings[0][j + 1], rings[0][j + 1]);
-    circus_quad(&b, rings[count - 1][0], rings[count - 1][j + 1], rings[count - 1][j], rings[count - 1][j]);
+    circus_quad(&b, rings[0][0], rings[0][j + 1], rings[0][j], rings[0][j]);
+    circus_quad(&b, rings[count - 1][0], rings[count - 1][j], rings[count - 1][j + 1], rings[count - 1][j + 1]);
   }
   return mb_done(&b);
 }
-/* A parked or passing car. One rounded shell (car_shell) scaled into five kinds, so the street has variety
- * without a second art style: 0 sedan, 1 hatchback, 2 SUV, 3 pickup, 4 minivan. Ten real-world paints.
- * Mirrors, a grille, plates, a door seam and hubs make it read up close. Length runs along x, the front at +x. */
+/* A parked or passing car, in five kinds: 0 sedan, 1 hatchback, 2 SUV, 3 pickup, 4 minivan. Ten real-world
+ * paints. Per kind: the length and body height scales, the wheel radius and track (the tyre's outer face
+ * just inside the body side), the body and cabin shells, and where the cabin's back and front glass meet
+ * the body in metres from the middle, and its height scale. */
 #define CAR_KINDS 5
 #define CAR_PAINTS 10
-static void fk_car(t3_object *r, const whimsy_parts *p, const car_parts *c, int colour, int kind) {
-  /* per kind: length, body height, cabin x offset, cabin length, cabin height, wheel radius, track */
-  static const float K[CAR_KINDS][7] = {
-    {1.00f, 1.00f,  0.00f, 1.00f, 1.00f, .35f, .90f},   /* sedan */
-    {0.86f, 1.02f, -0.22f, 1.18f, 1.04f, .34f, .88f},   /* hatchback: short, the roof runs to the back */
-    {1.04f, 1.22f, -0.12f, 1.22f, 1.22f, .42f, .95f},   /* SUV: tall, long roof, big wheels */
-    {1.12f, 1.12f,  0.55f, 0.62f, 1.14f, .41f, .95f},   /* pickup: a short cab up front, a bed behind */
-    {1.06f, 1.30f, -0.05f, 1.42f, 1.42f, .36f, .93f},   /* minivan: tall and long */
-  };
+typedef struct { float L, Hb, wr, tr; int body, cab; float c0, c1, ch; } car_kind;
+static const car_kind CAR_K[CAR_KINDS] = {
+  {1.00f, 1.00f, .35f, .78f, CAR_BODY_SEDAN, CAR_CAB_SEDAN, -1.35f, 1.18f, 1.00f},
+  {0.86f, 0.98f, .33f, .77f, CAR_BODY_BOX, CAR_CAB_HATCH, -1.84f, .80f, .98f},      /* short, the roof runs to the back */
+  {1.04f, 1.12f, .40f, .80f, CAR_BODY_BOX, CAR_CAB_BOX, -2.22f, 1.02f, 1.06f},      /* tall, a long roof, big wheels */
+  {1.12f, 1.00f, .40f, .80f, CAR_BODY_PICKUP, CAR_CAB_BOX, -.94f, 1.02f, 1.00f},    /* a crew cab up front, the bed behind */
+  {1.06f, 1.06f, .35f, .78f, CAR_BODY_BOX, CAR_CAB_BOX, -2.30f, 1.40f, 1.18f},      /* long and tall, the glass far forward */
+};
+/* where it all lands, in metres: the body's y offset, the cabin's x scale, x offset and y offset, the roof's top */
+typedef struct { float L, Hb, wr, tr, base, sx, cx, ch, cy, top; const car_profile *B, *C; } car_geom;
+static car_geom car_measure(int kind) {
   kind = ((kind % CAR_KINDS) + CAR_KINDS) % CAR_KINDS;
-  const float *k = K[kind];
-  float L = k[0], Hb = k[1], wr = k[5], tr = k[6];
+  const car_kind *k = &CAR_K[kind];
+  car_geom g = {k->L, k->Hb, k->wr, k->tr, 0, 0, 0, k->ch, 0, 0, &CAR_BODY[k->body], &CAR_CAB[k->cab]};
+  g.base = .03f + (k->wr - .35f) * .9f;   /* bigger wheels sit the body higher */
+  float r0 = g.C->p[0][0], r1 = g.C->p[g.C->n - 1][0];
+  g.sx = (k->c1 - k->c0) / (r1 - r0); g.cx = k->c0 - r0 * g.sx;
+  /* the cabin sits down on the body: every ring's bottom 3 cm into the body's top under it */
+  g.cy = 1e9f; float hmax = 0;
+  for (int i = 0; i < g.C->n; i++) {
+    float hi; car_section(g.B, (g.cx + g.C->p[i][0] * g.sx) / g.L, NULL, &hi, NULL);
+    g.cy = fminf(g.cy, g.base + hi * g.Hb - g.C->p[i][1] * g.ch - .03f);
+    hmax = fmaxf(hmax, g.C->p[i][2]);
+  }
+  g.top = g.cy + hmax * g.ch + .03f;
+  return g;
+}
+/* the box a car stands in, for collision: half length, half width, height */
+static void car_extent(int kind, float *hx, float *hz, float *top) {
+  car_geom g = car_measure(kind);
+  *hx = 2.3f * g.L; *hz = fmaxf(g.tr + .11f, .91f); *top = g.top;
+}
+static void fk_car(t3_object *r, const whimsy_parts *p, const car_parts *c, int colour, int kind) {
+  kind = ((kind % CAR_KINDS) + CAR_KINDS) % CAR_KINDS;
+  const car_kind *K = &CAR_K[kind];
+  car_geom g = car_measure(kind);
+  float L = g.L, Hb = g.Hb, wr = g.wr, tr = g.tr, base = g.base;
   t3_material *m = c->paint[((colour % CAR_PAINTS) + CAR_PAINTS) % CAR_PAINTS];
-  float lift = (wr - .35f) * .9f;   /* bigger wheels sit the body higher */
-  prop(r, c->body, m, 0, .03f + lift, 0, L, Hb, 1);
-  /* the cabin: glass, with the roof panel over it in paint */
-  float cx = k[2], cl = k[3], ch = k[4];
-  float body_top = .91f * Hb + lift;
-  if (kind != 3) {
-    prop(r, c->cabin, c->glass, cx, .03f + lift + (body_top - .9f - lift), 0, cl * L, ch, 1);
-    prop(r, p->box, m, cx - .15f * cl, .03f + lift + (body_top - .9f - lift) + 1.5f * ch - .02f, 0, 1.35f * cl * L, .05f, 1.44f);
-  } else {
-    /* pickup: the cab forward, the open bed behind it with its side walls and tailgate */
-    prop(r, c->cabin, c->glass, cx, body_top - .9f + .03f, 0, cl, ch, 1);
-    prop(r, p->box, m, cx - .15f * cl, body_top - .9f + .03f + 1.5f * ch - .02f, 0, 1.35f * cl, .05f, 1.44f);
-    float bx0 = -2.3f * L + .08f, bx1 = cx - .95f * cl, bl = bx1 - bx0, bm = (bx0 + bx1) * .5f;
-    prop(r, p->box, c->rubber, bm, body_top + .02f, 0, bl, .04f, 1.6f);                         /* bed floor */
-    for (int sd = -1; sd <= 1; sd += 2) prop(r, p->box, m, bm, body_top + .2f, sd * .86f, bl, .38f, .07f);   /* bed sides */
-    prop(r, p->box, m, bx0, body_top + .2f, 0, .07f, .38f, 1.7f);                                /* tailgate */
-  }
+  /* body heights at a world x: bottom, top and half width */
+#define CAR_AT(x, lo, hi, w) do { car_section(g.B, (x) / L, &lo, &hi, &w); lo = base + lo * Hb; hi = base + hi * Hb; } while (0)
+  prop(r, c->body[K->body], m, 0, base, 0, L, Hb, 1);
+  /* the glass cabin, and the roof over it in paint */
+  prop(r, c->cabin[K->cab], c->glass, g.cx, g.cy, 0, g.sx, g.ch, 1);
+  const float (*C)[4] = g.C->p;
+  float rx0 = g.cx + C[1][0] * g.sx, rx1 = g.cx + C[2][0] * g.sx;
+  prop(r, p->box, m, (rx0 + rx1) * .5f, g.cy + C[1][2] * g.ch + .005f, 0, rx1 - rx0, .05f, 2 * C[1][3] - .03f);
+  /* the B pillar a door's length behind the windshield, in paint, and the door seams below it and at the
+   * front door's leading edge (behind the front arch), and at the back door's (ahead of the rear arch) */
+  float xb = K->c1 - 1.12f, lo, hi, w;
+  float seams[3] = {fminf(K->c1 - .04f, (1.43f - .45f) * L), xb, fmaxf(xb - 1.0f, (-1.43f + .48f) * L)};
+  /* behind it the C pillar of a car with a back door and a long roof, and the D pillar of the boxy ones */
+  float xc = xb - 1.0f, xd = K->c0 + .07f;
+  bool cpil = K->cab != CAR_CAB_SEDAN && kind != 3 && xc > rx0 + .2f, dpil = K->cab == CAR_CAB_BOX && kind != 3;
   for (int side = -1; side <= 1; side += 2) {
-    for (int axle = -1; axle <= 1; axle += 2) {
-      float wx = axle * 1.43f * L, wz = side * tr;
-      t3_mesh *t = prop(r, c->disc, c->rubber, wx, wr, wz, wr, .22f, wr); t3_object_set_rotation(t, 1.5707963f, 0, 0);
-      t3_mesh *h = prop(r, c->disc, c->alloy, wx, wr, wz + side * .115f, wr * .58f, .02f, wr * .58f); t3_object_set_rotation(h, 1.5707963f, 0, 0);
+    prop(r, p->box, m, xb, g.cy + 1.215f * g.ch, side * (C[1][3] + .004f), .09f, .53f * g.ch, .012f);
+    if (cpil) prop(r, p->box, m, xc, g.cy + 1.215f * g.ch, side * (C[1][3] + .004f), .14f, .53f * g.ch, .012f);
+    if (dpil) prop(r, p->box, m, xd, g.cy + 1.17f * g.ch, side * (C[0][3] - .02f), .12f, .44f * g.ch, .012f);
+    for (int i = 0; i < 3; i++) {
+      if (i == 2 && (kind == 3 || seams[2] > xb - .6f)) continue;   /* the pickup's cab ends there; a short car has no back door */
+      CAR_AT(seams[i], lo, hi, w);
+      prop(r, p->box, c->rubber, seams[i], (lo + .06f + hi - .03f) * .5f, side * (w + .004f), .012f, hi - .03f - lo - .06f, .012f);
     }
-    float fx = 2.3f * L - .02f, rx = -2.3f * L + .02f;
-    prop(r, p->box, c->head, fx, .72f * Hb + lift, side * .56f, .06f, .12f, .33f);
-    prop(r, p->box, c->tail, rx, .75f * Hb + lift, side * .58f, .06f, .14f, .3f);
-    /* mirrors on short stalks, by the front of the cabin */
-    float mx = (kind == 3 ? cx : cx) + .62f * cl * L;
-    prop(r, p->box, m, mx, body_top + .08f, side * 1.02f, .12f, .1f, .14f);
-    /* the door seam: a thin dark line down each side */
-    prop(r, p->box, c->rubber, cx + .05f, .62f * Hb + lift, side * .985f, .02f, .42f * Hb, .02f);
+    /* the mirror on a stalk from the glass, at the foot of the windshield */
+    float mx = K->c1 - .14f; CAR_AT(mx, lo, hi, w);
+    prop(r, p->box, m, mx, hi + .07f, side * .815f, .05f, .04f, .23f);
+    prop(r, p->box, m, mx - .02f, hi + .08f, side * .975f, .12f, .1f, .12f);
+    prop(r, p->box, c->glass, mx - .081f, hi + .08f, side * .975f, .005f, .07f, .09f);
   }
-  /* grille and plates */
-  prop(r, p->box, c->rubber, 2.3f * L, .55f * Hb + lift, 0, .05f, .16f * Hb, .7f);
-  prop(r, p->box, c->alloy, 2.31f * L, .4f * Hb + lift, 0, .03f, .1f, .3f);
-  prop(r, p->box, c->alloy, -2.31f * L, .5f * Hb + lift, 0, .03f, .1f, .3f);
+  /* the wheels: tyres just inside the body side, the hub on the tyre's face */
+  for (int side = -1; side <= 1; side += 2) for (int axle = -1; axle <= 1; axle += 2) {
+    float wx = axle * 1.43f * L, wz = side * tr;
+    t3_mesh *t = prop(r, c->disc, c->rubber, wx, wr, wz, wr, .22f, wr); t3_object_set_rotation(t, 1.5707963f, 0, 0);
+    t3_mesh *h = prop(r, c->disc, c->alloy, wx, wr, wz + side * .115f, wr * .58f, .02f, wr * .58f); t3_object_set_rotation(h, 1.5707963f, 0, 0);
+  }
+  /* the nose and the tail, from the body's end sections: lamps in the upper corners, a grille between the
+   * headlamps, the plates low in the middle */
+  const float *F = g.B->p[g.B->n - 1], *R = g.B->p[0];
+  float fl = base + F[1] * Hb, fh = base + F[2] * Hb, rl = base + R[1] * Hb, rh = base + R[2] * Hb, fx = 2.3f * L, rxe = -2.3f * L;
+  for (int side = -1; side <= 1; side += 2) {
+    prop(r, p->box, c->head, fx - .015f, fl + .7f * (fh - fl), side * (F[3] - .2f), .05f, fminf(.13f, .4f * (fh - fl)), .28f);
+    if (kind == 3) prop(r, p->box, c->tail, rxe - .01f, base + .97f * Hb, side * (R[3] - .05f), .04f, .26f, .09f);   /* tall lamps at the bed's corners */
+    else prop(r, p->box, c->tail, rxe + .015f, rl + .68f * (rh - rl), side * (R[3] - .2f), .05f, fminf(.14f, .4f * (rh - rl)), .26f);
+  }
+  prop(r, p->box, c->rubber, fx + .005f, fl + .55f * (fh - fl), 0, .03f, .3f * (fh - fl), 2 * (F[3] - .36f));
+  prop(r, p->box, c->alloy, fx + .012f, fl + .22f * (fh - fl), 0, .02f, .09f, .3f);
+  prop(r, p->box, c->alloy, rxe - .012f, rl + .25f * (rh - rl), 0, .02f, .09f, .3f);
+  if (kind == 3) {
+    /* the pickup's bed: side walls on the body's shoulders up to the cab's beltline, the tailgate, a liner */
+    float bx0 = rxe, bx1 = -.87f * L, y0 = base + (.80f - .07f) * Hb, y1 = base + 1.18f * Hb, bl = bx1 - bx0;
+    for (int side = -1; side <= 1; side += 2) prop(r, p->box, m, (bx0 + bx1) * .5f, (y0 + y1) * .5f, side * (.90f - .035f), bl, y1 - y0, .07f);
+    prop(r, p->box, m, bx0 + .035f, (y0 + y1) * .5f, 0, .07f, y1 - y0, 1.80f);
+    prop(r, p->box, c->rubber, (bx0 + bx1) * .5f + .035f, base + .80f * Hb + .004f, 0, bl - .07f, .01f, 1.66f);
+    prop(r, p->box, c->alloy, bx0 - .006f, y1 - .06f, 0, .012f, .03f, .4f);   /* the tailgate's handle */
+  }
+#undef CAR_AT
 }
 /* the catenary pole: teal, tapering, with a curved double lamp arm to each side, and two cross arms for the wires */
 static void fk_pole(t3_object *r, const whimsy_parts *p, t3_material *teal, t3_material *wire) {

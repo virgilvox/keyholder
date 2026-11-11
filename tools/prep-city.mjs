@@ -349,22 +349,27 @@ for (let x = BOUNDS.x0 + 6; x < BOUNDS.x1; x += 19) {
     }
   }
 }
-// lamps on the cross streets
-for (const s of streets.filter((q) => q.a === 'z')) for (let z = BOUNDS.z0 + 10; z < BOUNDS.z1; z += 26) {
+// lamps on the cross streets, along the stretch each street runs (Drew starts at Main), never in a building
+// or out on another street's asphalt
+const lampClear = (s, x, z) => !insideBuilding(x, z, 0.3) && !streets.some((o) => o !== s && inR(x, z, rectOf(o, 0)));
+for (const s of streets.filter((q) => q.a === 'z')) for (let z = Math.max(BOUNDS.z0, s.s0) + 10; z < Math.min(BOUNDS.z1, s.s1); z += 26) {
   if (z > -2 && z < 40) continue;
-  for (const sd of [-1, 1]) prop(PROP.LAMP, s.c + sd * (s.hw + 0.8), z, sd < 0 ? Math.PI : 0);
+  for (const sd of [-1, 1]) { const x = s.c + sd * (s.hw + 0.8); if (lampClear(s, x, z)) prop(PROP.LAMP, x, z, sd < 0 ? Math.PI : 0); }
 }
 for (const s of streets.filter((q) => q.a === 'x' && q.n !== 'Main')) for (let x = Math.max(BOUNDS.x0, s.s0) + 8; x < Math.min(BOUNDS.x1, s.s1); x += 30) {
   if (nearCross(x, 5)) continue;
-  for (const sd of [-1, 1]) prop(PROP.LAMP, x, s.c + sd * (s.hw + 0.8), sd < 0 ? Math.PI / 2 : -Math.PI / 2);
+  for (const sd of [-1, 1]) { const z = s.c + sd * (s.hw + 0.8); if (lampClear(s, x, z)) prop(PROP.LAMP, x, z, sd < 0 ? Math.PI / 2 : -Math.PI / 2); }
 }
-// parked cars. Clear in front of the lab, for the street fight, and near corners
-for (const [z, flip] of [[8.0, 0], [29.6, 1]]) for (let x = BOUNDS.x0; x < BOUNDS.x1; x += 6.8) {
+// parked cars along Main, with the traffic beside them: the north curb's lane runs west, the south's east
+// (src/city.c LANE_W, LANE_E). A car's front is its +x, so the north row faces west (yaw pi), the south east.
+// Each a car's half width plus a hand off its curb. Clear in front of the lab, for the street fight, and near
+// corners. (The slots are picked by the row's old line, 8.0 and 29.6, so the same ones stay filled.)
+for (const [z, north, pick] of [[MAIN.nCurb + 1.2, true, 8.0], [MAIN.sCurb - 1.2, false, 29.6]]) for (let x = BOUNDS.x0; x < BOUNDS.x1; x += 6.8) {
   if (nearCross(x, 11)) continue;
   if (x > 240 && x < 420) continue;
-  if (flip === 0 && x > -60 && x < 12) continue;
-  if (hash(x, z) % 100 > 56) continue;
-  prop(PROP.CAR, x, z, flip ? Math.PI : 0, hash(z, x) % 6);
+  if (north && x > -60 && x < 12) continue;
+  if (hash(x, pick) % 100 > 56) continue;
+  prop(PROP.CAR, x, z, north ? Math.PI : 0, hash(pick, x) % 6);
 }
 // signals at the corners
 for (const c of XS) for (const [dx, z] of [[-1, MAIN.nCurb - 1], [1, MAIN.sCurb + 1]]) {
@@ -413,29 +418,61 @@ for (let x = BOUNDS.x0 - 50; x < BOUNDS.x1 + 50; x += 12) {
   for (const dz of [-0.09, 0.09]) { stripe(x, MAIN.center - MAIN.bedHalf - MAIN.strip - 0.15 + dz - 0.05, x1, MAIN.center - MAIN.bedHalf - MAIN.strip - 0.15 + dz + 0.05, YELLOW); stripe(x, MAIN.center + MAIN.bedHalf + MAIN.strip + 0.15 + dz - 0.05, x1, MAIN.center + MAIN.bedHalf + MAIN.strip + 0.15 + dz + 0.05, YELLOW); }
   stripe(x, MAIN.nCurb + 2.5, x1, MAIN.nCurb + 2.58, WHITE); stripe(x, MAIN.sCurb - 2.58, x1, MAIN.sCurb - 2.5, WHITE);
 }
-// stalls along the parking aisles
-for (const e of J.elements) {
-  const t = e.tags || {};
-  if (e.type !== 'way' || t.highway !== 'service' || t.service !== 'parking_aisle') continue;
-  const g = e.geometry.map(project);
-  for (let i = 0; i + 1 < g.length; i++) {
-    const a = g[i], b = g[i + 1], l = Math.hypot(b[0] - a[0], b[1] - a[1]);
-    if (l < 6) continue;
-    const ux = (b[0] - a[0]) / l, uz = (b[1] - a[1]) / l;
-    const axial = Math.abs(ux) > 0.97 || Math.abs(uz) > 0.97;
-    if (!axial) continue;
-    for (let d = 2; d < l - 1; d += 2.8) for (const sd of [-1, 1]) {
-      const px = a[0] + ux * d + -uz * sd * 3.2, pz = a[1] + uz * d + ux * sd * 3.2;
-      const qx = px + -uz * sd * 5, qz = pz + ux * sd * 5;
-      if (!inBounds([px, pz]) || !inBounds([qx, qz])) continue;
-      if (insideBuilding(px, pz) || insideBuilding(qx, qz) || streets.some((s) => inR(qx, qz, rectOf(s, s.walk)) || inR(px, pz, rectOf(s, s.walk)))) continue;
-      if (Math.abs(ux) > 0.97) stripe(Math.min(px, qx) - 0.05, Math.min(pz, qz), Math.max(px, qx) + 0.05, Math.max(pz, qz), WHITE);
-      else stripe(Math.min(px, qx), Math.min(pz, qz) - 0.05, Math.max(px, qx), Math.max(pz, qz) + 0.05, WHITE);
-      // a few cars in the lots, nose in: the car's length (its local x) runs down the stall, away from the aisle,
-      // so yaw turns local +x onto the stall direction (-uz, ux) * sd: (cos yaw, -sin yaw) = that
-      if (hash(px, pz) % 7 === 0) { const mx = px + -uz * sd * 2.5 + ux * 1.4, mz = pz + ux * sd * 2.5 + uz * 1.4; if (!(mx > -85 && mx < -40 && mz > -80 && mz < -50) && !insideBuilding(mx, mz, 3)) prop(PROP.CAR, mx, mz, Math.atan2(-ux * sd, -uz * sd), hash(pz, px) % 6); }
+// stalls along the parking aisles, both sides of each straight run. Where aisles meet, their grids would
+// cross: the longer aisle keeps its stalls, and a stall of another that would lie on them or on any aisle's
+// driving lane is left out, so every car stands square to the paint it is in, and none in another.
+{
+  const aisles = [];
+  for (const e of J.elements) {
+    const t = e.tags || {};
+    if (e.type !== 'way' || t.highway !== 'service' || t.service !== 'parking_aisle') continue;
+    const g = e.geometry.map(project);
+    for (let i = 0; i + 1 < g.length; i++) {
+      const a = g[i], b = g[i + 1], l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (l < 6) continue;
+      const ux = (b[0] - a[0]) / l, uz = (b[1] - a[1]) / l;
+      if (!(Math.abs(ux) > 0.97 || Math.abs(uz) > 0.97)) continue;
+      const alongX = Math.abs(ux) > 0.97, mid = alongX ? (a[1] + b[1]) / 2 : (a[0] + b[0]) / 2;
+      const lane = alongX ? [Math.min(a[0], b[0]), mid - 3.0, Math.max(a[0], b[0]), mid + 3.0] : [mid - 3.0, Math.min(a[1], b[1]), mid + 3.0, Math.max(a[1], b[1])];
+      aisles.push({ a, l, ux, uz, alongX, lane });
     }
   }
+  aisles.sort((p, q) => q.l - p.l);
+  const hit = (r, q) => r[0] < q[2] && q[0] < r[2] && r[1] < q[3] && q[1] < r[3];
+  const box = (xs, zs, m = 0) => [Math.min(...xs) + m, Math.min(...zs) + m, Math.max(...xs) - m, Math.max(...zs) - m];
+  const taken = [], cars = [];
+  aisles.forEach((A, ai) => {
+    const { a, l, ux, uz, alongX } = A;
+    for (const sd of [-1, 1]) {
+      const lines = new Map();
+      for (let d = 2; d < l - 1; d += 2.8) {
+        const px = a[0] + ux * d + -uz * sd * 3.2, pz = a[1] + uz * d + ux * sd * 3.2;
+        const qx = px + -uz * sd * 5, qz = pz + ux * sd * 5;
+        if (!inBounds([px, pz]) || !inBounds([qx, qz])) continue;
+        if (insideBuilding(px, pz) || insideBuilding(qx, qz) || streets.some((s) => inR(qx, qz, rectOf(s, s.walk)) || inR(px, pz, rectOf(s, s.walk)))) continue;
+        // the stall: from this line to the next one along
+        const nx = ux * 2.8, nz = uz * 2.8, r = box([px, qx, px + nx, qx + nx], [pz, qz, pz + nz, qz + nz], 0.05);
+        if (aisles.some((o, oi) => oi !== ai && hit(r, o.lane)) || taken.some((q) => q.ai !== ai && hit(r, q.r))) continue;
+        taken.push({ ai, r });
+        for (const k of [d, d + 2.8]) lines.set(k.toFixed(2), k);
+        // now and then a car, nose in: its length (local x) runs down the stall, away from the aisle, so yaw
+        // turns local +x onto the stall direction (-uz, ux) * sd: (cos yaw, -sin yaw) = that
+        if (hash(px, pz) % 7 === 0) {
+          const mx = px + -uz * sd * 2.5 + ux * 1.4, mz = pz + ux * sd * 2.5 + uz * 1.4;
+          const f = alongX ? [mx - 1.05, mz - 2.6, mx + 1.05, mz + 2.6] : [mx - 2.6, mz - 1.05, mx + 2.6, mz + 1.05];
+          if (!(mx > -85 && mx < -40 && mz > -80 && mz < -50) && !insideBuilding(mx, mz, 3) && !cars.some((c) => hit(f, c))) {
+            cars.push(f);
+            prop(PROP.CAR, mx, mz, Math.atan2(-ux * sd, -uz * sd), hash(pz, px) % 6);
+          }
+        }
+      }
+      for (const d of lines.values()) {
+        const px = a[0] + ux * d + -uz * sd * 3.2, pz = a[1] + uz * d + ux * sd * 3.2, qx = px + -uz * sd * 5, qz = pz + ux * sd * 5;
+        if (Math.abs(ux) > 0.97) stripe(Math.min(px, qx) - 0.05, Math.min(pz, qz), Math.max(px, qx) + 0.05, Math.max(pz, qz), WHITE);
+        else stripe(Math.min(px, qx), Math.min(pz, qz) - 0.05, Math.max(px, qx), Math.max(pz, qz) + 0.05, WHITE);
+      }
+    }
+  });
 }
 // the far skyline: a ring of low boxes past the fog
 const skyline = [];

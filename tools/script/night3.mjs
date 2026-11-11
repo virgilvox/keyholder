@@ -10,7 +10,7 @@ import { lab, at, stage, CLOCK, P, HIDE, W, WAITW, S, SHOT, WAIT, CLIP, OBJ, ROA
 
 export const FIGHTS = {
   makerhub: { title: 'A BRIEF WORD FROM OUR SPONSOR, AGAIN', sub: 'MakerHub, by HiveDesk. The hackerspace, minus the hackers', where: 'mid_block', radius: 11, twist: 'defend', twist_a: 80,
-    obj: [0, -6], obj_label: 'GUARD THE FIX-IT BINS', tier: 4, foes: [
+    obj: [0, -6], obj_label: 'GUARD THE FIX-IT BINS', obj_prop: 'fixit_bins', tier: 4, foes: [
     { who: 'brant', weapon: 'ARC', ai: 'BOSS', hp: 320, power: 1.0, speed: 1.08, at: [0, -3] },
     { who: 'intern', weapon: 'STAFF', ai: 'CASTER', hp: 45, power: .5, speed: .95, at: [-5, -4] },
     { who: 'intern', weapon: 'TWIN', ai: 'SKIRMISH', hp: 45, power: .5, speed: 1.0, at: [5, -4], palette: 'alt' } ],

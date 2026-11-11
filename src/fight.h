@@ -84,7 +84,7 @@ typedef struct {
   bool finisher_qte;           /* the last blow is a cinematic with a button prompt */
   unsigned mods;               /* MOD_ bits (Battle Zone) */
   bool battle_zone;            /* no story after: show the result screen in fight_draw_hud */
-  int obj_kind;                /* v1.3: the twist object's look: 0 the twist's own, 1 a welding table on casters (FT_DEFEND) */
+  int obj_kind;                /* v1.3: the twist object's look: 0 the twist's own, 1 a welding table on casters, 2 the fix-it table and its bins (FT_DEFEND) */
 } fight_def;
 const char *fight_obj_name(void);   /* the defended object's short name: TABLE or BINS */
 
@@ -101,4 +101,6 @@ void fight_result_get(fight_result *r);         /* after FIGHT_WON or FIGHT_LOST
 actor_t *fight_foe_actor(int i);
 
 /* player.h is the third person walk: see player.h */
+/* v1.3: the back lot's welding table as the defend twist draws it (an fx prop, hidden by nobody: the caller owns it) */
+t3_object *fight_weld_table_model(void);
 #endif

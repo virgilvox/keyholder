@@ -54,16 +54,16 @@ static void expand(char *o, size_t cap, const char *s) {
 }
 
 /* ---- the day's memory ---- */
-#define MAXT 64
-#define MAXK 256
+#define MAXT ST_MAX_TYPES
+#define MAXK ST_MAX_TALKS
 #define GIVE_CAP 4          /* stat points strangers give in a day, all together */
 static uint8_t had[MAXK], met_n[MAXT];
 static int bound[MAXT];     /* the body a stranger wears for the day, -1 until first cast */
-static const char *marks[48]; static int nmark;
+static const char *marks[ST_MAX_MARKS]; static int nmark;
 static int given, met_people;
 static bool cameo_met;
 static bool has_mark(const char *m) { for (int i = 0; i < nmark; i++) if (!strcmp(marks[i], m)) return true; return false; }
-static void set_mark(const char *m) { if (!has_mark(m) && nmark < 48) marks[nmark++] = m; }
+static void set_mark(const char *m) { if (!has_mark(m) && nmark < ST_MAX_MARKS) marks[nmark++] = m; }
 
 /* ---- the venue: which downtown place the room you are in belongs to ---- */
 #define MAXI 32
@@ -92,7 +92,7 @@ static bool venue_place(const char *suffix, v3 *p, float *y) { return venue_plac
 /* ---- conditions ---- */
 static bool fits(const st_talk *t, bool met) {
   const story_ui_t *U = &STORY_UI;
-  if (U->hour < t->h0 || U->hour >= t->h1) return false;
+  if (U->hour < t->h0 || U->hour >= t->h1 || !(t->parts >> story_part() & 1)) return false;
   if (t->met >= 0 && (t->met == 1) != met) return false;
   if (t->flag && story_flag(t->flag) == t->flag_not) return false;
   if (t->mark && has_mark(t->mark) == t->mark_not) return false;
@@ -118,7 +118,7 @@ int street_cast(int slot, actor_model body, int where, unsigned seed, bool *alt)
   int cand[MAXT], nc = 0, best = -1;
   for (int t = 0; t < ST_NTYPE && t < MAXT; t++) {
     const st_type *T = &ST_TYPES[t];
-    if (!(T->where & where) || h < T->h0 || h >= T->h1 || !(T->bodies >> body & 1)) continue;
+    if (!(T->where & where) || h < T->h0 || h >= T->h1 || !(T->parts >> story_part() & 1) || !(T->bodies >> body & 1)) continue;
     if (bound[t] >= 0 && bound[t] != (int)body) continue;
     bool taken = false; for (int s = 0; s < SLOTS; s++) if (cast[s] == t) taken = true;
     if (taken) continue;
@@ -163,7 +163,7 @@ static struct {
   const char *spk;
 } TK;
 static float letterbox;
-static bool chat_had[64];
+static bool chat_had[ST_MAX_CHAT];
 bool street_busy(void);
 static void cut(int who) {
   if (!cam) return;
@@ -208,13 +208,12 @@ static void say(int who, const char *text) {
   } else C.speaking = who == SP_MOHEEB ? 0 : who == SP_LUIS ? 1 : -1;
   cut(who);
 }
-static const char *stat_name(int s) { return s == ST_TRUST ? "TRUST" : s == ST_SAFETY ? "SAFETY" : s == ST_VIBE ? "VIBE" : s == ST_DUES ? "DUES" : s == ST_ENERGY ? "ENERGY" : NULL; }
 static void finish(void) {
   story_ui_t *U = &STORY_UI;
   U->talking = false; U->choosing = false;   /* the extras region puts the stranger back to what they were doing */
   actor_t *me = player_actor(); if (me) { actor_play(me, "Idle_Loop", 1, true, .3f); actor_look(me, actor_head_pos(me), 0); actor_mouth(me, 0, 0); }
   director_stop();
-  player_camera_from(cam_pos());
+  player_camera_snap();   /* back behind you, as after a task's talk (story.c OP_RET): the talk's last lens may stand across a bench or a wall */
   C.speaking = -1;
   TK.st = TK_OFF; TK.a = NULL; TK.hold = .5f;
 }
@@ -237,7 +236,7 @@ static void run(void) {
         int n = b->b; if (given + n > GIVE_CAP) n = GIVE_CAP - given;
         if (n > 0 && b->a >= 0 && b->a < ST_COUNT) {
           U->stats[b->a] += n; given += n;
-          const char *nm = stat_name(b->a);
+          const char *nm = story_stat_name(b->a);
           if (nm) { U->toast = nm; U->toast_n = n; U->toast2 = NULL; U->toast_t = 2.6f; }
         }
         TK.pc++; break;
@@ -397,8 +396,6 @@ bool street_holds(int slot) { return TK.st != TK_OFF && TK.slot == slot && TK.a;
 
 void street_after(float dt) {
   story_ui_t *U = &STORY_UI;
-  /* the clock ran back (a night after the day): the same people, with new things to say */
-  { static float last_h; if (U->hour + 3 < last_h) { memset(had, 0, sizeof had); memset(chat_had, 0, sizeof chat_had); given = 0; } last_h = U->hour; }
   if (street_busy()) {
     U->roam = false;   /* the roam's HUD steps aside for the talk */
     letterbox = ds_damp(letterbox, TK.st != TK_OFF ? .55f : 0, 7, dt);
@@ -424,6 +421,11 @@ v3 street_task_point(v3 p) {
   return p;
 }
 
+/* the room whose counter p is (a task's spot street_task_point moved inside), or -1 */
+int street_room_of(v3 p) {
+  for (int i = 0; i < interior_count(); i++) { v3 c; float y; if (venue_place_of(i, "counter", &c, &y) && flat(c, p) < .5f) return i; }
+  return -1;
+}
 /* the people inside a venue: at its named spots (interior.h), staff behind the counter or the bar, the rest
  * where customers stand and sit; else spread out from the door. The spot you stand at to be served
  * (<id>_counter) stays free for you. pos.y is the floor, or a seat's top for a seat. */
@@ -463,9 +465,10 @@ int street_end_lines(const char **out, int n, int cap) {
   return n;
 }
 
-void street_init(t3_scene *s, t3_camera *c, void (*occ)(void)) { scene = s; cam = c; occluders = occ; street_reset(); }
-void street_reset(void) {
-  memset(had, 0, sizeof had); memset(met_n, 0, sizeof met_n); nmark = 0; given = 0; met_people = 0; cameo_met = false;
+void street_init(t3_scene *s, t3_camera *c, void (*occ)(void)) { scene = s; cam = c; occluders = occ; street_reset(false); }
+void street_reset(bool keep_friends) {
+  memset(had, 0, sizeof had); memset(met_n, 0, sizeof met_n); nmark = 0; given = 0; met_people = 0;
+  if (!keep_friends) cameo_met = false;   /* Moheeb and Luis remember you from one evening to the next */
   for (int t = 0; t < MAXT; t++) bound[t] = -1;
   for (int s = 0; s < SLOTS; s++) cast[s] = -1;
   if (TK.st != TK_OFF) { STORY_UI.talking = STORY_UI.choosing = false; TK.st = TK_OFF; }
@@ -738,7 +741,7 @@ static void cameo_chat(float dt) {
     if (!near) return;
     if ((C.chat_gap -= dt) > 0 || U->sub_t > 0 || voice_busy() || U->talking) return;
     C.chat = -1;
-    for (int i = 0; i < ST_NCHAT && i < 64; i++) if (!chat_had[i] && fits(&ST_TALKS[ST_CHAT0 + i], cameo_met)) { C.chat = i; break; }
+    for (int i = 0; i < ST_NCHAT && i < ST_MAX_CHAT; i++) if (!chat_had[i] && fits(&ST_TALKS[ST_CHAT0 + i], cameo_met)) { C.chat = i; break; }
     if (C.chat < 0) return;
     chat_had[C.chat] = true; C.chat_on = true; C.chat_line = 0;
   }
@@ -757,9 +760,9 @@ static void cameo_frame(float dt) {
   bool town = world_get_stage() == STAGE_TOWN;
   bool want = town && cameo_hours();
   if (want && !C.loaded) {
-    /* load on the way there, not at boot: within 90 m of Chupacabra in a roam */
-    v3 d; float dy; if (!world_place("chupacabra", &d, &dy)) d = v3_(-221.85f, 0, -43.f);
-    if (!roaming() || flat(player_pos(), d) > 90) return;
+    /* load at the first town roam in their hours (not at boot), so they are already at the table when
+     * you come down Robson or see the patio from Main */
+    if (!roaming()) return;
     if (!cameo_load()) { C.failed = true; return; }
     bool has_table; cameo_layout(&has_table);
     cameo_props(!has_table);

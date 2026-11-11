@@ -413,6 +413,13 @@ bool world_in_lab(v3 p) { return p.x > LAB_X0 && p.x < LAB_X1 && p.z < -LAB_DOOR
 bool world_indoors(v3 p) { return world_in_lab(p) || interior_contains(p); }
 /* under the portico, in front of the glass and in the recessed entry: everything inside is in view */
 static bool at_storefront(v3 p) { return p.x > LAB_X0 - .5f && p.x < LAB_X1 + .5f && p.z < 1.5f && p.z > -LAB_DOOR_X - .5f && p.y < 4; }
+/* behind the lab, in sight of the two open exits (world x 3.2 to 5.6): from the alley, or from across the
+ * back lot, where they are a few pixels but must not show a hollow building with Main Street through it.
+ * In sight: within about 70 degrees of straight on and not high over them; dl is the distance to the lab. */
+static bool at_backdoor(v3 p, float dl) {
+  float back = -40.4f - p.z;
+  return back > 0 && dl < 90 && fabsf(p.x - 4.4f) < 3 + back * 2.75f && p.y < 6 + back * .3f;
+}
 static v3 subj_p; static float subj_t;
 void world_subject(v3 p) { subj_p = p; subj_t = .5f; }
 void world_update(float dt, v3 focus) {
@@ -447,9 +454,11 @@ void world_update(float dt, v3 focus) {
   /* far from the lab it does not draw, deep inside the city does not */
   float dl = hypotf(ds_clamp(focus.x, LAB_X0, LAB_X1) - focus.x, ds_clamp(focus.z, -40.5f, 0) - focus.z);
   /* the interior draws whole when the lens is in it, at the glass or in the entry, or near the building
-   * with the subject inside (a lens out the back door, through a window). It used to key on the lens
-   * alone, and a lens between the glass and the doors saw an empty box */
-  bool open = in || at_storefront(focus) || (in_s && dl < 15);
+   * with the subject inside (a lens out the back door, through a window), or from behind in sight of the
+   * open back exits (bands past LAB_NEAR draw their far twins: about 55k triangles from the alley, which
+   * stays under what the storefront view draws). It used to key on the lens alone, and a lens between the
+   * glass and the doors saw an empty box */
+  bool open = in || at_storefront(focus) || at_backdoor(focus, dl) || (in_s && dl < 15);
   /* inside, a band more than LAB_NEAR away along the hall draws its far twin. Outside, only from in front of
    * the glass: the first bands near, the next ones far */
   const float LAB_NEAR = 6.5f;
@@ -739,5 +748,7 @@ void world_door_auto(bool on) { door_auto = on; }
 float world_debug_door(void) { return door_open; }   /* for the world test */
 void world_arena_phase(int phase) { arena_set_phase(phase); }
 void world_traffic(bool on) { city_traffic(on); }
+void world_train_hold(bool on) { city_train_hold(on); }
 void world_crew_truck(bool on) { city_crew_truck(on); }
+void world_solid(int slot, bool on, v3 at, float hx, float hz, float yaw, float top) { city_solid(slot, on, at, hx, hz, yaw, top); }
 bool world_train_bell(v3 *at) { return stage == STAGE_TOWN && city_train_bell(at); }

@@ -106,6 +106,14 @@ static const shot_t SHOTS[] = {
   ST("lot_east_above_13", 13, 120.f, 34.f, -80.f, 120.f, 0.f, -72.f, 60),
   ST("street_cars_13", 13, -150.f, 1.7f, 4.5f, -110.f, 1.f, 9.f, 55),
   ST("crew_truck_13", 13, 6.f, 1.8f, -45.f, -5.f, 1.f, -47.5f, 55),
+  /* the lab's back half from inside: the electronics bench, the hallway, member storage, the back door */
+  S("lab_elec_13", 13, STAGE_TOWN, 2.2f, 1.7f, -15.5f, 5.2f, 1.0f, -21.f),
+  S("lab_hall_13", 13, STAGE_TOWN, 1.7f, 1.7f, -13.5f, 1.7f, 1.3f, -31.f),
+  S("lab_backhalf_13", 13, STAGE_TOWN, -1.5f, 1.8f, -24.f, 3.f, 1.1f, -35.f),
+  S("lab_backdoor_in_13", 13, STAGE_TOWN, 4.5f, 1.7f, -30.f, 0.f, 1.2f, -39.f),
+  /* 87, 88: down the rear corridor to its exit, whose open leaf lies on the diagonal kitchen wall, and back from the exit */
+  S("rear_corridor_13", 13, STAGE_TOWN, 3.85f, 1.6f, -37.4f, 3.2f, 0.9f, -40.4f),
+  S("rear_corridor_out_13", 13, STAGE_TOWN, 3.5f, 1.6f, -40.2f, 3.1f, 1.0f, -37.f),
 };
 #define NSHOT (int)(sizeof SHOTS / sizeof SHOTS[0])
 /* after the list: the rooms behind the facades, a lens at one spot looking at another (both world_place names) */
@@ -171,7 +179,7 @@ void game_frame(float dt) {
       }
       interior_exit();
     }
-    const char *names[] = {"lab_door","lab_back_door","lab_lot","nile","proof","chiwas","worth","burritoholics","gus","oro","chupacabra","main_burger","az_distilling","phantom_fox","que_chevere","espiritu","haunted","against_grain","organic_bean","casa_copal","diamond_dons","level1","mad_candy","mangos","republica","margaritas","lost_dutchman","hopes","pizza_mart","guadalupe","one_macdonald","macdonald_main","center_main_station","city_plaza","arts_center","mid_block","lot_fight"};
+    const char *names[] = {"lab_door","lab_back_door","lab_lot","nile","proof","chiwas","worth","burritoholics","gus","oro","chupacabra","main_burger","az_distilling","phantom_fox","que_chevere","espiritu","haunted","against_grain","organic_bean","casa_copal","diamond_dons","level1","mad_candy","mangos","margaritas","lost_dutchman","one_macdonald","macdonald_main","center_main_station","city_plaza","arts_center","mid_block","lot_fight"};
     for (int i = 0; i < (int)(sizeof names / sizeof names[0]); i++) if (!world_place(names[i], NULL, NULL)) ds_log("no place: %s", names[i]);
     float t; v3 n;
     if (world_raycast(v3_(0, 1.5f, 10), v3_(0, 0, 1), 100, &t, &n)) ds_log("ray south from Main hits %.1f", t);

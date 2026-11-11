@@ -37,7 +37,7 @@ static const town_set TOWN_SET[] = {
   {SET_PICNIC, -219.6f, -44.9f, 0, 2.4f, 0, 0, NULL},
   {SET_PICNIC, -219.6f, -43.0f, 0, 2.4f, 0, 0, "chupacabra"},
   {SET_PICNIC, -219.6f, -39.4f, 0, 2.4f, 0, 0, NULL},
-  {SET_PICNIC, -219.4f, -35.9f, 0, 2.4f, 0, 0, NULL},
+  {SET_PICNIC, -227.0f, -35.2f, 0, 2.4f, 0, 0, NULL},
   {SET_STOP, -215.6f, -46.6f, 1.5708f, 0, 0, 0, NULL},
   {SET_CACTUS_BED, -224.0f, -47.0f, 0, 2.6f, .8f, 0, NULL},
   {SET_MURAL, -233.5f, -33.86f, 3.1416f, 12.f, 3.6f, 0, NULL},
@@ -63,7 +63,7 @@ static const town_set TOWN_SET[] = {
   /* the date palms along the plaza's Main edge and up the walk (photos 2009, 2010, 2016) */
   {SET_PALM, 298.f, 50.f, 0, 8.5f, 0, 0, NULL}, {SET_PALM, 310.f, 52.f, 0, 9.5f, 0, 1, NULL}, {SET_PALM, 336.f, 50.f, 0, 8.f, 0, 2, NULL},
   {SET_PALM, 362.f, 49.f, 0, 9.f, 0, 3, NULL}, {SET_PALM, 300.f, 64.f, 0, 10.f, 0, 4, NULL}, {SET_PALM, 330.f, 80.f, 0, 8.5f, 0, 5, NULL},
-  {SET_PALM, 336.f, 128.f, 0, 9.f, 0, 6, NULL}, {SET_PALM, 357.f, 150.f, 0, 8.f, 0, 7, NULL},
+  {SET_PALM, 336.f, 128.f, 0, 9.f, 0, 6, NULL}, {SET_PALM, 344.5f, 150.f, 0, 8.f, 0, 7, NULL},
   {SET_BIKE_RACK, 300.f, 44.f, 0, 5, 0, 0, NULL},
   /* the lab's back: where the welding table sits by the back door (its footprint's centre on the ground,
    * the long side along the wall, yaw facing out into the alley), and the middle of the alley */
@@ -343,7 +343,7 @@ static void ts_upole(t3_object *r, float *top_y) {
 static void fk_lab_back(t3_object *r, const whimsy_parts *p) {
   const float z0 = LAB_BACK_Z0, z1 = LAB_BACK_Z1, zm = (z0 + z1) * .5f, d = z0 - z1, X0 = -2.775f, X1 = 6.63f;
   t3_material *green = toy_paint(.18f, .4f, .26f), *dkgreen = toy_paint(.12f, .3f, .2f), *yellow = toy_paint(.9f, .72f, .12f), *ink = toy_paint(.06f, .07f, .07f);
-  t3_material *coping = toy_paint(.5f, .26f, .18f), *tan = toy_paint(.78f, .68f, .52f), *gray = toy_paint(.6f, .62f, .62f), *teal = toy_paint(.12f, .4f, .36f), *inside = toy_paint(.13f, .11f, .1f);
+  t3_material *coping = toy_paint(.5f, .26f, .18f), *tan = toy_paint(.78f, .68f, .52f), *gray = toy_paint(.6f, .62f, .62f), *teal = toy_paint(.12f, .4f, .36f);
   /* the brick skin in pieces around the two openings, up to the parapet's three heights */
   const float seg[4][2] = {{X0, 3.17f}, {4.20f, 4.66f}, {5.63f, X1}};
   for (int i = 0; i < 3; i++) mesa_masonry(r, FAC_BRICK, (seg[i][0] + seg[i][1]) * .5f, 1.15f, zm, seg[i][1] - seg[i][0], 2.3f, d);
@@ -359,19 +359,15 @@ static void fk_lab_back(t3_object *r, const whimsy_parts *p) {
   prop(r, p->box, green, 2.0f, 4.75f, z1 - .03f, 1.95f, .95f, .05f);
   { t3_mesh *sg = prop(r, FAC_PLANE, FAC_SIGNMAT, 2.0f, 4.75f, z1 - .06f, 1.75f, .78f, 1);   /* faces the alley (-z) */
     sg->base.user_data = (void *)sign_find("108 WEST MAIN"); t3_object_set_rotation(&sg->base, 0, 3.14159265f, 0); }
-  /* the corridor exit: reveals, a dark hall inside, the glass door open flat to the wall, the lamp */
+  /* the corridor exit: reveals and the lamp. Both exit doors stand open, swung in flat against the hall
+   * walls as the model has them (tools/prep-lab.mjs), and the lab draws through them from the alley
+   * (world.c at_backdoor): no backdrop or second leaf here, it would stand inside the lab */
   for (int s = 0; s < 2; s++) prop(r, p->box, coping, s ? 4.21f : 3.16f, 1.15f, zm, .04f, 2.3f, d + .02f);
-  prop(r, p->box, inside, 3.69f, 1.2f, -38.9f, 1.1f, 2.4f, .02f);
-  prop(r, p->box, ink, 2.66f, 1.08f, z1 - .05f, 1.0f, 2.16f, .04f);
-  prop(r, p->box, p->glass, 2.66f, 1.15f, z1 - .075f, .7f, 1.8f, .01f);
   prop(r, p->box, ink, 3.69f, 2.62f, z1 - .1f, .36f, .14f, .2f);
   prop(r, p->ball, p->lamp, 3.69f, 2.54f, z1 - .14f, .14f, .05f, .08f);
-  /* the workshop exit: the green steel door in its frame, a mat */
-  prop(r, p->box, inside, 5.15f, 1.2f, -38.9f, 1.0f, 2.4f, .02f);
-  prop(r, p->box, green, 5.15f, 1.08f, z1 - .03f, .95f, 2.14f, .05f);
+  /* the workshop exit: its green steel frame, a mat */
   prop(r, p->box, dkgreen, 5.15f, 2.2f, z1 - .05f, 1.15f, .1f, .08f);
   for (int s = -1; s <= 1; s += 2) prop(r, p->box, dkgreen, 5.15f + s * .53f, 1.1f, z1 - .05f, .08f, 2.2f, .08f);
-  prop(r, p->box, gray, 4.8f, 1.05f, z1 - .07f, .04f, .16f, .04f);
   prop(r, p->box, ink, 5.15f, .01f, z1 - .55f, 1.0f, .02f, .7f);
   /* green conduit boxing the doors */
   t3_object_set_rotation(prop(r, p->cyl, green, 4.4f, 3.55f, z1 - .05f, .035f, 4.2f, .035f), 0, 0, 1.5707963f);

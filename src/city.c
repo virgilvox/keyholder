@@ -7,6 +7,7 @@
 #include "gen/city_data.h"
 #include "gen/sign_atlas.h"
 #include "world.h"
+#include "interior.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -423,6 +424,8 @@ static int ground_type(float x, float z) {
   return GT_LOT;
 }
 static bool inside_building(float x, float z, float m) {
+  /* the lab is its own model, not a footprint: nothing of the town goes in it */
+  for (int k = 0; k < 5; k++) { if (world_in_lab(v3_(x + (k == 1 ? m : k == 2 ? -m : 0), 0, z + (k == 3 ? m : k == 4 ? -m : 0)))) return true; if (m <= 0) break; }
   for (int b = 0; b < CITY_NBUILDING; b++) {
     const city_building *B = &CITY_BUILDING[b];
     const float *P = CITY_PTS + B->first * 2;
@@ -476,6 +479,14 @@ static void back_kit(float ax, float az, float ux, float uz, float nx, float nz,
     uint32_t q = hh ^ (uint32_t)(k * 2654435761u);
     float px = ax + ux * d, pz = az + uz * d;
     if (!kit_clear(px + nx, pz + nz, 0)) continue;
+    /* the whole group, from the cooler's spot to the bins' end, has to look onto open lot: one sample at the
+     * wall's middle does not see a neighbour built against part of it (a party wall with a notch) */
+    bool open = true;
+    for (float t = d - 2.6f; t <= d + 4.2f && open; t += 1.f) {
+      float sx = ax + ux * t + nx * .6f, sz = az + uz * t + nz * .6f;
+      if (t > 0 && t < L && (inside_building(sx, sz, 0) || ground_type(sx, sz) != GT_LOT)) open = false;
+    }
+    if (!open) continue;
     int cell = cell_of(px, pz);
     sink_t *nr = kit_sink(px, pz), *fr = sink_at(cell, MC_FPROP), *lp = sink_at(cell, MC_LAMP);
     /* the door, its frame, step and lamp */
@@ -611,9 +622,20 @@ static void build_buildings(void) {
       if (B->style == 4) {
         /* the Arts Center: lavender stucco masses with a band at each floor, and on some walls a glass box,
          * dark blue green, white mullions and deep white louvres (photos 2009 to 2026) */
-        if (L > 9 && hash2(ax, az) % 5 < 3) {
+        float drx, drz; bool room = interior_front_on(ax, az, bx, bz, &drx, &drz);   /* the lobby (interior.c) */
+        if (L > 9 && (room || hash2(ax, az) % 5 < 3)) {
           t3_color gc = lin(.14f, .3f, .36f), wf = lin(.93f, .93f, .92f);
           float gy1 = fminf(H - 1.2f, 13.f);
+          if (room) {
+            /* the way in: a pair of dark glass doors in a white frame with a canopy, at the room's door */
+            float td = (drx - ax) * ux + (drz - az) * uz, cx0 = ax + ux * td, cz0 = az + uz * td;
+            t3_color dk = lin(.05f, .08f, .1f);
+            s_quad(pl, v3_(cx0 + ux * 1.1f + nx * .09f, .02f, cz0 + uz * 1.1f + nz * .09f), v3_(cx0 - ux * 1.1f + nx * .09f, .02f, cz0 - uz * 1.1f + nz * .09f), v3_(cx0 - ux * 1.1f + nx * .09f, 2.7f, cz0 - uz * 1.1f + nz * .09f), v3_(cx0 + ux * 1.1f + nx * .09f, 2.7f, cz0 + uz * 1.1f + nz * .09f), dk.r, dk.g, dk.b, 1, 1);
+            for (int k = -1; k <= 1; k++) s_obox(pl, cx0 + ux * k * 1.15f + nx * .14f, cz0 + uz * k * 1.15f + nz * .14f, 0, 2.8f, ux, uz, k ? .14f : .06f, .14f, wf);
+            s_obox(pl, cx0 + nx * .14f, cz0 + nz * .14f, 2.7f, 2.9f, ux, uz, 2.44f, .16f, wf);
+            s_obox(pl, cx0 + nx * 1.0f, cz0 + nz * 1.0f, 3.3f, 3.45f, ux, uz, 3.6f, 2.0f, wf);
+            for (int k = -1; k <= 1; k += 2) s_obox(pl, cx0 + ux * k * .3f + nx * .2f, cz0 + uz * k * .3f + nz * .2f, 1.0f, 1.6f, ux, uz, .03f, .06f, lin(.6f, .62f, .64f));
+          }
           s_quad(pl, v3_(bx + nx * .05f, .2f, bz + nz * .05f), v3_(ax + nx * .05f, .2f, az + nz * .05f), v3_(ax + nx * .05f, gy1, az + nz * .05f), v3_(bx + nx * .05f, gy1, bz + nz * .05f), gc.r, gc.g, gc.b, 1, 1);
           if (hash2(bz, ax) % 2) s_quad(win, v3_(bx + nx * .07f, .3f, bz + nz * .07f), v3_(ax + nx * .07f, .3f, az + nz * .07f), v3_(ax + nx * .07f, 3.6f, az + nz * .07f), v3_(bx + nx * .07f, 3.6f, bz + nz * .07f), .9f, .75f, .5f, 1, 1);
           for (float t = .75f; t < L - .3f; t += 1.5f) s_obox(pl, ax + ux * t + nx * .12f, az + uz * t + nz * .12f, .2f, gy1, ux, uz, .08f, .16f, wf);
@@ -702,13 +724,32 @@ static void far_tree(t3_object *r, uint32_t h, float s) {
     prop(r, G_lowball, i % 2 ? M_leaf : M_leaf2, cosf(a) * rr, (2.5f + i * .45f) * s, sinf(a) * rr, .85f * s, .7f * s, .85f * s);
   }
 }
-static void far_car(t3_object *r, int colour) {
+/* the same car in a dozen boxes: each stretch of the body's profile a box to its mean top, the cabin's glass
+ * and roof, the wheels, the lamps. Every kind keeps its length, height and outline across the switch */
+static void far_car(t3_object *r, int colour, int kind) {
   t3_material *m = CP.paint[colour % 10];
-  prop(r, P_.box, m, 0, .62f, 0, 4.5f, .55f, 1.75f);
-  prop(r, P_.box, CP.glass, -.1f, 1.18f, 0, 2.4f, .56f, 1.5f);
-  prop(r, P_.box, m, -.15f, 1.48f, 0, 1.35f, .05f, 1.44f);
-  for (int ax = -1; ax <= 1; ax += 2) prop(r, P_.box, CP.rubber, ax * 1.43f, .35f, 0, .7f, .7f, 1.8f);
-  for (int side = -1; side <= 1; side += 2) { prop(r, P_.box, CP.head, 2.28f, .72f, side * .56f, .06f, .12f, .33f); prop(r, P_.box, CP.tail, -2.28f, .75f, side * .58f, .06f, .14f, .3f); }
+  car_geom g = car_measure(kind);
+  const car_profile *B = g.B;
+  for (int i = 0; i + 1 < B->n; i++) {
+    float x0 = B->p[i][0], x1 = B->p[i + 1][0];
+    if (x1 - x0 < .1f) continue;
+    float lo = fmaxf(.42f, (B->p[i][1] + B->p[i + 1][1]) * .5f), hi = (B->p[i][2] + B->p[i + 1][2]) * .5f, w = fminf(B->p[i][3], B->p[i + 1][3]);
+    prop(r, P_.box, m, (x0 + x1) * .5f * g.L, g.base + (lo + hi) * .5f * g.Hb, 0, (x1 - x0) * g.L, (hi - lo) * g.Hb, 2 * w);
+  }
+  const float (*C)[4] = g.C->p;
+  float gx0 = g.cx + (C[0][0] + .1f) * g.sx, gx1 = g.cx + (C[3][0] - .3f) * g.sx, rx0 = g.cx + C[1][0] * g.sx, rx1 = g.cx + C[2][0] * g.sx;
+  prop(r, P_.box, CP.glass, (gx0 + gx1) * .5f, g.cy + 1.2f * g.ch, 0, gx1 - gx0, .52f * g.ch, 1.52f);
+  prop(r, P_.box, m, (rx0 + rx1) * .5f, g.cy + 1.48f * g.ch + .005f, 0, rx1 - rx0, .05f, 1.45f);
+  if (kind == 3) {   /* the bed's walls up to the beltline */
+    float bx0 = -2.3f * g.L, bx1 = -.87f * g.L;
+    prop(r, P_.box, m, (bx0 + bx1) * .5f, g.base + .99f * g.Hb, 0, bx1 - bx0, .38f * g.Hb, 1.8f);
+  }
+  for (int ax = -1; ax <= 1; ax += 2) prop(r, P_.box, CP.rubber, ax * 1.43f * g.L, g.wr, 0, 1.6f * g.wr, 2 * g.wr, 2 * (g.tr + .11f));
+  const float *F = B->p[B->n - 1], *R = B->p[0];
+  for (int side = -1; side <= 1; side += 2) {
+    prop(r, P_.box, CP.head, 2.3f * g.L, g.base + (F[1] + .7f * (F[2] - F[1])) * g.Hb, side * (F[3] - .2f), .06f, .12f, .3f);
+    prop(r, P_.box, CP.tail, -2.3f * g.L, g.base + (R[1] + .68f * (R[2] - R[1])) * g.Hb, side * (R[3] - .2f), .06f, .12f, .28f);
+  }
 }
 static void far_lamp(t3_object *r) {
   prop(r, P_.box, M_ink, 0, 2.3f, 0, .14f, 4.6f, .14f);
@@ -745,7 +786,11 @@ static void build_props(void) {
         else fk_planter(g, &P_, M_conc, M_dirt, M_bark, M_leaf, M_leaf2, h);
         rx = 1.6f; rz = .8f; top = .24f; break;
       case CP_BENCH: if (far) prop(g, P_.box, M_gspl, 0, .5f, -.1f, 1.8f, .45f, .5f); else fk_bench(g, &P_, M_gspl); rx = .92f; rz = .3f; top = .5f; break;
-      case CP_CAR: if (far) far_car(g, (int)((h >> 5) % 10)); else fk_car(g, &P_, &CP, (int)((h >> 5) % 10), (int)((h >> 9) % 5)); rx = 2.3f; rz = .95f; top = 1.45f; break;
+      case CP_CAR: {
+        int kind = (int)((h >> 9) % 5), colour = (int)((h >> 5) % 10);
+        if (far) far_car(g, colour, kind); else fk_car(g, &P_, &CP, colour, kind);
+        car_extent(kind, &rx, &rz, &top); break;
+      }
       case CP_SIGNAL: fk_signal(g, &P_, M_teal); r = .16f; break;
       case CP_TOWER: fk_tower(g, &P_, M_steel, q->v ? 26 : 15, q->v ? 3.2f : 2.1f); r = q->v ? 3.3f : 2.2f; top = .5f; break;
       case CP_SHELTER: fk_shelter(g, &P_, M_teal, M_gspl); rx = 2.1f; rz = .3f; top = .5f; break;
@@ -1037,12 +1082,14 @@ static void build_train(void) {
 #define NCAR 6
 #define LANE_W 11.6f            /* westbound, the north half of Main */
 #define LANE_E 27.4f            /* eastbound, the south half */
-static struct { t3_object *g; float x, dir, v, vmax, wait; } CAR[NCAR];
+static struct { t3_object *g; float x, dir, v, vmax, wait, hx, hz; } CAR[NCAR];
 static bool traffic = true;
+static bool train_held;   /* a fight in town brings its own light rail (fight.c): this one waits, out of sight */
 static void build_cars(void) {
   for (int i = 0; i < NCAR; i++) {
     t3_object *g = t3_group_new();
     fk_car(g, &P_, &CP, (i * 7 + 2) % 10, i % 5);
+    float top; car_extent(i % 5, &CAR[i].hx, &CAR[i].hz, &top);
     CAR[i].g = t3_group_new();
     private_meshes(g, CAR[i].g);
     t3_object_add(croot, CAR[i].g);
@@ -1057,6 +1104,13 @@ static void build_cars(void) {
 #define TRUCK_X (-4.6f)
 #define TRUCK_Z (-47.4f)
 static t3_object *TRUCK;
+#define NSOLID 4
+static int solids(col_box *out);
+/* parked: a solid box like any other, while it is there (it comes and goes with the scene) */
+static col_box truck_box(void) {
+  float hx, hz, top; car_extent(3, &hx, &hz, &top);
+  return (col_box){TRUCK_X - hx, TRUCK_Z - hz, TRUCK_X + hx, TRUCK_Z + hz, 0, top};
+}
 static void build_truck(void) {
   t3_object *g = t3_group_new();
   fk_car(g, &P_, &CP, 6, 3);   /* the crew's pickup */
@@ -1068,11 +1122,37 @@ static void build_truck(void) {
   t3_object_add(croot, TRUCK);
 }
 void city_crew_truck(bool on) { if (TRUCK) TRUCK->visible = on; }
+/* solids that come and go with a scene (the story's van and tables): a box around a footprint turned by yaw */
+static struct { bool on; col_box c; } SOLID[NSOLID];
+void city_solid(int slot, bool on, v3 at, float hx, float hz, float yaw, float top) {
+  if (slot < 0 || slot >= NSOLID) return;
+  float cs = fabsf(cosf(yaw)), sn = fabsf(sinf(yaw)), ex = hx * cs + hz * sn, ez = hx * sn + hz * cs;
+  SOLID[slot].on = on;
+  SOLID[slot].c = (col_box){at.x - ex, at.z - ez, at.x + ex, at.z + ez, at.y, at.y + top};
+}
+static int solids(col_box *out) {
+  int n = 0;
+  if (TRUCK && TRUCK->visible) out[n++] = truck_box();
+  for (int i = 0; i < NSOLID; i++) if (SOLID[i].on) out[n++] = SOLID[i].c;
+  return n;
+}
+#if defined(KH_TEST_WORLD) && defined(KH_CAR_SHOWROOM)
+/* a test lineup in the clear fight lot: the five kinds near (x -62) and their far stand ins (x -74), 6 m apart */
+static void car_showroom(void) {
+  for (int k = 0; k < CAR_KINDS; k++) for (int f = 0; f < 2; f++) {
+    t3_object *g = t3_group_new(), *o = t3_group_new();
+    if (f) far_car(g, 4 + k, k); else fk_car(g, &P_, &CP, 4 + k, k);
+    private_meshes(g, o); t3_release(g);
+    t3_object_set_position(o, f ? -74.f : -62.f, 0, -76.f + k * 6.f);
+    t3_object_add(croot, o);
+  }
+}
+#endif
 static float train_off(float x) { return fabsf(x - STOP_X) < 54 ? 2 : fabsf(x - STOP_X) < 74 ? 2 * (74 - fabsf(x - STOP_X)) / 20 : 0; }
 static void movers_update(float dt, v3 focus) {
   /* the train: runs, slows into the station, dwells with the bell, runs on, and comes back the other way */
   const float VMAX = 12, ACC = 1.3f;
-  switch (TR.st) {
+  if (!train_held) switch (TR.st) {
     case TR_WAIT:
       TR.wait -= dt;
       if (TR.wait <= 0) { TR.st = TR_RUN; TR.v = VMAX; TR.stopped = false; TR.bell_t = 0; }
@@ -1097,7 +1177,7 @@ static void movers_update(float dt, v3 focus) {
       if (TR.wait <= 0) { TR.st = TR_RUN; TR.v = 0; bell(TR.x, MAIN_CENTER); TR.bell_t = 6; }
       break;
   }
-  TR.g->visible = TR.st != TR_WAIT && hypotf(TR.x - focus.x, MAIN_CENTER - focus.z) < 420;
+  TR.g->visible = !train_held && TR.st != TR_WAIT && hypotf(TR.x - focus.x, MAIN_CENTER - focus.z) < 420;
   t3_object_set_position(TR.g, TR.x, -.08f, MAIN_CENTER + TR.dir * (2.2f + train_off(TR.x)));
   t3_object_set_rotation(TR.g, 0, TR.dir > 0 ? 0 : DS_PI, 0);
   /* cars: steady along the through lanes, braking for someone in the road ahead, round again at the ends */
@@ -1118,6 +1198,7 @@ static void movers_update(float dt, v3 focus) {
   }
 }
 void city_traffic(bool on) { traffic = on; }
+void city_train_hold(bool on) { train_held = on; }
 bool city_train_bell(v3 *at) { if (!bell_q) return false; bell_q--; if (at) *at = bell_at; return true; }
 
 void city_init(t3_object *root) {
@@ -1139,7 +1220,9 @@ void city_init(t3_object *root) {
   M_white = toy_paint(.91f, .9f, .86f); M_timber = toy_paint(.74f, .6f, .44f); M_teal = toy_paint(.1f, .42f, .4f); M_ink = toy_paint(.1f, .13f, .13f); M_wire = toy_paint(.12f, .12f, .12f);
   M_bark = toy_paint(.36f, .29f, .22f); M_leaf = toy_paint(.36f, .47f, .2f); M_leaf2 = toy_paint(.46f, .54f, .24f); M_frond = toy_paint(.3f, .47f, .2f); M_palebark = toy_paint(.5f, .42f, .34f);
   M_conc = toy_paint(.74f, .71f, .65f); M_dirt = toy_paint(.46f, .36f, .26f); M_steel = toy_paint(.8f, .82f, .84f); M_gspl = toy_paint(.13f, .33f, .22f); M_bronze = toy_paint(.36f, .25f, .15f);
-  CP.body = car_shell(false); CP.cabin = car_shell(true); CP.disc = t3_cylinder_geometry_new(1, 1, 1, 10, 1, false);
+  for (int i = 0; i < CAR_BODY_N; i++) CP.body[i] = car_shell(&CAR_BODY[i], false);
+  for (int i = 0; i < CAR_CAB_N; i++) CP.cabin[i] = car_shell(&CAR_CAB[i], true);
+  CP.disc = t3_cylinder_geometry_new(1, 1, 1, 10, 1, false);
   /* the paints you see in a Mesa lot: silver, white, black, grey, navy, red, sky blue, sage, tan, maroon */
   const float pc[10][3] = {{.66f, .68f, .7f}, {.88f, .87f, .83f}, {.08f, .08f, .1f}, {.38f, .39f, .41f}, {.14f, .2f, .33f},
                            {.55f, .08f, .08f}, {.24f, .48f, .72f}, {.42f, .5f, .4f}, {.64f, .56f, .42f}, {.36f, .1f, .14f}};
@@ -1177,6 +1260,9 @@ void city_init(t3_object *root) {
   build_train();
   build_cars();
   build_truck();
+#if defined(KH_TEST_WORLD) && defined(KH_CAR_SHOWROOM)
+  car_showroom();
+#endif
   finish_meshes();
   bins_build();
   city_set_time(0, (t3_color){1, 1, 1});
@@ -1302,11 +1388,26 @@ void city_push(v3 *p, float r, float h, v3 *n, bool *hit) {
       *hit = true;
     }
   }
-  /* the train and the cars */
-  for (int i = -2; i < NCAR; i++) {
-    t3_object *t = i == -2 ? TRUCK : i < 0 ? TR.g : CAR[i].g;
+  /* the parked truck and the story's big props (city_solid): out along the shortest way, as from any box */
+  col_box sb[NSOLID + 1]; int ns = solids(sb);
+  for (int i = 0; i < ns; i++) {
+    const col_box *c = &sb[i];
+    float qx = ds_clamp(p->x, c->x0, c->x1), qz = ds_clamp(p->z, c->z0, c->z1), dx = p->x - qx, dz = p->z - qz, d2 = dx * dx + dz * dz;
+    if (d2 < r * r && yb <= c->y1 && yt >= c->y0) {
+      if (d2 > 1e-8f) { float d = sqrtf(d2); p->x += dx / d * (r - d); p->z += dz / d * (r - d); *n = v3_(dx / d, 0, dz / d); }
+      else {
+        float l = p->x - c->x0, rr = c->x1 - p->x, b = p->z - c->z0, f = c->z1 - p->z, m = fminf(fminf(l, rr), fminf(b, f));
+        if (m == l) { p->x = c->x0 - r; *n = v3_(-1, 0, 0); } else if (m == rr) { p->x = c->x1 + r; *n = v3_(1, 0, 0); }
+        else if (m == b) { p->z = c->z0 - r; *n = v3_(0, 0, -1); } else { p->z = c->z1 + r; *n = v3_(0, 0, 1); }
+      }
+      *hit = true;
+    }
+  }
+  /* the train and the moving cars push to the side, out of their lane */
+  for (int i = -1; i < NCAR; i++) {
+    t3_object *t = i < 0 ? TR.g : CAR[i].g;
     if (!t || !t->visible) continue;
-    float cx = t->position.x, cz = t->position.z, hx = i == -2 ? 2.85f : i < 0 ? 14.5f : 2.3f, hz = i == -2 ? 1.0f : i < 0 ? 1.4f : .95f;
+    float cx = t->position.x, cz = t->position.z, hx = i < 0 ? 14.5f : CAR[i].hx, hz = i < 0 ? 1.4f : CAR[i].hz;
     if (fabsf(p->x - cx) < hx + r && fabsf(p->z - cz) < hz + r) { float s = p->z > cz ? 1 : -1; p->z = cz + s * (hz + r); *n = v3_(0, 0, s); *hit = true; }
   }
 }
@@ -1365,6 +1466,15 @@ bool city_raycast(v3 o, v3 d, float max_dist, float *t_out, v3 *n_out) {
     if (tn > max_dist) break;
     if (tmx < tmz) { cx += sx; tmx += tdx; if (cx < 0 || cx >= CGX) break; }
     else { cz += sz; tmz += tdz; if (cz < 0 || cz >= CGZ) break; }
+  }
+  /* the parked truck and the story's big props, while they are there: lenses and lines of sight stop at them */
+  { col_box sb[NSOLID + 1]; int ns = solids(sb);
+    for (int i = 0; i < ns; i++) { float tt; v3 nn; if (ray_box(o, d, &sb[i], &tt, &nn) && tt < best) { best = tt; bn = nn; any = true; } } }
+  /* and the light rail going by: a lens across the track comes in to this side of it, not into its flank */
+  if (TR.g && TR.g->visible) {
+    float cx = TR.g->position.x, cz = TR.g->position.z, tt; v3 nn;
+    col_box c = {cx - 14.5f, cz - 1.4f, cx + 14.5f, cz + 1.4f, -.1f, 3.6f};
+    if (ray_box(o, d, &c, &tt, &nn) && tt < best) { best = tt; bn = nn; any = true; }
   }
   /* the ground: only below head height of a low curb is it worth sampling */
   if (d.y < -1e-5f) {

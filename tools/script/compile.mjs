@@ -1,6 +1,6 @@
 // Compiles tools/script/day.mjs into src/gen/script.c (the beats as C tables) and source/lines.json
 // (every voiced line, per speaker, every name variant, for tools/bake_tts.py).
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readdirSync } from 'node:fs';
@@ -23,9 +23,12 @@ const DAY = [...DAYMOD.DAY];
 if (DAY.length && DAY[DAY.length - 1].op === 'end') DAY.pop();
 for (const N of NIGHTS) DAY.push({ op: 'night', n: N.n, hour: N.hour, title: N.title, sub: N.sub }, ...N.beats.flat(), { op: 'epilogue', part: N.n });
 DAY.push({ op: 'end' });
-// flags keep the order v1.2 saved them in, so a v1.2 save's flags still mean the same things; new ones follow
-const PINNED_FLAGS = ['cocky', 'asked_help', 'looked_up', 'did_not_look', 'promised_laser', 'wes_invited', 'met_lou', 'met_jo', 'hal_teaches', 'hal_stays', 'explained_pvc', 'pvc_cut', 'kai_coming', 'invited_morgan', 'beat_champ', 'got_tube', 'owned_strip', 'found_binder', 'inspect_ok', 'passed_inspection', 'milo_glasses', 'red_tag', 'helped_bex', 'bex_proposal', 'tested_props', 'fixed_gerald', 'hal_mentor', 'fixed_joint', 'backup_lot', 'told_root', 'root_returns', 'lipo_demo', 'sam_joins', 'gloria_quiet', 'gloria_visits', 'asked_kai', 'ending_friends', 'ending_alone',
-  'has_bike'];   /* has_bike: story.c keeps it in step with the loaner bike */
+// Saves store flags by index (story.c bits_put), so a flag's index is fixed once it ships: tools/script/flags.json
+// holds the order, append only. A new flag goes on its end (this run writes it back); a flag the scripts no longer
+// use keeps its place. The first 38 are v1.2's order; has_bike is one story.c keeps in step with the loaner bike.
+const FLAGS_JSON = join(HERE, 'flags.json');
+const PINNED = JSON.parse(readFileSync(FLAGS_JSON, 'utf8'));
+const PINNED_FLAGS = PINNED.flags;
 const WHO = ['me', 'm1', 'm2', 'shadow', ...Object.keys(CAST).filter((c) => !PLAYABLE.includes(c)), ...PLAYABLE];
 const whoId = (w) => { const i = WHO.indexOf(w); if (i < 0) throw new Error('unknown actor ' + w); return i; };
 const cstr = (s) => (s === null || s === undefined ? 'NULL' : JSON.stringify(s));
@@ -33,6 +36,9 @@ const STATS = ['trust', 'safety', 'vibe', 'dues', 'energy', 'aff_sam', 'aff_kai'
 const WEAP = { ARC: 0, MAUL: 1, TWIN: 2, SPEAR: 3, STAFF: 4 };
 const OPS = ['chapter', 'clock', 'place', 'hide', 'walk', 'waitwalk', 'say', 'shot', 'wait', 'face', 'look', 'clip', 'emote', 'objective', 'roam', 'fight', 'choice', 'option', 'jump', 'jump_not', 'flag', 'add', 'card', 'music', 'stage', 'give', 'draw', 'door', 'fx', 'note', 'epilogue', 'end', 'ret', 'bark', 'night', 'bike', 'prop'];
 const FIGHT_IDS = Object.keys(FIGHTS);
+// a defend twist's object (fight.h obj_kind): the welding table on casters, the fix-it table and its bins
+const OBJ_PROPS = { welding_table: 1, fixit_bins: 2 };
+const objKind = (id, p) => { if (p && !(p in OBJ_PROPS)) throw new Error(`fight ${id}: no obj_prop ${p}`); return p ? OBJ_PROPS[p] : 0; };
 const BARK_ON = ['start', 'phase2', 'foe_low', 'player_low', 'assist', 'obj_warn', 'hazard', 'finish', 'parry'];
 const flags = new Set(PINNED_FLAGS);
 const longLabels = [];   // task labels over 34 characters run past the HUD list
@@ -122,6 +128,12 @@ for (const e of ENDINGS) flags.add(e.flag);
 for (const s of STAT_LINES) { flags.add(s.flag); if (s.not) flags.add(s.not); }
 const flagList = [...flags];
 const flagId = (f) => (f ? flagList.indexOf(f) : -1);
+if (flagList.length > 256) throw new Error(`${flagList.length} flags: saves hold 256 bits`);
+const newFlags = flagList.slice(PINNED_FLAGS.length);
+if (newFlags.length && !process.env.GEN) {
+  writeFileSync(FLAGS_JSON, JSON.stringify({ ...PINNED, flags: flagList }, null, 1) + '\n');
+  console.log(`flags.json: appended ${newFlags.join(', ')}`);
+}
 
 const markC = (m) => {
   if (!m) return '{0}';
@@ -156,7 +168,7 @@ beats.forEach((b, i) => {
     case 'night': f.i = b.n; f.f = b.hour || 19; f.s = cstr(b.title); f.s2 = cstr(b.sub); break;
     case 'epilogue': f.i = b.part || 0; break;
     case 'bike': f.i = b.mode; f.who = b.who ? whoId(b.who) : -1; f.mark = markC(b.mark); break;
-    case 'prop': f.s = cstr(b.name); f.i = { hide: 0, still: 1, circle: 2, straight: 3 }[b.mode]; f.mark = markC(b.mark); if (f.i === undefined) throw new Error('prop mode ' + b.mode); break;
+    case 'prop': if (!['gerald', 'table', 'weld_table', 'van'].includes(b.name)) throw new Error('no prop ' + b.name); f.s = cstr(b.name); f.i = { hide: 0, still: 1, circle: 2, straight: 3 }[b.mode]; f.mark = markC(b.mark); if (f.i === undefined) throw new Error('prop mode ' + b.mode); break;
     case 'bark': f.who = whoId(b.who); f.s = cstr(b.text); break;
     case 'fight': f.i = 'FI_' + b.id.toUpperCase(); f.i2 = (b.tutorial ? 1 : 0) | (b.cant_lose ? 2 : 0) | (b.lose_ok ? 4 : 0); f.flag = flagId(b.win_flag); f.target = flagId(b.easier_flag); break;
     case 'choice': f.s = cstr(b.prompt); f.i = b.n; break;
@@ -204,7 +216,7 @@ for (const id of FIGHT_IDS) {
   out += `}, FT_${(F.twist || 'none').toUpperCase()}, ${(+(F.twist_a || 0)).toFixed(2)}f, ${(+(F.twist_b || 0)).toFixed(2)}f, ${(+(F.obj ? F.obj[0] : 0)).toFixed(2)}f, ${(+(F.obj ? F.obj[1] : 0)).toFixed(2)}f, ${cstr(F.obj_label || null)}, ${F.protect ? whoId(F.protect) : -1}, `;
   out += `${barks.length}, {${barks.map((k) => `{FB_${k.on.toUpperCase()}, ${whoId(k.who)}, ${cstr(k.text)}}`).join(', ') || '{0}'}}, `;
   out += `${as.length}, {${as.map((a) => `{${whoId(a.who)}, ${flagId(a.flag)}, ${(+(a.trust || 0)).toFixed(1)}f}`).join(', ') || '{0}'}}, `;
-  out += `${(+(F.phase2 || 0)).toFixed(3)}f, ${F.qte ? 'true' : 'false'}, ${F.tier || 1}, ${{ welding_table: 1 }[F.obj_prop] || 0}},\n`;
+  out += `${(+(F.phase2 || 0)).toFixed(3)}f, ${F.qte ? 'true' : 'false'}, ${F.tier || 1}, ${objKind(id, F.obj_prop)}},\n`;
 }
 out += '};\n\n';
 out += 'const sc_ending ENDINGS[] = {\n' + ENDINGS.map((e) => `  {${flagId(e.flag)}, ${cstr(e.title)}, {${e.lines.map(cstr).join(', ')}}, ${e.part}},`).join('\n') + '\n  {-1}\n};\n';

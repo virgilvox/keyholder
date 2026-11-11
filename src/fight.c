@@ -1555,11 +1555,31 @@ static void lock_input(const intent_t *in, float rdt) {
     lock_flick = .35f;
   }
 }
+/* the passing train is a wall to the lens too: a camera across the track saw nothing but its side for the
+ * two seconds it took to go by. The distance along u to its box, or -1 */
+static float track_z(void); static float floor_at(v3 p);
+static float train_hit(v3 o, v3 u, float max) {
+  if (FG.tw.train_st != 2) return -1;
+  float tz = track_z(), fy = floor_at(v3_(FG.def.center.x, 0, tz));
+  const float lo[3] = {FG.tw.train_x - 13.8f, fy, tz - 1.4f}, hi[3] = {FG.tw.train_x + 13.8f, fy + 3.6f, tz + 1.4f};
+  const float oo[3] = {o.x, o.y, o.z}, dd[3] = {u.x, u.y, u.z};
+  float t0 = 0, t1 = max;
+  for (int a = 0; a < 3; a++) {
+    if (fabsf(dd[a]) < 1e-6f) { if (oo[a] < lo[a] || oo[a] > hi[a]) return -1; continue; }
+    float ta = (lo[a] - oo[a]) / dd[a], tb = (hi[a] - oo[a]) / dd[a];
+    if (ta > tb) { float q = ta; ta = tb; tb = q; }
+    t0 = fmaxf(t0, ta); t1 = fminf(t1, tb);
+    if (t0 > t1) return -1;
+  }
+  return t0 > 0 ? t0 : -1;   /* from inside it (a fighter thrown against it), nothing to stop at */
+}
 static v3 spring_arm(v3 pivot, v3 want) {
   v3 d = v3_sub(want, pivot); float l = v3_len(d), t; v3 n;
   if (l < .01f) return want;
   v3 u = v3_scale(d, 1 / l);
-  if (world_raycast(pivot, u, l + .25f, &t, &n)) { float k = fmaxf(.5f, t - .25f); if (k < l) return v3_add(pivot, v3_scale(u, k)); }
+  float hit = world_raycast(pivot, u, l + .25f, &t, &n) ? t : 1e9f, tr = train_hit(pivot, u, l + .25f);
+  if (tr >= 0) hit = fminf(hit, tr);
+  if (hit < 1e8f) { float k = fmaxf(.5f, hit - .25f); if (k < l) return v3_add(pivot, v3_scale(u, k)); }
   return want;
 }
 static void cam_update(const intent_t *in, float rdt) {
@@ -1794,6 +1814,27 @@ static t3_object *build_weld_table(void) {
   fxp_layer(FXP_HALO); fxp_disc(v3_(0, .03f, 0), 2.f, 12, 0x30200c, 0);
   return fxp_end();
 }
+t3_object *fight_weld_table_model(void) { return build_weld_table(); }   /* the story stands the same table in its scenes */
+/* night 3: the fix-it table, a folding table with the fix-it bins on it and the things waiting in them (a
+ * desk lamp with its shade off, a toaster, a radio), each bin with its white label */
+static t3_object *build_fixit_bins(void) {
+  fxp_begin();
+  uint32_t leg = 0x2a2c30;
+  fxp_box(v3_(0, .74f, 0), v3_(1.8f, .04f, .76f), 0xe8e6e0);                 /* the top */
+  for (int i = 0; i < 4; i++) { float x = i & 1 ? .82f : -.82f, z = i & 2 ? .32f : -.32f; fxp_bar(v3_(x, 0, z), v3_(x, .72f, z), .035f, leg); }
+  static const uint32_t BIN[3] = {0x2c6ac4, 0x8a8e94, 0xd8b030};
+  for (int k = 0; k < 3; k++) {
+    float x = -.56f + k * .56f;
+    fxp_box(v3_(x, .9f, 0), v3_(.5f, .28f, .4f), BIN[k]);
+    fxp_box(v3_(x, .93f, .205f), v3_(.3f, .08f, .01f), 0xf4f4f0);             /* the label */
+  }
+  fxp_box(v3_(-.6f, 1.08f, -.04f), v3_(.22f, .1f, .16f), 0xb8bcc0);         /* a toaster */
+  fxp_box(v3_(0, 1.1f, .02f), v3_(.3f, .14f, .1f), 0x6a4a30);               /* a radio */
+  fxp_bar(v3_(.56f, 1.04f, 0), v3_(.62f, 1.36f, .04f), .02f, 0x2a6a4a);     /* the lamp's arm */
+  fxp_cyl(v3_(.7f, .76f, .22f), .09f, .1f, .14f, 8, 0x2a6a4a);              /* its shade, off, on the table */
+  fxp_layer(FXP_HALO); fxp_disc(v3_(0, .03f, 0), 2.f, 12, 0x30200c, 0);
+  return fxp_end();
+}
 /* a bike along +x, wheels standing */
 static t3_object *build_bike(void) {
   fxp_begin();
@@ -1849,12 +1890,12 @@ static t3_object *build_gantry(void) {
 
 /* ---- twist rules ---- */
 /* the defended object's short name for the tags over it */
-const char *fight_obj_name(void) { return FG.def.obj_kind == 1 ? "TABLE" : "BINS"; }
+const char *fight_obj_name(void) { return FG.def.obj_kind == 1 ? "TABLE" : "BINS"; }   /* 2, the fix-it bins, are BINS too */
 static const char *twist_label(void) {
   if (FG.def.obj_label) return FG.def.obj_label;
   switch (FG.tw.kind) {
     case FT_TIMER: return "STOP THE CUT"; case FT_RETRIEVE: return "GET THE BIKE BACK"; case FT_SCORE: return "BEAT THE HIGH SCORE";
-    case FT_HOLD: return "KEEP THE DOOR SHUT"; case FT_DEFEND: return FG.def.obj_kind == 1 ? "GUARD THE WELDING TABLE" : "GUARD THE BINS"; case FT_PROTECT: return "KEEP SAM SAFE";
+    case FT_HOLD: return "KEEP THE DOOR SHUT"; case FT_DEFEND: return FG.def.obj_kind == 1 ? "GUARD THE WELDING TABLE" : FG.def.obj_kind == 2 ? "GUARD THE FIX-IT BINS" : "GUARD THE BINS"; case FT_PROTECT: return "KEEP SAM SAFE";
     default: return NULL;
   }
 }
@@ -2287,7 +2328,7 @@ static void twist_start(void) {
       T->obj_hp = T->obj_hpmax = FG.def.twist_a > 0 ? FG.def.twist_a : 70;
       T->obj = given ? FG.def.obj_pos : v3_add(c, v3_(0, 0, -(R * .55f)));
       T->obj.y = floor_at(T->obj);
-      PROP[PR_OBJ] = FG.def.obj_kind == 1 ? build_weld_table() : build_cage(); prop_at(PR_OBJ, T->obj, yaw_to(T->obj, c));
+      PROP[PR_OBJ] = FG.def.obj_kind == 1 ? build_weld_table() : FG.def.obj_kind == 2 ? build_fixit_bins() : build_cage(); prop_at(PR_OBJ, T->obj, yaw_to(T->obj, c));
       for (int i = 0; i < FG.nfoe; i++) if (FG.foe[i].d.ai != AI_BRUISER && FG.foe[i].d.ai != AI_BOSS) FG.foe[i].goal = true;
       T->step_t = 8;
       break;
@@ -2464,7 +2505,7 @@ static void twist_update(float dt) {
           if (T->step_t <= 0) { FG.foe[0].goal = !FG.foe[0].goal; T->step_t = FG.foe[0].goal ? 7 : 11; }
         }
         if (T->obj_hp < T->obj_hpmax * .35f && T->warn_t <= 0) { twist_warn(FG.def.obj_kind == 1 ? "THE TABLE IS GOING" : "THE BINS ARE GOING", 2.5f); bark(FB_OBJ_WARN); }
-        if (T->obj_hp <= 0) { T->obj_hp = 0; fx_burst(v3_add(T->obj, v3_(0, 1, 0)), 0xd88040, 1.2f); twist_end(false, "THE SCRAP WALKED OFF"); }
+        if (T->obj_hp <= 0) { T->obj_hp = 0; fx_burst(v3_add(T->obj, v3_(0, 1, 0)), 0xd88040, 1.2f); twist_end(false, FG.def.obj_kind == 2 ? "THE FIX-IT BINS WALKED OFF" : "THE SCRAP WALKED OFF"); }
       }
       break; }
     case FT_PROTECT: {
@@ -2646,6 +2687,8 @@ static void fighter_setup(fighter_t *f, bool player) {
 void fight_start(const fight_def *def, actor_t *player) {
   memset(&FG, 0, sizeof FG);
   FG.def = *def; FG.cine_t = -1; FG.lock = -1;
+  /* the town's light rail would run through the ring and fill the frame; the bike fight has its own */
+  world_train_hold(world_get_stage() == STAGE_TOWN);
   if (!FG.def.weapons) FG.def.weapons = 1u << WP_ARC;
   memset(POOL_USED, 0, sizeof POOL_USED);
   memset(BOLT, 0, sizeof BOLT);
@@ -2845,6 +2888,7 @@ actor_t *fight_foe_actor(int i) { return i >= 0 && i < FG.nfoe ? FG.foe[i].a : N
 
 void fight_end(void) {
   fighter_t *P = &FG.P;
+  world_train_hold(false);
   ally_leave(); FG.ally_cd = 0;
   props_clear();
   if (FG.tw.kind == FT_PROTECT && FG.def.protect_actor) { actor_t *s = FG.def.protect_actor; actor_hands_up(s, 0); actor_flash(s, 1, 1, 1); actor_expr_clear(s); actor_play(s, "Idle_Loop", 1, true, .3f); }

@@ -326,7 +326,7 @@ static void build_all(void) {
   MAT[M_HALO]->transparent = true; MAT[M_HALO]->blending = T3_ADDITIVE_BLENDING; MAT[M_HALO]->depth_write = false; MAT[M_HALO]->version++;
 }
 
-#define MAX_SLOTS 16
+#define MAX_SLOTS 24
 #define TN 18
 typedef struct { v3 b[TN], t[TN]; float age[TN]; int n; bool on; } trail_t;
 typedef struct {
@@ -369,14 +369,23 @@ static t3_object *hold_make(actor_t *a, int w, int hand) {
   return h;
 }
 
+/* empty hands give the slot back: its props come off the hand sockets and go, so a slot is held only
+ * by someone holding a weapon (16 used to run out by night 2, every fighter ever set up keeping one) */
+static void slot_release(slot_t *s) {
+  for (int w = 0; w < WP_COUNT; w++) for (int h = 0; h < 2; h++) if (s->hold[w][h]) {
+    if (s->hold[w][h]->parent) t3_object_remove(s->hold[w][h]->parent, s->hold[w][h]);
+    t3_release(s->hold[w][h]);
+  }
+  memset(s, 0, sizeof *s); s->cur = -1;
+}
 void weapon_equip(actor_t *a, int w) {
   build_all();
+  if (w < 0 || w >= WP_COUNT) { slot_t *s = slot_of(a, false); if (s) slot_release(s); return; }
   slot_t *s = slot_of(a, true);
   if (!s) return;
   if (s->cur >= 0) for (int h = 0; h < 2; h++) if (s->hold[s->cur][h]) s->hold[s->cur][h]->visible = false;
   s->cur = w;
   s->tr[0].on = s->tr[1].on = false; s->tr[0].n = s->tr[1].n = 0;
-  if (w < 0 || w >= WP_COUNT) { s->cur = -1; return; }
   int hands = w == WP_TWIN ? 2 : 1;
   for (int h = 0; h < hands; h++) {
     if (!s->hold[w][h]) s->hold[w][h] = hold_make(a, w, h);

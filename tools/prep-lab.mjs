@@ -35,9 +35,11 @@ const isPrinter = (n) => /centauri/i.test(n);
 const dropPart = (p) => p.name === 'LED cube LEDs' || p.name === 'Hacker backdrop peg holes' || p.name === 'Caution tape stripes';
 const DOOR_PARTS = /^Entry door /;
 const LETTERING = /text|letter|label|decal|vinyl|digit|plate|title|notice|sign\b/i;
-// the rear exit leaves stand part way across their doorways: swing them flat against the hall wall
+// the rear exit leaves stand part way across their doorways: swing them flat against the hall wall.
+// The corridor's wall (Kitchen hall lower) is diagonal, its face running from plan (40.39, 6.005) to
+// (37.78, 5.545): the corridor leaf turns to that angle and steps 10 cm out so it lies on the face
 const swings = {
-  'Rear corridor exit open leaf': { hinge: [40.41, 5.93], to: -Math.PI },        // along plan z = 5.93
+  'Rear corridor exit open leaf': { hinge: [40.41, 5.93], to: Math.atan2(-0.46, -2.61), shift: 0.1 },
   'Rear workshop exit open leaf': { hinge: [40.41, 7.41], to: -Math.PI },
   'Metalshop door open leaf': { hinge: [30.13, 5.48], to: Math.PI / 2 },       // and this one clear of its doorway
 };
@@ -75,11 +77,14 @@ for (const p of parts) {
     let far = 0, fa = 0;
     for (let i = 0; i < pos.length; i += 3) { const d = Math.hypot(pos[i] - sw.hinge[0], pos[i + 2] - sw.hinge[1]); if (d > far) { far = d; fa = Math.atan2(pos[i + 2] - sw.hinge[1], pos[i] - sw.hinge[0]); } }
     const da = sw.to - fa, c = Math.cos(da), s = Math.sin(da);
-    xf = (x, y, z) => { const dx = x - sw.hinge[0], dz = z - sw.hinge[1]; return toWorld(sw.hinge[0] + dx * c - dz * s, y, sw.hinge[1] + dx * s + dz * c); };
+    const sh = sw.shift || 0;
+    xf = (x, y, z) => { const dx = x - sw.hinge[0], dz = z - sw.hinge[1]; return toWorld(sw.hinge[0] + dx * c - dz * s, y, sw.hinge[1] + sh + dx * s + dz * c); };
   }
   let rgb = p.color;
   // the Tech Tear Apart bins (the wire bin shelf at the end of member storage) are bright blue plastic
   if (p.name === 'Wire bin' && p.area === 'member storage and jewelry') rgb = srgb(0x2c6ac4);
+  // the workshop exit is a green steel door (street view, Oct 2025): its frame on the alley side is green too
+  if (p.name === 'Rear workshop exit open leaf') rgb = srgb(0x2e6644);
   const cx = (p.box[0] + p.box[3]) / 2;
   let target;
   const leaf = (p.box[2] + p.box[5]) / 2 < 2.76 ? 'a' : 'b';
@@ -105,22 +110,70 @@ for (const p of parts) {
 // The kitchen's doors came off long ago, and each opening has a black curtain, pulled back. The model
 // hangs both blackout curtains closed across their doorways, where they read as flat black walls (and
 // a follow camera behind one sees nothing). Here each is gathered against the wall beside its opening,
-// inside the kitchen: three folds and a tie, in the band so it collides like the wall it hangs on.
-// Plan metres: px from the street, pz from the west wall. The rods stay as the model has them.
+// inside the kitchen, in the band so it collides like the wall it hangs on. It has to read as cloth, not
+// as a door leaf standing open: four folds of uneven depth hang from the rod fanned out, pinch in to a
+// tie well above handle height, and flare out again to a hem on the floor, the inner edge running in a
+// diagonal from the top of the opening down to the tie. Charcoal, a little lighter than the shadows, so
+// the folds show. Plan metres: px from the street, pz from the west wall. Each curtain is laid out in its
+// own wall frame: u along the wall away from the opening's edge, n out from the wall into the kitchen.
 const CURTAINS = [
-  // the side door from the biolab (opening pz 4.19 to 5.10 in the wall at px 36.33 to 36.46): gathered west of it
-  { folds: [[36.47, 3.94, 36.58, 4.03], [36.50, 4.01, 36.64, 4.12], [36.48, 4.10, 36.60, 4.19]] },
-  // the hall door (opening px 36.87 to 37.80 in the wall at pz 5.28 to 5.55): gathered toward the back
-  { folds: [[37.80, 5.15, 37.89, 5.27], [37.87, 5.12, 37.98, 5.26], [37.96, 5.16, 38.05, 5.27]] },
+  // the side door from the biolab (opening pz 4.19 to 5.10 in the wall at px 36.33 to 36.46): gathered
+  // west of it. The model has no rod over this one, so it gets one
+  { at: (u, n) => [36.465 + n, 4.19 - u], rod: true },
+  // the hall door (opening px 36.87 to 37.80 in the wall at pz 5.28 to 5.55): gathered toward the back,
+  // under the model's rod
+  { at: (u, n) => [37.80 + u, 5.275 - n], rod: false },
 ];
 {
+  // the drape's outline by height: y, the inner and outer edge along the wall, the depth out from it
+  const LV = [
+    [2.12, -0.02, 0.30, 0.10], [1.86, 0.05, 0.29, 0.11], [1.58, 0.11, 0.275, 0.12], [1.34, 0.145, 0.26, 0.125],
+    [1.08, 0.10, 0.28, 0.135], [0.58, 0.05, 0.30, 0.15], [0.02, 0.025, 0.315, 0.16],
+  ];
+  const TIE_Y = 1.34, NF = 4, SIDES = 6;
+  const FOLD = [srgb(0x2a2a2f), srgb(0x222226), srgb(0x303036), srgb(0x1d1d21)], TIE = srgb(0x5c5a56), ROD = srgb(0x8a8d90);
   const pbox = (c, px0, y0, pz0, px1, y1, pz1, rgb) => c.box(pz0 - DOOR_Z, y0, -px1, pz1 - DOOR_Z, y1, -px0, rgb);
-  const FOLD = [srgb(0x161618), srgb(0x202024), srgb(0x121214)], TIE = srgb(0x45454a);
+  // one fold: a six sided tube through the levels, its cross section an ellipse in (u, n)
+  const fold = (cu, i) => {
+    const pos = [], idx = [];
+    LV.forEach(([y, u0, u1, d], L) => {
+      const w = (u1 - u0) / NF, uc = u0 + w * (i + 0.5), hw = w * 0.62;
+      const depth = d * (i % 2 ? 0.78 : 1), nc = depth * 0.5 + 0.004, hd = depth * 0.5;
+      for (let k = 0; k < SIDES; k++) {
+        const a = (k / SIDES) * Math.PI * 2, [px, pz] = cu.at(uc + Math.cos(a) * hw, nc + Math.sin(a) * hd);
+        pos.push(pz - DOOR_Z, y, -px);
+      }
+      if (L > 0) for (let k = 0; k < SIDES; k++) {
+        const a0 = (L - 1) * SIDES + k, a1 = (L - 1) * SIDES + (k + 1) % SIDES, b0 = a0 + SIDES, b1 = a1 + SIDES;
+        idx.push(a0, b0, b1, a0, b1, a1);
+      }
+    });
+    const last = (LV.length - 1) * SIDES;
+    for (let k = 1; k < SIDES - 1; k++) idx.push(0, k, k + 1, last, last + k + 1, last + k);
+    return { pos: Float32Array.from(pos), idx };
+  };
   for (const cu of CURTAINS) {
-    const xs = cu.folds.flatMap((f) => [f[0], f[2]]), zs = cu.folds.flatMap((f) => [f[1], f[3]]);
-    const c = ch(band((Math.min(...xs) + Math.max(...xs)) / 2), 'opaque');
-    for (const k of [c, ch(`${c.name}_far`, 'opaque')]) cu.folds.forEach((f, i) => pbox(k, f[0], 0.02, f[1], f[2], 2.12, f[3], FOLD[i]));
-    pbox(c, Math.min(...xs) - 0.01, 1.0, Math.min(...zs) - 0.01, Math.max(...xs) + 0.01, 1.06, Math.max(...zs) + 0.01, TIE);
+    const mid = cu.at(0.15, 0.08)[0];
+    const c = ch(band(mid), 'opaque');
+    for (let i = 0; i < NF; i++) {
+      const f = fold(cu, i);
+      // the winding depends on which way the wall frame turns: a tube with a negative volume is inside out
+      let vol = 0;
+      for (let t = 0; t < f.idx.length; t += 3) {
+        const [a, b, d] = [f.idx[t], f.idx[t + 1], f.idx[t + 2]].map((v) => f.pos.subarray(v * 3, v * 3 + 3));
+        vol += a[0] * (b[1] * d[2] - b[2] * d[1]) - a[1] * (b[0] * d[2] - b[2] * d[0]) + a[2] * (b[0] * d[1] - b[1] * d[0]);
+      }
+      if (vol < 0) for (let t = 0; t < f.idx.length; t += 3) [f.idx[t + 1], f.idx[t + 2]] = [f.idx[t + 2], f.idx[t + 1]];
+      for (const k of [c, ch(`${c.name}_far`, 'opaque')]) k.add(f.pos, f.idx, FOLD[i], null);
+    }
+    // the tie: a band round the pinch, lighter
+    const t0 = cu.at(0.135, 0), t1 = cu.at(0.27, 0.135);
+    pbox(c, Math.min(t0[0], t1[0]), TIE_Y - 0.03, Math.min(t0[1], t1[1]), Math.max(t0[0], t1[0]), TIE_Y + 0.03, Math.max(t0[1], t1[1]), TIE);
+    if (cu.rod) {   // a rod over the opening and the gather, on two small brackets
+      const r0 = cu.at(-0.98, 0.05), r1 = cu.at(0.34, 0.07);
+      pbox(c, Math.min(r0[0], r1[0]), 2.13, Math.min(r0[1], r1[1]), Math.max(r0[0], r1[0]), 2.15, Math.max(r0[1], r1[1]), ROD);
+      for (const u of [-0.95, 0.31]) { const q0 = cu.at(u - 0.01, 0), q1 = cu.at(u + 0.01, 0.07); pbox(c, Math.min(q0[0], q1[0]), 2.12, Math.min(q0[1], q1[1]), Math.max(q0[0], q1[0]), 2.16, Math.max(q0[1], q1[1]), ROD); }
+    }
   }
 }
 
@@ -228,7 +281,8 @@ const CURTAINS = [
     // the far twin: the cabinet and its door, as before
     const w = worldBox(b), fc = ch(`${c.name}_far`, 'opaque');
     fc.box(...w, srgb(0x2e3034));
-    fc.box(w[0] + 0.03, w[1] + (w[4] - w[1]) * 0.25, w[2] + 0.04, w[3] - 0.03, w[4] - 0.05, w[2] - 0.005, srgb(0x96a0aa));
+    // the door is on the front, plan +z, which is world +x (w[3])
+    fc.box(w[3] - 0.005, w[1] + (w[4] - w[1]) * 0.25, w[2] + 0.03, w[3] + 0.004, w[4] - 0.05, w[5] - 0.03, srgb(0x96a0aa));
   });
 }
 

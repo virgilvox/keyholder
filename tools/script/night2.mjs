@@ -35,8 +35,8 @@ const setup = (del) => ROAM('lab_classroom', 2.4, 'Start the meeting at the whit
   TASK('carry', 'chairs', { at: at('lab_lounge'), to: at('lab_cowork'), n: 2, label: 'Pull chairs up to the tables', where: 'Lounge chairs', where2: 'Coworking tables', prompt: 'Grab a chair', reward: { vibe: 1 } }),
   ...(del ? [TASK('greet', 'del2', { who: 'del', at: at('lab_door', 0, -1.5), label: 'Del came back', prompt: 'Say hi', reward: { trust: 2 },
     after: [
-      S('del', "You said Thursday at seven. It's Thursday at seven. I brought the pedal.", { shot: 'mcu', emote: 'joy', amount: .5 }),
-      S('me', "Bench is yours. I'm moderating a meeting, but I'll be ten feet away. You hold the iron."),
+      S('del', "You said Thursday at seven. You never said which Thursday. I brought the pedal.", { shot: 'mcu', emote: 'joy', amount: .5 }),
+      S('me', "This one's good. Bench is yours. I'm moderating a meeting, but I'll be ten feet away. You hold the iron."),
       S('del', "I hold the iron. Okay.", { emote: 'joy', amount: .6 }),
       SET('del_returned'),
     ] })] : []),
@@ -72,7 +72,8 @@ const beats = [
     dex: "We need eight voting members for a vote. Anybody can talk. Members vote. That part I know." }),
   OBJ('Get the meeting started'),
   IF({ flag: 'del_followed' }, [setup(true)], [setup(false)]),
-  // ---- the meeting
+  // ---- the meeting. Its card first: a save resumes at it, so the room is seated after it
+  CHAPTER_CARD(),
   HIDE('napper', 'bex', 'del'),
   P('me', BOARD), P('m2', lab(9.0, 8.2, 160)),
   ...sit('m1', 11.3, 6.6, -90), ...sit('napper', 12.6, 7.0, -90), ...sit('regular', 12.4, 5.6, -90), ...sit('haunter', 13.6, 6.4, -90),
@@ -81,7 +82,6 @@ const beats = [
   IF({ flag: 'sam_joins' }, [...sit('sam', 10.6, 6.6, -80)]),
   IF({ flag: 'root_returns' }, [...sit('root', 14.4, 7.2, -100)]),
   IF({ flag: 'del_returned' }, [P('del', lab(19.4, 6.0, 0)), CLIP('del', 'Interact', { loop: true })]),
-  CHAPTER_CARD(),
   SHOT('wide', ['me', 'm1', 'june'], { dist: 7, height: 2.2 }),
   S('me', "Okay. It's seven oh four. Introductions first. Your name and what you're working on."),
   IF({ flag: 'sam_joins' }, [

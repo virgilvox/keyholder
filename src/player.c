@@ -66,9 +66,18 @@ void player_teleport(v3 p, float y) {
 #define CAM_MIN .5f
 static float cam_hold;   /* seconds the way out has stayed clear since the arm last pulled in */
 static float cam_lift;   /* extra pitch while boxed in: the boom rises over the head */
+/* Outdoors the lens also keeps CAM_OFF further from a wall than the probe alone would: shopfronts stand
+ * proud of the wall the probe sees (door frames, glass and sills up to .3 m), and a lens closer in than
+ * that ends up behind a door frame, looking out through its bars. */
+#define CAM_OFF .2f
+static float cam_off;   /* CAM_OFF outdoors, 0 indoors: set each frame by cam_apply */
+static float wall_clear(v3 from, v3 to) {
+  float c = world_cam_clear(from, to, CAM_R);
+  return c < v3_len(v3_sub(to, from)) - 1e-3f ? fmaxf(0, c - cam_off) : c;
+}
 /* the longest arm whose probe stays clear of walls and props, from the pivot along dir */
 static float arm_length(v3 pivot, v3 dir, float want) {
-  return fmaxf(CAM_MIN, world_cam_clear(pivot, v3_add(pivot, v3_scale(dir, want)), CAM_R));
+  return fmaxf(CAM_MIN, wall_clear(pivot, v3_add(pivot, v3_scale(dir, want))));
 }
 static float cam_zoom = 1;   /* the player's zoom: the wheel (or Tab, LB, R3 in steps) scales the arm */
 float player_cam_zoom(void) { return cam_zoom; }
@@ -89,22 +98,31 @@ static void cam_apply(float dt, bool snap) {
   /* boxed in (a doorway, a corner, a narrow room): rather than press into the back of the head, the boom
    * rises and looks down past it, to the steepest of a few higher angles that buys real room. Up quickly,
    * back down slowly. */
+  bool inside = world_indoors(pos);
+  cam_off = inside ? 0 : CAM_OFF;
+  float lift_max = inside ? .9f : .6f;   /* outdoors no steeper than about 45 degrees: below that it is all pavement */
   float lift_to = 0, arm0 = arm_length(pivot, cam_dir_lift(0), want);
   if (arm0 < want * .6f) {
-    float best = arm0;
-    for (int k = 1; k <= 3; k++) { float a = arm_length(pivot, cam_dir_lift(k * .3f), want); if (a > best + .35f) { best = a; lift_to = k * .3f; } }
+    /* Indoors the gain is the arm's length: further from the head, looking down on it. Outdoors only the
+     * ground gained behind her counts. Against a shopfront a steeper arm is longer only because it climbs
+     * the wall, and it looked straight down on her head; over a railing, a bench or a car it reaches out. */
+    float best = inside ? arm0 : arm0 * cosf(cam_pitch);
+    for (int k = 1; k * .3f <= lift_max + 1e-3f; k++) {
+      float a = arm_length(pivot, cam_dir_lift(k * .3f), want), r = inside ? a : a * cosf(fminf(1.25f, cam_pitch + k * .3f));
+      if (r > best + .35f) { best = r; lift_to = k * .3f; }
+    }
   }
   /* shelving and furniture never pull the lens in (only walls do): when they stand between the lens and
    * the player, the boom rises over them and looks down, the way a crowded room is shot from above */
   float need = 0; bool over = true;
   for (int k = 0; k <= 4; k++) {
-    float lf = fmaxf(lift_to, k * .22f); v3 dk = cam_dir_lift(lf);
+    float lf = fminf(lift_max, fmaxf(lift_to, k * .22f)); v3 dk = cam_dir_lift(lf);
     float a = arm_length(pivot, dk, want);
     float c = world_cam_clear_all(pivot, v3_add(pivot, v3_scale(dk, a)), CAM_R * .5f);
     if (c >= a - .25f) { need = lf; over = true; break; }
     over = false;
   }
-  if (over) lift_to = fmaxf(lift_to, need); else lift_to = fmaxf(lift_to, .66f);
+  lift_to = fmaxf(lift_to, over ? need : fminf(.66f, lift_max));
   cam_lift = snap ? lift_to : ds_damp(cam_lift, lift_to, lift_to > cam_lift ? 8.f : 2.f, dt);
   /* a corridor or a corner: when the player is not turning the camera, it swings gently toward the
    * nearest open direction (whiskers either side), so it does not sit against a wall behind the head */
@@ -146,7 +164,7 @@ static void cam_apply(float dt, bool snap) {
   else { cam_pos = v3_lerp(cam_pos, p, 1 - expf(-18 * dt)); cam_look = v3_lerp(cam_look, look, 1 - expf(-14 * dt)); }
   /* the damping (and the rise) must not carry the lens into a wall: probe from the pivot to where it is */
   { v3 dd = v3_sub(cam_pos, pivot); float l = v3_len(dd);
-    if (l > 1e-3f) { float c = world_cam_clear(pivot, cam_pos, CAM_R); if (c < l) cam_pos = v3_add(pivot, v3_scale(dd, c / l)); } }
+    if (l > 1e-3f) { float c = wall_clear(pivot, cam_pos); if (c < l) cam_pos = v3_add(pivot, v3_scale(dd, c / l)); } }
   /* the lab's interior and lights follow the player, not the lens */
   world_subject(pos);
   t3_object_set_position(cam, cam_pos.x, cam_pos.y, cam_pos.z);
@@ -182,14 +200,14 @@ bool player_riding(void) { return riding; }
 /* off at once with no step aside (a teleport, a new actor): the bike stays where it was */
 static void ride_drop(void) {
   if (!riding) { swing_t = 0; swing_queue = 0; if (A) weapon_trail(A, false); return; }
-  riding = false; speed = fmaxf(0, speed);
+  riding = false; speed = fmaxf(0, speed); bike_ridden(false);
   if (A) actor_reach(A, pos, pos, 0);
   t3_object *r = actor_root(); if (r) t3_object_set_rotation(r, 0, yaw, 0);
   if (bike_shown()) park(bike_pos(), bike_yaw());
 }
 void player_ride(bool on) {
   if (!A || on == riding) return;
-  riding = on;
+  riding = on; bike_ridden(on);
   t3_object *r = actor_root();
   if (on) {
     swing_t = 0; swing_queue = 0;
@@ -208,6 +226,7 @@ void player_ride(bool on) {
     v3 v = v3_(cosf(yaw) * 7.f, 0, -sinf(yaw) * 7.f);   /* .7 m in a tenth of a second, sliding round anything */
     bool g = grounded; world_move(&pos, &v, RADIUS, HEIGHT, .1f, &g);
     speed = 0; vel = v3_(0, 0, 0);
+    actor_reach(A, pos, pos, 0);
     actor_place(A, pos, yaw);
     actor_play(A, "Idle_Loop", 1, true, .2f);
     sfx(SFX_PICKUP, 0, .4f);

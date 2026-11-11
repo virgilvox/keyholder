@@ -194,12 +194,13 @@ static void refresh(void) {
   BZ.surv_best = SV.surv_score; BZ.surv_rank = (char)SV.surv_rank; BZ.surv_wave_best = SV.surv_wave;
 }
 
-void battle_unlock_fight(int fi) { if (fi < 0 || fi >= FI_COUNT || open_e(fi)) return; open_set(fi); sv_write(); }
+/* a win in the story opens its fight here: the menu's table follows at once (the title counts from it) */
+void battle_unlock_fight(int fi) { if (fi < 0 || fi >= FI_COUNT || open_e(fi)) return; open_set(fi); sv_write(); refresh(); }
 void battle_unlock_weapon(int w) {
   if (w < 0 || w >= WP_COUNT || (SV.weapons >> w & 1)) return;
   SV.weapons |= (uint8_t)(1u << w);
   if ((SV.weapons & 31) == 31) SV.mods |= MOD_ONE_WEAPON;
-  sv_write();
+  sv_write(); refresh();
 }
 bool battle_available(void) { for (int e = 0; e < FI_COUNT; e++) if (open_e(e)) return true; return false; }
 

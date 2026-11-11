@@ -11,6 +11,8 @@
 //   look   0 or 1: which of the body's two looks (story.c's extras region holds both palettes)
 //   where  'street' (Main and its sidewalks), 'inside' (a room you walk into), 'lab' (members at the benches)
 //   hours  [from, to] on the lab clock, when they are out
+//   parts  which parts of the story they are out in: 'day', 'nights', a part number (0 the day, 1 to 3 the
+//          nights) or a list of them. All parts if unset.
 //   voice, speed  a Kokoro voice (tools/script/cast.mjs lists the ones the cast uses; pick by the body)
 //   color  the name's colour on the dialogue box
 //   talks  TALK(when, beats) list, see below
@@ -20,7 +22,9 @@
 //            flag: 'story_flag' or '!story_flag' (FLAG_NAMES in src/gen/script.c, set by day.mjs),
 //            mark: 'name' or '!name' (a street memory a MARK set, any stranger's),
 //            stat: ['vibe', 8] (at least), low: ['energy', 3] (at most), venue: 'proof' (the room you are in),
-//            again: true (it can be had again; one of these is what they say once the rest are used) }
+//            again: true (it can be had again; one of these is what they say once the rest are used),
+//            part: 'day', 'nights', a part number or a list (as parts above): a talk about the day's events (the
+//            lunch fight, Arduino Night, the inspector) is part: 'day'. Unset, it fits any part. }
 //          The first talk in the list that fits and has not been had today is the one they have.
 //   beats  L(who, text): who is 'them' (the stranger), 'me' (you), or in the cameo 'moheeb' and 'luis'.
 //            text is a string, or { vee, dex, ruth, any } by who is playing; {me} is your name.
@@ -30,6 +34,7 @@
 //          NOTE('text'): a line on screen, no voice.
 // Then: node tools/script/street_compile.mjs, and bake the voices (HANDOFF.md).
 //
+// Each part of the story (the day, each night) starts the memory over: who you met, the talks had, the marks.
 // Writing: full sentences, each person their own voice, about downtown Mesa, the lab and what is on.
 // Fictional people only. HeatSync facts: open to the public, membership is a donation, joining needs no
 // vouch, only 24/7 card access needs a nomination. Arduino Night is the first Wednesday, seven to ten.
@@ -58,7 +63,7 @@ export const STRANGERS = [
         L('me', "Listen for the bell at Macdonald. Then you have a minute."),
         L('them', "A bell. That's better than the sign. The bell doesn't lie to me."),
       ]),
-      TALK({ hour: [13.2, 16] }, [
+      TALK({ hour: [13.2, 16], part: 'day' }, [
         L('them', "Were you the one out here with the sword? Over a bicycle? With a bag of bread?"),
         CHOICE('He saw the lunch fight.', [
           O("It was the lab's bike. We got it back.", [L('them', "Good. People should leave bikes alone. I say that as a man who has lost three.")],
@@ -66,7 +71,7 @@ export const STRANGERS = [
           A("Shrug. Change the subject.", [L('them', "Fair. I didn't see anything. I was reading my phone. Like a citizen.")]),
         ]),
       ]),
-      TALK({ hour: EVENING }, [
+      TALK({ hour: EVENING, part: 'day' }, [
         L('them', "You're still in your lanyard. Long shift?"),
         L('me', { vee: "Nine to midnight. I'm about halfway, I think.", dex: "Nine to midnight. I've stopped checking the clock.", ruth: "Nine until midnight. The clock and I aren't speaking." }),
         L('them', "I do eight hours at a desk and I feel like a raisin. Go easy on yourself."),
@@ -102,7 +107,7 @@ export const STRANGERS = [
         L('them', "I walked past your door twice today. Third time, I'm going in."),
         L('me', "Ask for the lathe. Somebody will light up."),
       ]),
-      TALK({ hour: [13.2, 20] }, [
+      TALK({ hour: [13.2, 20], part: 'day' }, [
         L('them', "Saw some commotion out front at lunch. In my day, we settled things with a strongly worded letter."),
         L('me', "We don't settle anything by sword. That was about a bike."),
         L('them', "That's what they all say."),
@@ -114,7 +119,7 @@ export const STRANGERS = [
     id: 'student', name: 'College student', body: ['K2'], look: 0, where: 'street', hours: [11, 23],
     voice: 'bf_lily', speed: 1.06, color: 0xf0a8c8,
     talks: [
-      TALK({ met: false }, [
+      TALK({ met: false, part: 'day' }, [
         L('them', "Sorry, is that a HeatSync lanyard? I have a studio project due Friday and I need a laser cutter."),
         L('them', "Do I need to know somebody? Like, does someone have to vouch for me?"),
         CHOICE('She looks like she has not slept since Monday.', [
@@ -155,7 +160,7 @@ export const STRANGERS = [
         L('me', "Sometimes it is. A cup once shimmed a print bed."),
         L('them', "I'm going to pretend you didn't tell me that."),
       ]),
-      TALK({ hour: [13.2, 18] }, [
+      TALK({ hour: [13.2, 18], part: 'day' }, [
         L('them', "Was that you at lunch? Swords, a bike, and a sack of sandwiches? The whole patio stopped talking."),
         CHOICE('She is grinning.', [
           O("Just a normal Wednesday.", [L('them', "If that's normal, I want to see a weird one.")], { say: "Just a normal Wednesday." }),
@@ -261,7 +266,7 @@ export const STRANGERS = [
         CHOICE('He is very serious about the corner.', [
           O("We've got a busted amp you could fix up.", [
             L('them', "You'd let me? I'd need to know a soldering iron from a curling iron."),
-            L('me', "Somebody will show you. Bring it to Arduino Night, seven tonight."),
+            L('me', "Somebody will show you. Bring it by the lab on any open night."),
             ADD('vibe', 1), MARK('busker_amp'),
           ], { say: "We've got a busted amp you could fix up." }),
           A("Point at the corner by the lab.", [
@@ -305,7 +310,7 @@ export const STRANGERS = [
     id: 'courier', name: 'Bike courier', body: ['P2'], look: 1, where: 'street', hours: [11, 20],
     voice: 'bm_daniel', speed: 1.04, color: 0xe08040,
     talks: [
-      TALK({ hour: [13.2, 20] }, [
+      TALK({ hour: [13.2, 20], part: 'day' }, [
         L('them', "That orange loaner by your door is yours, right? I saw two guys try to walk it off at lunch."),
         L('them', "I was going to step in. Then you stepped in. With a sword. So I stepped back out."),
         L('me', "It's a shared bike. It goes on the rack, not in a van."),
@@ -323,7 +328,7 @@ export const STRANGERS = [
     id: 'teen', name: 'Skateboarder', body: ['K2'], look: 1, where: 'street', hours: [12, 21],
     voice: 'af_nicole', speed: 1.12, color: 0x60d0e0,
     talks: [
-      TALK({ flag: 'beat_champ' }, [
+      TALK({ flag: 'beat_champ', part: 'day' }, [
         L('them', "Wait. Wait wait wait. Are you the one who beat High Score at Level 1 today?"),
         L('them', "Everybody at the arcade is losing their minds. She's never lost on that cabinet."),
         CHOICE('The teen is starstruck.', [
@@ -377,11 +382,11 @@ export const STRANGERS = [
             L('them', "Not tonight. But it's nice to know the light is on. Somebody's always building something in there."),
             ADD('vibe', 1),
           ], { say: "You're welcome to look in. We're open a bit longer." }),
-          O("Mostly it's me, turning things off.", [L('them', "Somebody has to be the last one. That's its own kind of work.")],
+          O("Mostly it's me, turning things off.", [L('them', "Then I'll walk till your light goes out. That's how I know the block's asleep.")],
             { say: "Mostly it's me, turning things off." }),
         ]),
       ]),
-      TALK({ flag: 'sam_joins' }, [
+      TALK({ flag: 'sam_joins', part: 'day' }, [
         L('them', "Saw you walking someone to the train. She was talking about cardboard the whole way. Very happy about it."),
       ]),
       TALK({ again: true }, [L('them', "Good night, keyholder. Lock the door twice. Everybody forgets once.")]),
@@ -393,7 +398,7 @@ export const STRANGERS = [
     id: 'counter', name: 'Behind the counter', body: ['I2', 'O2'], look: 1, where: 'inside', hours: [0, 99],
     voice: 'af_jessica', speed: 0.98, color: 0xe0b060,
     talks: [
-      TALK({ venue: 'proof', hour: [11, 14] }, [
+      TALK({ venue: 'proof', hour: [11, 14], part: 'day' }, [
         L('them', "You're here for the lab order? Fourteen sandwiches. One of them just says surprise."),
         L('them', "We don't know who ordered surprise. The baker made something. It's the baker's secret."),
         L('me', "Somebody at the lab is going to be very happy, or very confused."),
@@ -408,9 +413,9 @@ export const STRANGERS = [
       TALK({ venue: 'level1' }, [
         L('them', "Tokens are at the machine. The claw game is fair. I'm required to say that."),
       ]),
-      TALK({ met: false }, [
+      TALK({ met: false, part: 'day' }, [
         L('them', "Welcome in. Take your time. You look like you've been on your feet since this morning."),
-        L('me', "Nine o'clock, and I'm hosting the hackerspace till midnight."),
+        L('me', "Since nine this morning, and I'm hosting the hackerspace till midnight."),
         L('them', "Then sit for a minute. Nobody's timing you in here."),
       ]),
       TALK({ again: true }, [L('them', "Anything else? No rush. Seriously, sit down.")]),
@@ -501,7 +506,7 @@ export const STRANGERS = [
     talks: [
       TALK({}, [
         L('them', "The scope says my signal is clean. My circuit says otherwise. One of them is lying."),
-        L('me', "Check your ground. It's always the ground."),
+        L('me', "Check your ground first. Nine times out of ten, that's it."),
         L('them', "It is always the ground. Why is it always the ground? Don't answer. I know why."),
       ]),
       TALK({ again: true }, [L('them', "It was the ground. Don't say anything.")]),
@@ -521,7 +526,7 @@ export const STRANGERS = [
     ],
   },
   {
-    id: 'a_first', name: 'First timer', body: ['K2', 'I2'], look: 1, where: 'lab', hours: [19, 23],
+    id: 'a_first', parts: 'day', name: 'First timer', body: ['K2', 'I2'], look: 1, where: 'lab', hours: [19, 23],
     voice: 'af_sky', speed: 1.06, color: 0xf0c0a0,
     talks: [
       TALK({}, [
@@ -539,7 +544,7 @@ export const STRANGERS = [
     ],
   },
   {
-    id: 'a_parent', name: 'Arduino Night dad', body: ['N2', 'P2'], look: 1, where: 'lab', hours: [19, 23],
+    id: 'a_parent', parts: 'day', name: 'Arduino Night dad', body: ['N2', 'P2'], look: 1, where: 'lab', hours: [19, 23],
     voice: 'am_liam', speed: 0.98, color: 0xb0d080,
     talks: [
       TALK({}, [
@@ -551,7 +556,7 @@ export const STRANGERS = [
     ],
   },
   {
-    id: 'a_kid', name: 'Kid with a servo', body: ['E'], look: 1, where: 'lab', hours: [19, 22],
+    id: 'a_kid', parts: 'day', name: 'Kid with a servo', body: ['E'], look: 1, where: 'lab', hours: [19, 22],
     voice: 'af_alloy', speed: 1.12, color: 0xf0e070,
     talks: [
       TALK({}, [
@@ -569,13 +574,13 @@ export const STRANGERS = [
 ];
 
 // ---------------------------------------------------------------- the Chupacabra patio
-// Moheeb and Luis, at a table outside the taproom from late afternoon: Moheeb on his laptop, Luis with a
+// Moheeb and Luis, at a table outside the taproom from late morning on: Moheeb on his laptop, Luis with a
 // beer. They made a game called Coffee and Kill. Their voices are the Kyutai clones from SMALL PARTS
 // (tools/bake_tts.py, KYUTAI); voice and speed below are only the Kokoro stand ins if that is not set up.
 // chatter: what they say to each other when you are near (one exchange at a time, each once a day).
 // talks: what they say to you (a "Talk" at the table).
 export const CAMEO = {
-  hours: [16.5, 25],
+  hours: [11, 25],
   people: {
     moheeb: { name: 'Moheeb', color: 0x7ec8e3, voice: 'am_michael', speed: 1.0 },
     luis: { name: 'Luis', color: 0xf0a050, voice: 'am_adam', speed: 1.04 },
@@ -609,7 +614,7 @@ export const CAMEO = {
       ['moheeb', "Every time I sit at this table, I end up drawing a circuit board on a napkin."],
       ['luis', "Mine's on the coaster. It's my best work. It has a cup ring through the ground plane."],
     ]),
-    CHAT({}, [
+    CHAT({ part: 'day' }, [
       ['luis', "Downtown's busy for a Wednesday."],
       ['moheeb', "It's the train. The train brings everybody."],
       ['luis', "And then it takes them all home again. That's the dream."],
@@ -634,22 +639,22 @@ export const CAMEO = {
       ['luis', "We've said one more since six o'clock."],
       ['moheeb', "That's also how every project at the lab works."],
     ]),
-    CHAT({ flag: 'beat_champ' }, [
+    CHAT({ flag: 'beat_champ', part: 'day' }, [
       ['luis', "Did you hear somebody beat High Score at the arcade today?"],
       ['moheeb', "I heard. I'm choosing to believe it was a keyholder."],
     ]),
   ],
   talks: [
-    TALK({ met: false, mark: 'heard_patio' }, [
+    TALK({ met: false, mark: 'heard_patio', part: 'day' }, [
       L('moheeb', "Wait. Did a guy with a paper map send you here?"),
       L('luis', "We told him to find the real downtown. We didn't think he'd send it back to us."),
       L('me', "He said you both had opinions about solder."),
-      L('moheeb', "Strong ones. More flux. It's always more flux."),
+      L('moheeb', "Strong ones. More flux. And if that doesn't work, more flux."),
       L('luis', "Sit for a minute. You look like you've been hosting since nine."),
       ADD('energy', 1),
     ]),
     TALK({ met: false }, [
-      L('luis', "Hey, you're hosting today, right? You've got the clipboard face."),
+      L('luis', "Hey, you're the host over at the lab, right? You've got the clipboard face."),
       L('moheeb', "Sit for a minute. Nobody's setting the lab on fire in the next five minutes."),
       L('luis', "Probably."),
       CHOICE('Two people at a patio table, a laptop and a beer between them.', [
@@ -665,7 +670,7 @@ export const CAMEO = {
         ], { say: "I can only stay a minute." }),
       ]),
     ]),
-    TALK({ flag: 'passed_inspection' }, [
+    TALK({ flag: 'passed_inspection', part: 'day' }, [
       L('moheeb', "We heard the fire inspector came by. Did the lab pass?"),
       L('me', { vee: "We passed. Every extinguisher tagged. I may have hugged one.", dex: "We passed. She even said the shop looked organized.", ruth: "We passed. I labeled the label maker, just in case." }),
       L('luis', "Of course you did. Cheers to the lab."),
@@ -673,7 +678,7 @@ export const CAMEO = {
     ]),
     TALK({ low: ['energy', 3] }, [
       L('luis', "You okay? You look like you've been carrying the whole lab on your back."),
-      L('moheeb', "Sit. There's a chair. Hosting isn't a sprint. It's a long walk with a lot of doors."),
+      L('moheeb', "Sit. There's a chair. Luis is buying you a water whether you sit or not."),
       L('me', "Thanks. Just for a minute."),
       ADD('energy', 1),
     ]),

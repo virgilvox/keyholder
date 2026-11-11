@@ -41,6 +41,11 @@ actor_t *actor_new(actor_model model, const actor_palette *pal, float scale, t3_
  * not stall the frame. actor_new preloads on first use otherwise. */
 bool actor_preload(actor_model model);
 void actor_preload_all(void);
+/* the actor and everything actor_new made for it (its node tree, materials, its hold on the palette
+ * atlas, the shadow); a weapon in its hand goes first (weapon_equip(a, -1)). The model stays parsed */
+void actor_free(actor_t *a);
+/* a model no actor uses: its parse and atlases go (actor_new parses it again when next asked) */
+void actor_unload(actor_model model);
 /* level of detail, picked by the renderer by camera distance: the full body with face morphs
  * and outline within 5 m, a light body (about 5k triangles) with an outline to 10 m, the light
  * body alone beyond. bias scales those distances for every actor (2 = keep detail twice as far).

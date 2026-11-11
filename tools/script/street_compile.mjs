@@ -29,6 +29,16 @@ const warn = (m) => console.warn('street: warning: ' + m);
 // the story's flags, to warn about a talk that waits on a flag nothing sets
 const scriptC = join(ROOT, 'src/gen/script.c');
 const FLAGS = existsSync(scriptC) ? new Set([...(readFileSync(scriptC, 'utf8').match(/FLAG_NAMES\[FLAG_COUNT\] = \{([^}]*)\}/) || ['', ''])[1].matchAll(/"([^"]+)"/g)].map((m) => m[1])) : null;
+// street.c's limits (street.h): the data must fit them, or street.c drops the rest without a word
+const LIMITS = Object.fromEntries([...readFileSync(join(ROOT, 'src/street.h'), 'utf8').matchAll(/^#define (ST_MAX_\w+) (\d+)/gm)].map((m) => [m[1], +m[2]]));
+for (const k of ['ST_MAX_TYPES', 'ST_MAX_TALKS', 'ST_MAX_CHAT', 'ST_MAX_MARKS']) if (!LIMITS[k]) throw new Error(`street: no ${k} in src/street.h`);
+// the parts of the story a talk or a stranger fits: 'day' (0), 'nights' (1 to 3), a part number or a list; all if unset
+const PARTS = (v, where) => {
+  if (v == null) return 0xff;
+  const list = v === 'day' ? [0] : v === 'nights' ? [1, 2, 3] : [].concat(v);
+  let m = 0; for (const p of list) { if (!Number.isInteger(p) || p < 0 || p > 7) err(`part ${p} in ${where}`); else m |= 1 << p; }
+  return m;
+};
 // the downtown place keys, to tell which venue a room is
 const VENUES = [...readFileSync(join(ROOT, 'docs/PLACES.md'), 'utf8').matchAll(/^\| `([a-z0-9_]+)` \|/gm)].map((m) => m[1]);
 
@@ -111,7 +121,7 @@ function talk(t, owner, where) {
   const sc = w.stat || w.low, st = sc ? STATS[sc[0]] : null;
   if (sc && !st) err(`stat ${sc[0]} in ${where}`);
   const rec = { h0, h1, met: w.met === true ? 1 : w.met === false ? 0 : -1, flag, flagNot, mark, markNot,
-    stat: st || '-1', gte: sc ? sc[1] : 0, low: !!w.low, venue: w.venue || null, again: !!w.again, start: BEATS.length };
+    stat: st || '-1', gte: sc ? sc[1] : 0, low: !!w.low, venue: w.venue || null, again: !!w.again, start: BEATS.length, parts: PARTS(w.part, where) };
   emit(t.beats, owner, where);
   BEATS.push({ op: 'SB_END' });
   TALKS.push(rec);
@@ -134,13 +144,20 @@ for (const s of STRANGERS) {
   s.talks.forEach((t, i) => talk(t, owner, `${where} talk ${i + 1}`));
   if (!s.talks.some((t) => t.when && t.when.again)) warn(`${where}: no talk marked again, so they go quiet after the rest`);
   const [h0, h1] = s.hours || [0, 99];
-  TYPES.push({ id: s.id, name: s.name, speaker: owner.speaker, color: s.color || 0xd8d0c0, bodies, where: w, look: s.look ? 1 : 0, h0, h1, t0, nt: TALKS.length - t0 });
+  TYPES.push({ id: s.id, name: s.name, speaker: owner.speaker, color: s.color || 0xd8d0c0, bodies, where: w, look: s.look ? 1 : 0, h0, h1, t0, nt: TALKS.length - t0, parts: PARTS(s.parts, where) });
 }
 // the cameo
 const ch0 = TALKS.length;
 CAMEO.chatter.forEach((c, i) => talk({ when: c.when, beats: c.lines.map(([who, text]) => ({ op: 'say', who, text })) }, { cameo: true }, `cameo chatter ${i + 1}`));
 const ct0 = TALKS.length;
 CAMEO.talks.forEach((t, i) => talk(t, { cameo: true }, `cameo talk ${i + 1}`));
+
+// the limits
+const marks = new Set(BEATS.filter((b) => b.op === 'SB_MARK').map((b) => b.text[0]));
+if (TYPES.length > LIMITS.ST_MAX_TYPES) err(`${TYPES.length} strangers: street.h ST_MAX_TYPES is ${LIMITS.ST_MAX_TYPES}`);
+if (TALKS.length > LIMITS.ST_MAX_TALKS) err(`${TALKS.length} talks: street.h ST_MAX_TALKS is ${LIMITS.ST_MAX_TALKS}`);
+if (ct0 - ch0 > LIMITS.ST_MAX_CHAT) err(`${ct0 - ch0} cameo chatter exchanges: street.h ST_MAX_CHAT is ${LIMITS.ST_MAX_CHAT}`);
+if (marks.size > LIMITS.ST_MAX_MARKS) err(`${marks.size} MARK names: street.h ST_MAX_MARKS is ${LIMITS.ST_MAX_MARKS}`);
 
 if (errors) { console.error(`street: ${errors} errors, nothing written`); process.exit(1); }
 
@@ -153,12 +170,12 @@ BEATS.forEach((b, i) => {
   c += `  /*${i}*/ {${b.op}, ${b.who || 0}, ${b.a ?? 0}, ${b.b ?? 0}, ${t3(b.text)}, ${t3(b.say)}, ${cstr(b.clip)}},\n`;
 });
 c += `};\nconst st_talk ST_TALKS[] = {\n`;
-for (const t of TALKS) c += `  {${fl(t.h0)}, ${fl(t.h1)}, ${t.met}, ${cstr(t.flag)}, ${t.flagNot}, ${cstr(t.mark)}, ${t.markNot}, ${t.stat}, ${t.gte}, ${t.low}, ${cstr(t.venue)}, ${t.again}, ${t.start}},\n`;
+for (const t of TALKS) c += `  {${fl(t.h0)}, ${fl(t.h1)}, ${t.met}, ${cstr(t.flag)}, ${t.flagNot}, ${cstr(t.mark)}, ${t.markNot}, ${t.stat}, ${t.gte}, ${t.low}, ${cstr(t.venue)}, ${t.again}, ${t.start}, 0x${t.parts.toString(16)}},\n`;
 c += `};\nconst st_type ST_TYPES[] = {\n`;
 for (const t of TYPES) {
   const bodies = t.bodies.map((b) => `(1ull << AM_${b})`).join(' | ');
   const where = t.where.map((w) => WHERE[w]).join(' | ');
-  c += `  {${cstr(t.id)}, ${cstr(t.name)}, ${cstr(t.speaker)}, 0x${t.color.toString(16).padStart(6, '0')}, ${bodies}, ${where}, ${t.look}, ${fl(t.h0)}, ${fl(t.h1)}, ${t.t0}, ${t.nt}},\n`;
+  c += `  {${cstr(t.id)}, ${cstr(t.name)}, ${cstr(t.speaker)}, 0x${t.color.toString(16).padStart(6, '0')}, ${bodies}, ${where}, ${t.look}, ${fl(t.h0)}, ${fl(t.h1)}, 0x${t.parts.toString(16)}, ${t.t0}, ${t.nt}},\n`;
 }
 c += `};\nconst int ST_NTYPE = ${TYPES.length}, ST_NTALK = ${TALKS.length};\n`;
 const P = CAMEO.people;

@@ -4,8 +4,12 @@
 #include "bike.h"
 #include "fx.h"
 
-static t3_object *root, *lean_g, *front_g, *wheel_f, *wheel_r, *crank_g;
+static t3_object *root, *lean_g, *front_g, *wheel_f, *wheel_r, *crank_g, *stand_g;
 static v3 at; static float at_yaw;
+static bool ridden;
+/* parked, it leans on its kickstand, on the side away from the chain (-x): the stand's foot is on the ground
+ * at this lean */
+#define PARK_LEAN .2f
 
 #define FRAME 0xe8642au
 #define TYRE 0x17171bu
@@ -87,6 +91,13 @@ void bike_init(t3_scene *scene) {
   fxp_box(v3_(.15f, -.17f, 0), v3_(.1f, .025f, .07f), DARK);
   fxp_box(v3_(-.15f, .17f, 0), v3_(.1f, .025f, .07f), DARK);
   part_under(crank_g, v3_(0, 0, 0));
+  /* the kickstand: from the chain stay behind the bottom bracket, down and back to a foot on the ground */
+  stand_g = group_under(lean_g, v3_(0, 0, 0));
+  { v3 foot = v3_(-.21f, .21f * tanf(PARK_LEAN) + .012f, -.26f);
+    fxp_begin();
+    fxp_bar(v3_(-.06f, .27f, -.1f), foot, .018f, DARK);
+    fxp_box(v3_(foot.x, foot.y - .006f, foot.z), v3_(.05f, .014f, .08f), DARK);
+    part_under(stand_g, v3_(0, 0, 0)); }
   /* the parts use YXZ: turn about y, then roll and spin in that frame */
   root->rotation.order = T3_YXZ; lean_g->rotation.order = T3_YXZ;
   root->visible = false;
@@ -95,9 +106,14 @@ void bike_show(bool on) { if (root) root->visible = on; }
 bool bike_shown(void) { return root && root->visible; }
 v3 bike_pos(void) { return at; }
 float bike_yaw(void) { return at_yaw; }
+void bike_ridden(bool on) { ridden = on; }
 void bike_pose(v3 p, float yaw, float lean, float steer, float wheel, float crank) {
   if (!root) return;
   at = p; at_yaw = yaw;
+  /* a parked pose (a little lean, nobody on it) stands on the kickstand: walked or ridden, the stand is up */
+  bool parked = !ridden && lean >= .07f;
+  stand_g->visible = parked;
+  if (parked) lean = -PARK_LEAN;
   t3_object_set_position(root, p.x, p.y, p.z);
   t3_object_set_rotation(root, 0, yaw, 0);
   t3_object_set_rotation(lean_g, 0, 0, -lean);

@@ -79,4 +79,7 @@ export const BIKE_BACK = () => ({ op: 'bike', mode: 3 });
 export const EPILOGUE = () => ({ op: 'epilogue' });
 // PROP(name, mark, mode): a small prop the story moves. 'gerald' (Ines's robot): mode 'still', 'circle' (one motor
 // wired backwards: slow circles to the left), 'straight' (out and back), 'hide'. mark null keeps it where it is.
+// 'table': the fix-it table. 'weld_table': the lab's welding table on its casters, as the back lot fight draws it
+// (stand it where a FIGHT with obj_prop 'welding_table' puts its object, and hide it for the fight). 'van': Copper
+// Cal's work van, its back doors open toward the mark's facing. Each is 'still' or 'hide'.
 export const PROP = (name, mark, mode = 'still') => ({ op: 'prop', name, mark, mode });

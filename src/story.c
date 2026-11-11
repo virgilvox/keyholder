@@ -30,6 +30,7 @@ typedef struct {
   walk_t w;
   float turn_to; bool turning;
   const char *base;       /* the clip it rests in */
+  float kneel;            /* kneel_hold's phase */
   actor_expr ex; float ex_t;
   int weapon;
   bool in_fight;
@@ -150,20 +151,9 @@ static bool lab_place(const char *n, v3 *p, float *y) {
   }
   return false;
 }
-/* v1.3: places the world may not have yet (the town work adds them): the nearest known place and an offset */
-static const struct { const char *n, *base; float dx, dz, yaw; } PLACE_ALT[] = {
-  {"lab_back_table", "lab_back_door", -2.6f, -3.2f, 0},    /* where the welding table gets rolled out to, by the back door */
-};
 static bool place_of(const char *n, v3 *p, float *y) {
   if (!n) return false;
-  if (lab_place(n, p, y)) return true;
-  if (world_place(n, p, y)) return true;
-  for (unsigned i = 0; i < sizeof PLACE_ALT / sizeof PLACE_ALT[0]; i++) if (!strcmp(PLACE_ALT[i].n, n)) {
-    float by; if (!world_place(PLACE_ALT[i].base, p, &by)) return false;
-    *p = v3_add(*p, v3_(PLACE_ALT[i].dx, 0, PLACE_ALT[i].dz)); *y = PLACE_ALT[i].yaw * DS_PI / 180;
-    return true;
-  }
-  return false;
+  return lab_place(n, p, y) || world_place(n, p, y);
 }
 static bool nav_free(int ix, int iz);
 static int nav_ix(float v);
@@ -237,6 +227,8 @@ static void face_now(int who, int target) {
   actor_t *a = actor_of(who), *b = actor_of(target);
   v3 d = v3_sub(actor_pos(b), actor_pos(a));
   actor_move(a, actor_pos(a), atan2f(d.x, d.z));
+  if (actor_is_visible(b)) actor_look(a, actor_head_pos(b), .9f);   /* turned to someone, you look at them, not at what you held before */
+  if (canon(who) == me_id && !roam) player_teleport(actor_pos(a), atan2f(d.x, d.z));   /* and the player's own heading, in a scene */
 }
 static float flat_dist(v3 a, v3 b) { return hypotf(a.x - b.x, a.z - b.z); }
 static v3 fwd_of(float yaw) { return v3_(sinf(yaw), 0, cosf(yaw)); }
@@ -427,10 +419,17 @@ static int resolve_subj(const int *subj, actor_t **out) {
   for (int i = 0; i < 3; i++) if (subj[i] >= 0) out[n++] = actor_of(subj[i]);
   return n;
 }
-/* the nearest other visible actor: who a line is said to */
+static bool task_talk(int *partner);
+/* who a line is said to: in a hosting task's talk, the host and the task's person to each other; else the
+ * nearest other visible actor */
 static int listener_of(int who) {
   int w = canon(who), best = -1; float bd = 7;
   v3 p = actor_pos(actor_of(w));
+  int me = canon(W_ME), tw;
+  if (task_talk(&tw)) {
+    int l = w == me ? tw : me;
+    if (l >= 0 && l != w && A[l].a && actor_is_visible(A[l].a) && v3_len(v3_sub(actor_pos(A[l].a), p)) < bd) return l;
+  }
   for (int i = 0; i < WHO_COUNT; i++) {
     if (i == w || !A[i].a || !actor_is_visible(A[i].a)) continue;
     float d = v3_len(v3_sub(actor_pos(A[i].a), p));
@@ -501,7 +500,15 @@ static save_t *save_v3(void) {
 static void bits_put(uint8_t *b) { memset(b, 0, 32); for (int i = 0; i < FLAG_COUNT; i++) if (flags[i]) b[i >> 3] |= (uint8_t)(1u << (i & 7)); }
 static void bits_get(const uint8_t *b) { for (int i = 0; i < FLAG_COUNT; i++) flags[i] = (b[i >> 3] >> (i & 7)) & 1; }
 static uint32_t save_chap;   /* the title hash of the chapter or night the save resumes at */
+/* a night replayed from the title's night select: it saves only once it is further along than the save it
+ * started over, so going back to night one never costs the night three you were in the middle of */
+static bool replay;
 static void autosave(void) {
+  if (replay) {
+    const save_t *o = (const save_t *)DS_SAVE.data;
+    if (story_has_save() && o->ver == SAVE_V3 && o->pc > pc) return;
+    replay = false;   /* past it now: an ordinary run that saves */
+  }
   save_t *s = save_v3();
   s->magic = DS_SAVE_MAGIC; s->pc = pc; s->me = me_id; s->weapons = weapons; s->hour = hour_target;
   { actor_t *m = actor_of(W_ME); v3 p = actor_pos(m); s->x = p.x; s->y = p.y; s->z = p.z; s->yaw = actor_yaw(m); }
@@ -571,20 +578,23 @@ void story_new_game(int p) {
 #endif
   static const int PL[3] = { W_VEE, W_DEX, W_RUTH };
   memset(&STORY_UI, 0, sizeof STORY_UI); memset(flags, 0, sizeof flags);
+  street_reset(false);   /* street: a new day, nobody downtown has met you */
   set_cast(PL[p]);
   for (int i = 0; i < ST_COUNT; i++) STORY_UI.stats[i] = 0;
   STORY_UI.stats[ST_TRUST] = 5; STORY_UI.stats[ST_SAFETY] = 5; STORY_UI.stats[ST_VIBE] = 5; STORY_UI.stats[ST_DUES] = 5; STORY_UI.stats[ST_ENERGY] = 5;
   obj_buf[0] = 0; STORY_UI.objective = NULL;
   weapons = 0; hour = hour_target = 8.9f; world_set_time(hour);
   gear_bike_have = false;
-  pc = 0; part_now = 0; save_chap = 0;
+  pc = 0; part_now = 0; save_chap = 0; replay = false;
   boot();
 }
 /* the beat a save resumes at: its chapter or night by title, else (v1.2) the day's chapter at its hour */
+static bool first_chapter(int at) { for (int i = 0; i < at; i++) if (SCRIPT[i].op == OP_CHAPTER) return false; return true; }
 static int resume_pc(const save_t *s) {
   if (s->ver == SAVE_V3 && s->chap) for (int i = 0; i < SCRIPT_COUNT; i++) {
     const sc_beat *b = &SCRIPT[i];
-    if ((b->op == OP_CHAPTER || b->op == OP_NIGHT) && title_hash(b->s) == s->chap) return i;
+    /* a chapter card is its scene's first beat (day.mjs), except the day's first: the opening plays from the top */
+    if ((b->op == OP_CHAPTER || b->op == OP_NIGHT) && title_hash(b->s) == s->chap) return b->op == OP_CHAPTER && first_chapter(i) ? 0 : i;
   }
   for (int i = 0; i < SCRIPT_COUNT && SCRIPT[i].op != OP_NIGHT; i++) if (SCRIPT[i].op == OP_CHAPTER && fabsf(SCRIPT[i].f - s->hour) < .02f) return i;
   return s->pc >= 0 && s->pc < SCRIPT_COUNT ? s->pc : 0;
@@ -599,7 +609,7 @@ void story_continue(void) {
   memset(flags, 0, sizeof flags);
   if (s->ver == SAVE_V3) bits_get(s->fbits);
   else for (int i = 0; i < FLAG_V12 && i < FLAG_COUNT; i++) flags[i] = s->flags[i] != 0;
-  part_now = part_at(pc); save_chap = s->ver == SAVE_V3 ? s->chap : 0;
+  part_now = part_at(pc); save_chap = s->ver == SAVE_V3 ? s->chap : 0; replay = false;
   snprintf(obj_buf, sizeof obj_buf, "%s", s->objective);
   STORY_UI.objective = obj_buf[0] ? obj_buf : NULL;
   world_set_time(hour);
@@ -612,6 +622,7 @@ void story_start_night(int n) {
   save_t *s = (save_t *)DS_SAVE.data;
   if (n < 1 || n > NIGHTS_MAX || !(story_nights_open() & (1 << (n - 1)))) return;
   const carry_t *c = &s->start[n - 1];
+  street_reset(false);   /* street: a night picked from the title starts with nobody met */
   int at = -1; for (int i = 0; i < SCRIPT_COUNT; i++) if (SCRIPT[i].op == OP_NIGHT && SCRIPT[i].i == n) { at = i; break; }
   if (at < 0) return;
   memset(&STORY_UI, 0, sizeof STORY_UI);
@@ -620,7 +631,7 @@ void story_start_night(int n) {
   memset(flags, 0, sizeof flags); bits_get(c->fbits);
   obj_buf[0] = 0; STORY_UI.objective = NULL;
   hour = hour_target = SCRIPT[at].f; world_set_time(hour);
-  pc = at; part_now = n; save_chap = 0;
+  pc = at; part_now = n; save_chap = 0; replay = true;
   boot();
 }
 /* the epilogue's screen is done: on into the next night, or false when the story is over */
@@ -763,6 +774,13 @@ typedef struct {
   float with_t;           /* the companion's path timer */
 } task_t;
 static task_t T[TMAX]; static int tn, tcur = -1;
+static float me_kneel;   /* the player's kneel_hold phase, in a kneeling minigame */
+/* someone resting kneeling at work or sitting (their base clip): a task keeps them down, they only look up */
+static bool busy_pose(int who) {
+  const char *b = who >= 0 ? A[canon(who)].base : NULL;   /* an extra (a walk in) rests standing */
+  return b && (!strncmp(b, "Sitting", 7) || strstr(b, "Kneeling"));
+}
+static bool task_talk(int *partner) { *partner = tcur >= 0 && T[tcur].who >= 0 ? canon(T[tcur].who) : -1; return tcur >= 0; }
 static enum { TP_NONE, TP_PRE, TP_PLAY, TP_POST } tphase;
 /* walk in visitors for tasks with nobody named */
 #define NVIS 3
@@ -982,7 +1000,7 @@ static void reward(const sc_task *k, int quality) {
     if (quality < 2 && s == 1) continue;      /* a slow greeting earns the first stat only */
     if (quality < 1) continue;
     U->stats[k->stat[s]] += k->stat_n[s];
-    const char *nm = k->stat[s] == ST_TRUST ? "TRUST" : k->stat[s] == ST_SAFETY ? "SAFETY" : k->stat[s] == ST_VIBE ? "VIBE" : k->stat[s] == ST_DUES ? "DUES" : k->stat[s] == ST_ENERGY ? "ENERGY" : NULL;
+    const char *nm = story_stat_name(k->stat[s]);
     if (!nm) continue;
     if (!shown) { U->toast = nm; U->toast_n = k->stat_n[s]; U->toast2 = NULL; U->toast_t = 2.6f; }
     else { U->toast2 = nm; U->toast2_n = k->stat_n[s]; }
@@ -998,7 +1016,8 @@ static void task_finish(int i, int quality) {
   actor_t *a = task_actor(i);
   if (a && actor_is_visible(a)) {
     actor_expr_set(a, quality > 0 ? EX_JOY : EX_SORROW, quality > 0 ? .9f : .5f);
-    actor_play(a, quality > 0 ? "Yes" : "Idle_FoldArms_Loop", 1, quality <= 0, .2f);
+    /* a nod, or folded arms; somebody kneeling at work or sitting stays down and only looks up */
+    if (!busy_pose(T[i].who)) actor_play(a, quality > 0 ? "Yes" : "Idle_FoldArms_Loop", 1, quality <= 0, .2f);
     actor_look(a, actor_head_pos(actor_of(W_ME)), .8f);
     T[i].look_t = 2.2f;
   }
@@ -1042,6 +1061,7 @@ static void mg_setup(int i) {
     /* the player steps up to it and gets to work; the camera settles behind */
     player_teleport(T[i].at, T[i].at_yaw);
     bool low = U->mg == MG_MASH || U->mg == MG_STICK;
+    me_kneel = 0;
     actor_play(me, low ? "Fixing_Kneeling" : "Interact", U->mg == MG_MASH ? 1.4f : 1, true, .25f);
     if (U->mg == MG_SIGNIN) { actor_t *a = task_actor(i); if (a) actor_look(a, actor_head_pos(me), .8f); }
   }
@@ -1136,9 +1156,24 @@ static void task_use(int i) {
     v3 tg = v3_add(T[i].to, v3_add(v3_scale(fwd_of(T[i].to_yaw), .9f), v3_(0, 1.05f, 0)));
     if (a) { walk_t *w = task_walk(i); if (w) w->on = false; actor_look(a, tg, 1); actor_play(a, "Idle_Loop", 1, true, .2f); }
   } else if (a && actor_is_visible(a)) {
-    v3 d = v3_sub(actor_pos(a), player_pos());
-    player_teleport(player_pos(), atan2f(d.x, d.z));
-    actor_move(a, actor_pos(a), atan2f(-d.x, -d.z));
+    /* face each other at talking distance: step back out of someone you walked right up to. Somebody kneeling
+     * at work or sitting stays as they are, hands on the job, and looks up */
+    v3 ap = actor_pos(a), pp = player_pos(), d = v3_sub(ap, pp); d.y = 0;
+    float l = v3_len(d);
+    /* someone kneeling or sitting is shot from low and to the side: standing 1.1 m off, the player's own body
+     * is between every lens and their head, so they get more room */
+    const float GAP = busy_pose(T[i].who) ? 1.6f : 1.1f;
+    if (l < GAP) {
+      v3 dir = l > .05f ? v3_scale(d, 1 / l) : fwd_of(player_yaw());
+      for (int n = 0; n < 5; n++) {   /* straight back, then turned a little either way, onto clear floor */
+        float t = (n + 1) / 2 * .6f * (n & 1 ? 1 : -1), c = cosf(t), sn = sinf(t);
+        v3 r = v3_(dir.x * c - dir.z * sn, 0, dir.x * sn + dir.z * c), q = v3_sub(ap, v3_scale(r, GAP)); q.y = pp.y;
+        if (!world_in_lab(q) || nav_free(nav_ix(q.x), nav_ix(q.z))) { pp = q; d = v3_scale(r, GAP); break; }
+      }
+    }
+    player_teleport(pp, atan2f(d.x, d.z));
+    if (busy_pose(T[i].who)) actor_look(a, actor_head_pos(actor_of(W_ME)), .8f);
+    else actor_move(a, ap, atan2f(-d.x, -d.z));
   }
   if (k->start >= 0 && !T[i].talked) { T[i].talked = true; tphase = TP_PRE; call_beats(k->start); }
   else { tphase = TP_PLAY; mg_setup(i); }
@@ -1247,12 +1282,40 @@ static void bike_scene_tick(void) {
 }
 /* small props the story moves. gerald: Ines's line follower, a shoebox of a robot on two wheels: 1 sits still,
  * 2 drives a slow circle to its left (one motor wired backwards), 3 drives straight out and back. table: the fix-it
- * table, a folding table with a cloth, a lamp and a sign (1 stands) */
-enum { PROP_GERALD, PROP_TABLE, PROP_N };
+ * table, a folding table with a cloth, a lamp and a sign (1 stands). weld_table: the lab's welding table on its
+ * casters, the same model the back lot fight guards. van: Copper Cal's work van, the mark at its open back doors */
+enum { PROP_GERALD, PROP_TABLE, PROP_WELD, PROP_VAN, PROP_N };
 static struct { t3_object *o; int mode; v3 home; float yaw0, t; } PR[PROP_N];
 static t3_object *prop_build(int k) {
+  if (k == PROP_WELD) { t3_object *o = fight_weld_table_model(); o->visible = false; return o; }
   fxp_begin();
-  if (k == PROP_GERALD) {
+  if (k == PROP_VAN) {
+    /* a high roof cargo van along -z from its back doors at the origin: white, a copper stripe, dark glass */
+    const uint32_t body = 0xe8e6e0, trim = 0x2a2c30, glass = 0x26303a, copper = 0xb87333;
+    fxp_box(v3_(0, 1.27f, -1.95f), v3_(1.96f, 1.74f, 3.9f), body);           /* the cargo box */
+    fxp_box(v3_(0, 1.17f, -4.3f), v3_(1.96f, 1.54f, .8f), body);             /* the cab */
+    fxp_box(v3_(0, .77f, -5.0f), v3_(1.9f, .74f, .62f), body);               /* the hood */
+    fxp_box(v3_(0, 1.55f, -4.71f), v3_(1.7f, .62f, .04f), glass);            /* the windshield */
+    for (int s = -1; s <= 1; s += 2) {
+      fxp_box(v3_(s * .99f, 1.5f, -4.3f), v3_(.02f, .5f, .62f), glass);       /* the cab's side windows */
+      fxp_box(v3_(s * .99f, 1.3f, -1.95f), v3_(.02f, .16f, 3.7f), copper);    /* the stripe */
+      fxp_box(v3_(s * 1.0f, 1.12f, .46f), v3_(.05f, 1.5f, .88f), body);      /* a back door, swung open on its hinge */
+      fxp_box(v3_(s * 1.0f, 1.55f, .5f), v3_(.06f, .4f, .62f), glass);
+      fxp_box(v3_(s * .9f, .95f, -.02f), v3_(.14f, .3f, .05f), 0xc02a20);     /* a tail light */
+      fxp_box(v3_(s * 1.05f, 1.55f, -3.95f), v3_(.12f, .16f, .06f), trim);   /* a mirror */
+      for (int a = 0; a < 2; a++) {                                          /* the wheels, in their arches */
+        v3 w = v3_(s * .86f, .34f, a ? -4.15f : -.85f);
+        fxp_ring(w, v3_(1, 0, 0), .24f, .11f, 12, 0x18181c);
+        fxp_ring(w, v3_(1, 0, 0), .1f, .05f, 8, 0x9a9aa0);
+      }
+    }
+    fxp_box(v3_(0, 1.2f, -.03f), v3_(1.8f, 1.5f, .02f), 0x1a1a1e);          /* the dark inside, through the doors */
+    fxp_box(v3_(0, .44f, -.08f), v3_(1.42f, .06f, .1f), 0x6a6a70);           /* the floor's lip */
+    fxp_box(v3_(0, .32f, .04f), v3_(2.0f, .16f, .14f), trim);                /* the bumper */
+    fxp_box(v3_(0, .5f, -5.33f), v3_(2.0f, .2f, .12f), trim);                /* the front bumper */
+    fxp_box(v3_(0, .82f, -5.32f), v3_(1.2f, .22f, .04f), 0x4a4c52);          /* the grille */
+    fxp_layer(FXP_HALO); fxp_disc(v3_(0, .03f, -1.4f), 2.6f, 12, 0x30200c, 0); fxp_disc(v3_(0, .03f, -3.9f), 2.6f, 12, 0x30200c, 0);
+  } else if (k == PROP_GERALD) {
     fxp_box(v3_(0, .05f, 0), v3_(.16f, .06f, .2f), 0x3a6ea8u);              /* the chassis */
     fxp_box(v3_(0, .1f, -.02f), v3_(.12f, .04f, .1f), 0x2a8a4au);            /* the board on top */
     fxp_box(v3_(0, .13f, .07f), v3_(.07f, .035f, .03f), 0xd8d8d0u);          /* the eyes: an ultrasonic sensor */
@@ -1273,15 +1336,25 @@ static t3_object *prop_build(int k) {
   }
   t3_object *o = fxp_end(); o->visible = false; return o;
 }
-static void props_hide(void) { for (int k = 0; k < PROP_N; k++) if (PR[k].o) { PR[k].o->visible = false; PR[k].mode = 0; } }
+/* the van and the welding table are things you walk into, not through: a solid box while they stand */
+static void prop_solid(int k) {
+  bool on = PR[k].o && PR[k].o->visible; float yw = PR[k].yaw0; v3 h = PR[k].home;
+  if (k == PROP_VAN)        /* 2 m wide, from its back doors 5.45 m forward along its local -z; 2.15 m tall, but the box
+                             * reaches 2.4 so the lens treats it as a wall to come in front of, not a prop to climb over */
+    world_solid(0, on, v3_add(h, v3_(-2.62f * sinf(yw), 0, -2.62f * cosf(yw))), 1.0f, 2.75f, yw, 2.4f);
+  else if (k == PROP_WELD)
+    world_solid(1, on, h, .92f, .42f, yw, .95f);
+}
+static void props_hide(void) { for (int k = 0; k < PROP_N; k++) if (PR[k].o) { PR[k].o->visible = false; PR[k].mode = 0; prop_solid(k); } }
 static void prop_op(const sc_beat *b) {
-  int k = b->s && !strcmp(b->s, "table") ? PROP_TABLE : PROP_GERALD;
+  int k = !b->s ? PROP_GERALD : !strcmp(b->s, "table") ? PROP_TABLE : !strcmp(b->s, "weld_table") ? PROP_WELD : !strcmp(b->s, "van") ? PROP_VAN : PROP_GERALD;
   if (!PR[k].o) PR[k].o = prop_build(k);
-  if (b->i == 0) { PR[k].o->visible = false; PR[k].mode = 0; return; }
+  if (b->i == 0) { PR[k].o->visible = false; PR[k].mode = 0; prop_solid(k); return; }
   sc_mark m = b->mark; float y; bool hy;
   if (m.kind != MK_NONE) { PR[k].home = resolve(&m, &y, &hy); PR[k].yaw0 = hy ? y : 0; }
   PR[k].mode = b->i; PR[k].t = 0; PR[k].o->visible = true;
   t3_object_set_position(PR[k].o, PR[k].home.x, PR[k].home.y, PR[k].home.z); t3_object_set_rotation(PR[k].o, 0, PR[k].yaw0, 0);
+  prop_solid(k);
 }
 static void prop_tick(float dt) {
   for (int k = 0; k < PROP_N; k++) {
@@ -1306,7 +1379,7 @@ static void prop_tick(float dt) {
 }
 
 /* ---- the machine ---- */
-static const char *stat_name(int i) {
+const char *story_stat_name(int i) {
   switch (i) { case ST_TRUST: return "TRUST"; case ST_SAFETY: return "SAFETY"; case ST_VIBE: return "VIBE"; case ST_DUES: return "DUES"; case ST_ENERGY: return "ENERGY"; default: return NULL; }
 }
 static void step(void) {
@@ -1326,6 +1399,7 @@ static void step(void) {
         actor_t *a = actor_of(b->who); slot_t *s = &A[canon(b->who)];
         float y; bool hy; v3 p = resolve(&b->mark, &y, &hy);
         actor_visible(a, true); actor_hands_up(a, 0); actor_place(a, p, y); s->w.on = false; s->base = "Idle_Loop";
+        if (canon(b->who) == me_id) player_teleport(p, y);   /* the player is where the scene puts them: a later hand-off must not snap them back */
         actor_play(a, "Idle_Loop", 1, true, .1f);
         if (b->who2 >= 0) { actor_t *t = actor_of(b->who2); if (actor_is_visible(t)) face_now(b->who, b->who2); actor_look(a, actor_head_pos(t), .8f); }
         break;
@@ -1410,7 +1484,7 @@ static void step(void) {
       case OP_ROAM: {
         roam = b; roam_follow = b->who >= 0 ? canon(b->who) : -1;
         world_door_auto(true); door_forced = false;   /* a scene's DOOR(0) turned the automatic door off; free play needs it back */
-        if (b->f2 > 0) { hour_target = b->f2; }
+        if (b->f2 > 0) { hour_target = fmaxf(b->f2, hour_target); }   /* never back past the chapter card's hour */
         roam_h0 = hour_target; roam_t = 0;
         v3 p; float y;
         roam_has_place = place_of(b->s, &p, &y);
@@ -1470,7 +1544,7 @@ static void step(void) {
       case OP_FLAG: flags[b->flag] = true; break;
       case OP_ADD:
         STORY_UI.stats[b->i] += b->i2;
-        if (stat_name(b->i)) { STORY_UI.toast = stat_name(b->i); STORY_UI.toast_n = b->i2; STORY_UI.toast2 = NULL; STORY_UI.toast_t = 2.4f; }
+        if (story_stat_name(b->i)) { STORY_UI.toast = story_stat_name(b->i); STORY_UI.toast_n = b->i2; STORY_UI.toast2 = NULL; STORY_UI.toast_t = 2.4f; }
         break;
       case OP_CARD:
         STORY_UI.card = true; STORY_UI.card_title = b->s; STORY_UI.card_sub = b->s2; STORY_UI.card_t = 0; STORY_UI.card_dur = b->f;
@@ -1508,6 +1582,10 @@ static void step(void) {
         part_now = b->i;
         STORY_UI.stats[ST_ENERGY] = 5;   /* slept on it */
         hide_all(); tasks_end(); director_stop(); world_set_stage(STAGE_TOWN); world_door_auto(true);
+        /* memory: the last part's cast goes, weapons first; the night makes again whom it needs (preload_chapter) */
+        for (int w = 0; w < WHO_COUNT; w++) if (A[w].a && w != me_id) { weapon_equip(A[w].a, -1); actor_free(A[w].a); memset(&A[w], 0, sizeof A[w]); } /* memory */
+        occluders();   /* the director's list held the freed cast until the next cut: a street cameo cuts without refreshing it */ /* memory */
+        extras_reset(); street_reset(true);   /* street: a different evening. The extras are cast again, the strangers do not remember today (Moheeb and Luis do), and the talks are new */
         obj_buf[0] = 0; STORY_UI.objective = NULL;
         hour = hour_target = b->f; world_set_time(hour); STORY_UI.hour = hour;
         if (b->i >= 1 && b->i <= NIGHTS_MAX) {
@@ -1548,6 +1626,19 @@ static void step(void) {
   }
 }
 
+/* Fixing_Kneeling is a whole cycle: down onto a knee (to about 1 s), the work, and back up (from 4.2 s) in 5.2 s.
+ * Looped as it is, someone kneeling at a job stands up every five seconds. Whoever rests in it kneels down once,
+ * then the clip runs its working middle forward and back, which has no seam. *ph is the hold's phase (0 not yet) */
+#define KNEEL_IN 1.2f
+#define KNEEL_OUT 3.9f
+static void kneel_hold(actor_t *a, const char *clip, float *ph, float dt) {
+  if (!a || !clip || strcmp(clip, "Fixing_Kneeling")) { *ph = 0; return; }
+  float t = actor_clip_time(a);
+  if (*ph <= 0) { if (t < KNEEL_IN || t > KNEEL_OUT) return; *ph = 1e-4f + (t - KNEEL_IN); }
+  *ph += dt;
+  float span = KNEEL_OUT - KNEEL_IN, u = fmodf(*ph, 2 * span);
+  actor_clip_seek(a, KNEEL_IN + (u < span ? u : 2 * span - u));
+}
 static void update_actors(float dt) {
   for (int i = 0; i < WHO_COUNT; i++) {
     slot_t *s = &A[i];
@@ -1565,7 +1656,7 @@ static void update_actors(float dt) {
     /* lip sync: the line being said, or a bark or banter */
     if ((block == B_SAY && say_who == i) || (sub_who == i && STORY_UI.sub_t > 0 && voice_busy())) { float o, sh; voice_mouth(&o, &sh); actor_mouth(s->a, o, sh); }
     else actor_mouth(s->a, 0, 0);
-    if (!(STORY_UI.roam && is_player)) actor_update(s->a, dt);
+    if (!(STORY_UI.roam && is_player)) { kneel_hold(s->a, s->base, &s->kneel, dt); actor_update(s->a, dt); }
   }
 }
 
@@ -1580,6 +1671,7 @@ static void update_actors(float dt) {
 typedef struct {
   actor_t *a; float x, z, dir, speed; int role; walk_t w; float t;
   int type; bool alt, held; const char *clip;   /* the stranger they play (-1 a passer by), which look, in a talk, the clip they rest in */
+  float kneel;    /* kneel_hold's phase */
 } extra_t;
 static extra_t X[EXTRAS];
 static int extras_mode = -1, extras_zone = -1;
@@ -1759,6 +1851,7 @@ static void extras_update(float dt) {
       if (!near) continue;
     } else if (flat_dist(actor_pos(e->a), cp) > 60) continue;
     if (e->type >= 0 && flat_dist(actor_pos(e->a), pp) < STREET_NEAR) street_person(i, e->a, e->clip);
+    kneel_hold(e->a, e->clip, &e->kneel, dt);
     actor_update(e->a, dt);
   }
 }
@@ -1912,6 +2005,7 @@ static void roam_frame(float dt, const intent_t *in) {
   /* a minigame that holds the player still */
   if (tcur >= 0 && tphase == TP_PLAY && locked_mg(U->mg)) {
     int r = mg_run(dt, in);
+    kneel_hold(me, U->mg == MG_MASH || U->mg == MG_STICK ? "Fixing_Kneeling" : NULL, &me_kneel, dt);
     actor_update(me, dt);
     U->npin = 0;
     if (r > 0) { task_finish(tcur, 2); return; }
@@ -2104,7 +2198,7 @@ static void gear_frame(float dt, const intent_t *in) {
   bike_init(scene);
   actor_t *me = gear_me();
   v3 p = player_pos();
-  bool lab = world_in_lab(p), outdoors = world_get_stage() == STAGE_TOWN && !lab;
+  bool lab = world_in_lab(p), outdoors = world_get_stage() == STAGE_TOWN && !world_indoors(p);   /* the lab, or a room behind a door */
   if (!gear_was_roam) {
     gear_was_roam = true;
 #ifdef KH_GEAR_TEST
@@ -2222,10 +2316,15 @@ void story_update(float dt, const intent_t *in) {
           if (k->kind == TK_POINT) {
             player_teleport(v3_add(T[pick].to, v3_scale(fwd_of(T[pick].to_yaw), -2.6f)), T[pick].to_yaw);
             if (AUTO_STEP > 2 && point_wait != pick) { point_wait = pick; auto_log("task aims", k->name); goto auto_done; }
-          } else player_teleport(v3_add(task_point(pick), v3_(.8f, 0, .3f)), 0);
+          } else {
+            /* through the door, as a player would: a task at a counter inside a room enters the room (street) */
+            v3 q = task_point(pick); int r = street_room_of(q);
+            if (r >= 0 && interior_current() != r) { interior_enter(r); auto_log("enters", interior_id(r)); }
+            player_teleport(r >= 0 ? q : v3_add(q, v3_(.8f, 0, .3f)), 0);
+          }
           auto_log("task", k->name);
           task_use(pick);
-        } else if (gate_open() || !roam_has_place) { player_teleport(roam_pos, 0); fake.interact = true; auto_log("roam", roam->s); }
+        } else if (gate_open() || !roam_has_place) { if (interior_current() >= 0) interior_exit(); player_teleport(roam_pos, 0); fake.interact = true; auto_log("roam", roam->s); }
       }
       auto_done: ;
     }
@@ -2251,7 +2350,8 @@ void story_update(float dt, const intent_t *in) {
   U->dim = ds_damp(U->dim, dim_to, 3, dt);
   if (U->chapter) { U->ch_t += dt; if (U->ch_t > U->ch_dur) U->chapter = false; }
   if (U->card) { U->card_t += dt; if (U->card_t > U->card_dur) U->card = false; }
-  if (U->note_t > 0) { U->note_t -= dt; if (U->note_t <= 0) U->note = NULL; }
+  /* a note waits out a chapter card (the HUD shows it after the card, never over it) */
+  if (U->note_t > 0 && !U->chapter) { U->note_t -= dt; if (U->note_t <= 0) U->note = NULL; }
   if (U->toast_t > 0) U->toast_t -= dt;
   if (U->got_t > 0) U->got_t -= dt;
   if (U->sub_t > 0) { U->sub_t -= dt; if (U->sub_t <= 0) { U->sub_text = NULL; sub_who = -1; } }
@@ -2380,4 +2480,5 @@ int story_end_lines(const char **out, int cap) {
   return n;
 }
 bool story_more(void) { return block == B_EPILOGUE && pc < SCRIPT_COUNT && SCRIPT[pc].op != OP_END; }
+int story_part(void) { return part_now; }   /* street */
 bool story_flag(const char *n) { for (int i = 0; i < FLAG_COUNT; i++) if (!strcmp(FLAG_NAMES[i], n)) return flags[i]; return false; }   /* street */

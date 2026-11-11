@@ -81,7 +81,11 @@ bool world_train_bell(v3 *at);
 /* v1.1: cars in Main's through lanes (on by default). They wait short of the focus when it is on their half of
  * the road; a shot that frames people across the street can turn them off */
 void world_traffic(bool on);
+void world_train_hold(bool on);   /* the light rail on Main waits out of sight while on (a fight in town brings its own) */
 /* the crew's pickup parked down the alley behind the lab, its tailgate toward the back door (lab_truck_tailgate).
  * On by default; a scene that should not have it there turns it off */
 void world_crew_truck(bool on);
+/* up to four solid boxes a scene stands up and takes down (a van, a table): a footprint of half sizes hx by hz
+ * centred at 'at', turned by yaw, 'top' tall. Bodies, lenses and lines of sight stop at them while on */
+void world_solid(int slot, bool on, v3 at, float hx, float hz, float yaw, float top);
 #endif
