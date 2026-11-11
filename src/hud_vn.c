@@ -491,12 +491,12 @@ void hud_pause_draw(int sel, bool music) {
       cv_fill_hex(c, s ? ORANGE : 0x24242e, 1); cv_fill_rect(c, 0, 84 + i * 56, 470, 48);
       p_text(c, F_TYPE, 19, 0, CV_LEFT, rows[i], 18, 115 + i * 56, s ? INK : PAPER, 1);
     }
-    static const char *K[][2] = { {"Move", "WASD"}, {"Camera", "Mouse, arrows"}, {"Light attack", "Left click, J"}, {"Heavy attack", "Hold left click, K"},
-      {"Guard, parry", "Right click, L (tap to parry)"}, {"Dodge, sprint", "Shift tap; sprint hold Shift, Alt"}, {"Jump", "Space"}, {"Special", "Q, U"},
-      {"Lock on", "Middle click, Tab"}, {"Next target", "Wheel while locked on"}, {"Weapon", "1 to 5, wheel"}, {"Call a friend", "R"},
-      {"Talk, use", "E, F"}, {"Draw, sheathe", "G"}, {"Bike (outdoors)", "B"}, {"Skip scene", "Hold Enter"} };
-    static const char *P[] = {"Left stick", "Right stick", "X or RT", "Y", "LT (tap to parry)", "B; sprint L3 or full stick", "A", "RB", "LB or R3",
-      "Flick right stick", "D-pad left, right", "D-pad up", "X", "D-pad up", "D-pad down", "Hold START"};
+    static const char *K[][2] = { {"Move", "WASD"}, {"Camera", "Mouse, arrows"}, {"Light attack", "Left click"}, {"Heavy attack", "F"},
+      {"Guard, parry", "Right click (tap to parry)"}, {"Dodge, sprint", "Shift tap; hold Shift to sprint"}, {"Jump", "Space"}, {"Special", "Q"},
+      {"Lock on, switch", "Tab, middle click; wheel switches"}, {"Zoom", "Mouse wheel"}, {"Weapon", "1 to 5"}, {"Call a friend", "R"},
+      {"Talk, use", "E"}, {"Draw, sheathe", "G"}, {"Bike (outdoors)", "B"}, {"Skip scene", "Hold Enter"} };
+    static const char *P[] = {"Left stick", "Right stick", "X or RT", "Y", "LT (tap to parry)", "B; sprint L3 or full stick", "A", "RB", "LB or R3; flick right stick",
+      "LB in roams", "D-pad left, right", "D-pad up", "X", "D-pad up", "D-pad down", "Hold START"};
     enum { NK = sizeof K / sizeof K[0] };
     _Static_assert(sizeof P / sizeof P[0] == NK, "a pad row for every keyboard row");
     for (int i = 0; i < NK; i++) {

@@ -66,11 +66,14 @@ void bike_init(t3_scene *scene) {
   front_g = group_under(lean_g, v3_(0, 0, .42f));
   fxp_begin();
   for (int s = -1; s <= 1; s += 2) fxp_bar(v3_(s * .045f, .72f, .01f), v3_(s * .055f, BIKE_WHEEL_R, .1f), .026f, FRAME);
-  fxp_bar(v3_(0, .9f, -.04f), v3_(0, 1.0f, -.08f), .035f, DARK);           /* stem */
-  fxp_bar(v3_(-.3f, 1.0f, -.1f), v3_(.3f, 1.0f, -.1f), .03f, DARK);        /* bars */
-  fxp_bar(v3_(-.3f, 1.0f, -.1f), v3_(-.22f, 1.0f, -.1f), .045f, TYRE);     /* grips */
-  fxp_bar(v3_(.22f, 1.0f, -.1f), v3_(.3f, 1.0f, -.1f), .045f, TYRE);
-  fxp_cyl(v3_(.18f, 1.02f, -.1f), .03f, .028f, .022f, 8, 0xd8c040u);      /* the bell */
+  fxp_bar(v3_(0, .9f, -.04f), v3_(0, 1.02f, -.1f), .035f, DARK);          /* stem */
+  /* swept-back cruiser bars: out from the stem, then back toward the rider, so the grips sit within reach */
+  fxp_bar(v3_(-.2f, 1.02f, -.1f), v3_(.2f, 1.02f, -.1f), .03f, DARK);
+  for (int s = -1; s <= 1; s += 2) {
+    fxp_bar(v3_(s * .2f, 1.02f, -.1f), v3_(s * .25f, 1.03f, -.24f), .03f, DARK);
+    fxp_bar(v3_(s * .25f, 1.03f, -.24f), v3_(s * .25f, 1.03f, -.34f), .045f, TYRE);   /* grips */
+  }
+  fxp_cyl(v3_(.16f, 1.04f, -.1f), .03f, .028f, .022f, 8, 0xd8c040u);      /* the bell */
   fxp_layer(FXP_GLOW); fxp_box(v3_(0, .86f, .02f), v3_(.07f, .06f, .05f), 0xfff2c0u);   /* head lamp */
   part_under(front_g, v3_(0, 0, 0));
   fxp_begin(); wheel_parts(); wheel_f = part_under(front_g, v3_(0, BIKE_WHEEL_R, .1f));
@@ -102,4 +105,13 @@ void bike_pose(v3 p, float yaw, float lean, float steer, float wheel, float cran
   t3_object_set_rotation(wheel_f, wheel, 0, 0);
   t3_object_set_rotation(wheel_r, wheel, 0, 0);
   t3_object_set_rotation(crank_g, crank, 0, 0);
+}
+
+/* a grip's place in the world (side 0 right, 1 left), after bike_pose: where a rider's hand goes */
+v3 bike_grip(int side) {
+  if (!front_g) return v3_(0, 0, 0);
+  t3_object_update_world_matrix(front_g, true, false);
+  const float *m = front_g->matrix_world.e;
+  float x = side ? .25f : -.25f, y = 1.03f, z = -.29f;
+  return v3_(m[0] * x + m[4] * y + m[8] * z + m[12], m[1] * x + m[5] * y + m[9] * z + m[13], m[2] * x + m[6] * y + m[10] * z + m[14]);
 }

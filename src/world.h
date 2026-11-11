@@ -47,6 +47,7 @@ void world_subject(v3 p);
  * touches a wall, a prop or the ground (rays at its centre and its rim, then a sphere test in the lab).
  * Pick r so the sphere covers the near plane's corners. Returns a distance, 0..|to - from|. */
 float world_cam_clear(v3 from, v3 to, float r);
+float world_cam_clear_all(v3 from, v3 to, float r);   /* the same, furniture and shelves included */
 /* v1.1: the lab's seats, from the HSL-108 model's chairs, stools and sofa (i from 0 until it returns false):
  * the middle of the seat on the floor (pos.y is the seat's height), the yaw a sitter faces, and soft for the
  * sofa and the lounge chair */

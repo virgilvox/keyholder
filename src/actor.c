@@ -47,6 +47,7 @@ struct actor {
   bool spring_reset;
   /* hands up */
   t3_object *b_arm[4], *b_trunk[7];
+  v3 reach[2]; float reach_t, reach_w;   /* hand targets (right, left) in world space: actor_reach */
   float hands_t, hands_w;
 };
 
@@ -533,12 +534,63 @@ static void apply_hands(actor_t *a, float dt) {
   }
 }
 
+
+/* ---- reach: the hands onto two world points over whatever the clip plays (a bike's grips) ---- */
+void actor_reach(actor_t *a, v3 right, v3 left, float amount) { a->reach[0] = right; a->reach[1] = left; a->reach_t = amount; }
+static void qconj(float *o, const float *q) { o[0] = -q[0]; o[1] = -q[1]; o[2] = -q[2]; o[3] = q[3]; }
+static void qfrom_to(float *o, v3 u, v3 v) {   /* the shortest turn taking unit u onto unit v */
+  float d = v3_dot(u, v);
+  if (d < -.9999f) { qaxis(o, 0, 1, 0, DS_PI); return; }
+  v3 c = v3_cross(u, v);
+  o[0] = c.x; o[1] = c.y; o[2] = c.z; o[3] = 1 + d;
+  float l = sqrtf(o[0]*o[0] + o[1]*o[1] + o[2]*o[2] + o[3]*o[3]); for (int i = 0; i < 4; i++) o[i] /= l;
+}
+static v3 bpos(t3_object *b) { float p[3]; wpos(b, p); return v3_(p[0], p[1], p[2]); }
+/* turn bone b (in world space) by the rotation taking its child's direction onto want, blended by w */
+static void aim_bone(t3_object *b, t3_object *child_or_end, v3 from_pt, v3 want_pt, float w) {
+  v3 cur = v3_sub(bpos(child_or_end), from_pt), to = v3_sub(want_pt, from_pt);
+  if (v3_len(cur) < 1e-4f || v3_len(to) < 1e-4f) return;
+  float d[4], wq[4], nw[4], pq[4], pinv[4], loc[4];
+  qfrom_to(d, v3_norm(cur), v3_norm(to));
+  wquat(b, wq); qmul(nw, d, wq);
+  if (b->parent) wquat(b->parent, pq); else { pq[0] = pq[1] = pq[2] = 0; pq[3] = 1; }
+  qconj(pinv, pq); qmul(loc, pinv, nw);
+  t3_quat L = { loc[0], loc[1], loc[2], loc[3] };
+  t3_object_set_quaternion(b, t3_quat_slerp(b->quaternion, L, w));
+  t3_object_update_world_matrix(b, false, true);
+}
+static void apply_reach(actor_t *a, float dt) {
+  a->reach_w = ds_damp(a->reach_w, a->reach_t, 8, dt);
+  if (a->reach_w < .005f || !a->b_arm[0] || !a->b_arm[2] || !a->b_rhand || !a->b_lhand) return;
+  t3_object_update_world_matrix(a->root, true, true);
+  for (int s = 0; s < 2; s++) {
+    t3_object *up = a->b_arm[s * 2], *lo = a->b_arm[s * 2 + 1], *hand = s ? a->b_lhand : a->b_rhand;
+    v3 S = bpos(up), E = bpos(lo), H = bpos(hand), T = a->reach[s];
+    float L1 = v3_len(v3_sub(E, S)), L2 = v3_len(v3_sub(H, E));
+    v3 dv = v3_sub(T, S); float D = v3_len(dv);
+    if (D < 1e-3f) continue;
+    v3 dir = v3_scale(dv, 1 / D);
+    D = ds_clamp(D, fabsf(L1 - L2) + .01f, L1 + L2 - .002f);
+    T = v3_add(S, v3_scale(dir, D));
+    /* the elbow hangs down and a little out from the line shoulder to hand */
+    v3 out = v3_norm(v3_sub(S, bpos(a->b_chest ? a->b_chest : up)));
+    v3 pole = v3_add(v3_(0, -1, 0), v3_scale(out, .6f));
+    pole = v3_sub(pole, v3_scale(dir, v3_dot(pole, dir)));
+    if (v3_len(pole) < 1e-3f) pole = v3_(0, -1, 0); pole = v3_norm(pole);
+    float ax = (L1 * L1 - L2 * L2 + D * D) / (2 * D), h = sqrtf(fmaxf(0, L1 * L1 - ax * ax));
+    v3 elbow = v3_add(S, v3_add(v3_scale(dir, ax), v3_scale(pole, h)));
+    aim_bone(up, lo, S, elbow, a->reach_w);
+    aim_bone(lo, hand, bpos(lo), T, a->reach_w);
+  }
+}
+
 void actor_update(actor_t *a, float dt) {
   if (!a->gltf_scene || !a->root->visible) return;
   if (a->lod && a->lod->level_count == 3) { float k = lod_scale(); a->lod->levels[1].distance = LOD_NEAR * k; a->lod->levels[2].distance = LOD_FAR * k; }
   mixer_update(&a->mixer, dt);
   if (a->mixer.bound) {}
   apply_hands(a, dt);
+  apply_reach(a, dt);
   apply_look(a, dt);
   /* the face */
   a->blink_t -= dt;

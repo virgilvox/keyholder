@@ -12,7 +12,7 @@
 
 #define WALK_V 1.45f
 #define JOG_V 3.5f
-#define SPRINT_V 6.0f
+#define SPRINT_V 7.0f
 #define GRAVITY 16.f
 #define JUMP_V 5.6f
 #define RADIUS .3f
@@ -30,12 +30,12 @@ static bool cam_ok;
 
 /* v1.2: the bike and the roam swing */
 #define RIDE_V 8.5f        /* cruising: well past a sprint */
-#define RIDE_FAST_V 11.f   /* sprint held: standing on the pedals */
+#define RIDE_FAST_V 13.f   /* sprint held: standing on the pedals */
 #define RIDE_TURN_R 3.6f   /* the tightest turn at speed, metres: wider than on foot */
 #define RIDE_R .4f
 #define RIDER_HIP .47f     /* the sitting clip's hips over its feet: the rider's origin sits this far under the saddle */
-#define RIDER_BACK .06f    /* and this far forward of it */
-#define RIDER_PITCH .16f   /* leaning into the bars */
+#define RIDER_BACK -.09f   /* and this far along the bike from it (the driving clip's hips sit ahead of its origin) */
+#define RIDER_PITCH .22f   /* leaning into the bars */
 static bool riding;
 static float lean, steer, wheel_a, crank_a, tick_t, pedal_k;
 static v3 last_out; static float last_out_yaw;
@@ -68,7 +68,13 @@ static float cam_lift;   /* extra pitch while boxed in: the boom rises over the 
 static float arm_length(v3 pivot, v3 dir, float want) {
   return fmaxf(CAM_MIN, world_cam_clear(pivot, v3_add(pivot, v3_scale(dir, want)), CAM_R));
 }
-static float want_dist(void) { return world_in_lab(pos) ? 2.3f : 3.5f; }
+static float cam_zoom = 1;   /* the player's zoom: the wheel (or Tab, LB, R3 in steps) scales the arm */
+float player_cam_zoom(void) { return cam_zoom; }
+void player_zoom(int wheel, bool step) {
+  if (wheel) cam_zoom = ds_clamp(cam_zoom - wheel * .12f, .55f, 1.7f);
+  if (step) cam_zoom = cam_zoom < .8f ? 1.f : cam_zoom < 1.25f ? 1.45f : .65f;
+}
+static float want_dist(void) { return (world_in_lab(pos) ? 3.1f : 4.2f) * cam_zoom; }
 static v3 cam_dir_lift(float lift) {   /* from the pivot out to the camera, raised by lift */
   float pt = fminf(1.25f, cam_pitch + lift), cp = cosf(pt);
   return v3_(-sinf(cam_yaw) * cp, sinf(pt), -cosf(cam_yaw) * cp);
@@ -86,15 +92,28 @@ static void cam_apply(float dt, bool snap) {
     float best = arm0;
     for (int k = 1; k <= 3; k++) { float a = arm_length(pivot, cam_dir_lift(k * .3f), want); if (a > best + .35f) { best = a; lift_to = k * .3f; } }
   }
+  /* shelving and furniture never pull the lens in (only walls do): when they stand between the lens and
+   * the player, the boom rises over them and looks down, the way a crowded room is shot from above */
+  float need = 0; bool over = true;
+  for (int k = 0; k <= 4; k++) {
+    float lf = fmaxf(lift_to, k * .22f); v3 dk = cam_dir_lift(lf);
+    float a = arm_length(pivot, dk, want);
+    float c = world_cam_clear_all(pivot, v3_add(pivot, v3_scale(dk, a)), CAM_R * .5f);
+    if (c >= a - .25f) { need = lf; over = true; break; }
+    over = false;
+  }
+  if (over) lift_to = fmaxf(lift_to, need); else lift_to = fmaxf(lift_to, .66f);
   cam_lift = snap ? lift_to : ds_damp(cam_lift, lift_to, lift_to > cam_lift ? 8.f : 2.f, dt);
   /* a corridor or a corner: when the player is not turning the camera, it swings gently toward the
    * nearest open direction (whiskers either side), so it does not sit against a wall behind the head */
-  if (!snap && arm0 < want * .5f && idle_look > .4f) {
+  float all0 = fmaxf(CAM_MIN, world_cam_clear_all(pivot, v3_add(pivot, v3_scale(cam_dir_lift(0), arm0)), CAM_R * .5f));
+  if (!snap && all0 < want * .5f && idle_look > .4f) {
     static const float OFF[6] = {.35f, -.35f, .7f, -.7f, 1.05f, -1.05f};
     float keep = cam_yaw;
+    arm0 = all0;
     for (int k = 0; k < 6; k++) {
       cam_yaw = keep + OFF[k];
-      float a = arm_length(pivot, cam_dir_lift(0), want);
+      float a = fmaxf(CAM_MIN, world_cam_clear_all(pivot, v3_add(pivot, v3_scale(cam_dir_lift(0), want)), CAM_R * .5f));
       if (a > fmaxf(arm0 + .6f, want * .7f)) { keep += OFF[k] * (1 - expf(-1.6f * dt)); break; }
     }
     cam_yaw = keep;
@@ -106,6 +125,12 @@ static void cam_apply(float dt, bool snap) {
   if (snap || arm < cam_dist) { cam_dist = arm; cam_hold = 0; }
   else { cam_hold += dt; if (cam_hold > .3f) cam_dist = ds_damp(cam_dist, arm, 2.6f, dt); }
   v3 p = v3_add(pivot, v3_scale(d, cam_dist));
+  /* indoors the boom stays under the ceiling (3 m): risen and zoomed out, it shortens instead of
+   * climbing into the dark above the walls */
+  if (world_in_lab(pos)) { float top = pos.y + 2.6f; if (p.y > top && p.y - pivot.y > 1e-3f) p = v3_add(pivot, v3_scale(v3_sub(p, pivot), (top - pivot.y) / (p.y - pivot.y))); }
+  /* last resort: still behind a shelf after rising, come in to the near side of it */
+  { v3 dd = v3_sub(p, pivot); float l = v3_len(dd);
+    if (l > 1e-3f) { float c = world_cam_clear_all(pivot, p, CAM_R * .5f); if (c < l - .05f) p = v3_add(pivot, v3_scale(dd, fmaxf(CAM_MIN, c) / l)); } }
   /* pressed against a wall: rise well over the head and look down past it, not into the hair (the lab's
    * ceiling is 3 m up: there is room above even where there is none behind) */
   if (cam_dist < 1.3f) p.y += (1.3f - cam_dist) * 1.2f;
@@ -156,6 +181,7 @@ bool player_riding(void) { return riding; }
 static void ride_drop(void) {
   if (!riding) { swing_t = 0; swing_queue = 0; if (A) weapon_trail(A, false); return; }
   riding = false;
+  if (A) actor_reach(A, pos, pos, 0);
   t3_object *r = actor_root(); if (r) t3_object_set_rotation(r, 0, yaw, 0);
   if (bike_shown()) park(bike_pos(), bike_yaw());
 }
@@ -171,7 +197,7 @@ void player_ride(bool on) {
     bike_pose(pos, yaw, 0, 0, wheel_a, crank_a); bike_show(true);
     fx_dust(pos, .6f, 6);
     sfx(SFX_BIKE_BELL, 0, .55f);
-    actor_play(A, "Sitting_Idle_Loop", 1, true, .15f);
+    actor_play(A, "Driving_Loop", 1, true, .15f);
   } else {
     /* off to the left of it, and leave it parked where it stands */
     v3 at = bike_shown() ? bike_pos() : pos;
@@ -243,7 +269,7 @@ static void ride_step(float dt, const intent_t *in, v3 wish, float mag) {
   /* the door: off at the threshold, the bike stays outside */
   if (world_in_lab(pos)) {
     if (A) actor_play(A, "Idle_Loop", 1, true, .2f);
-    riding = false;
+    riding = false; actor_reach(A, pos, pos, 0);
     park(last_out, last_out_yaw);
     t3_object *r = actor_root(); if (r) t3_object_set_rotation(r, 0, yaw, 0);
     speed = fminf(speed, 1.5f);
@@ -263,9 +289,10 @@ static void ride_step(float dt, const intent_t *in, v3 wish, float mag) {
   float oy = BIKE_SEAT_Y - RIDER_HIP + .012f * pedal_k * sinf(crank_a * 2), oz = BIKE_SEAT_Z + RIDER_BACK;
   float sx = sinf(lean) * oy, sy = cosf(lean) * oy;
   v3 rp = v3_(pos.x + sx * cosf(yaw) + oz * sinf(yaw), pos.y + sy, pos.z - sx * sinf(yaw) + oz * cosf(yaw));
-  actor_play(A, "Sitting_Idle_Loop", 1, true, .15f);
+  actor_play(A, "Driving_Loop", 1, true, .15f);
   actor_move(A, rp, yaw);
   actor_set_floor(A, pos.y);
+  actor_reach(A, bike_grip(0), bike_grip(1), 1);
   t3_object *r = actor_root();
   if (r) { r->rotation.order = T3_YXZ; t3_object_set_rotation(r, RIDER_PITCH + .04f * pedal_k, yaw, -lean); }
 }
@@ -277,6 +304,7 @@ void player_update(float dt, const intent_t *in) {
   cam_yaw -= in->ax * 2.5f * dt;
   cam_pitch = ds_clamp(cam_pitch - in->ay * 1.5f * dt, -.38f, 1.0f);
   idle_look = look > .05f ? 0 : idle_look + dt;
+  player_zoom(in->wheel, in->lock);
 
   /* stick relative to the camera */
   float mag = fminf(1, sqrtf(in->mx * in->mx + in->my * in->my));

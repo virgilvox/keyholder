@@ -1655,7 +1655,7 @@ static void gear_frame(float dt, const intent_t *in) {
     if ((outdoors && held < 45) || (nroam == 1 && held < 25)) auto_t = 0; }
 #endif
   bool busy = tcur >= 0 || (U->mg && U->mg != MG_GREET && U->mg != MG_POINT);
-  /* which weapon: the one the story last drew, else the first owned; 1 to 5, Q, the d-pad or the wheel change it */
+  /* which weapon: the one the story last drew, else the first owned; 1 to 5 or the d-pad change it (the wheel zooms) */
   if (weapons && (gear_wp < 0 || !(weapons & (1u << gear_wp)))) {
     int sw = A[canon(W_ME)].weapon;
     gear_wp = sw >= 0 && (weapons & (1u << sw)) ? sw : gear_lowest();
@@ -1663,7 +1663,7 @@ static void gear_frame(float dt, const intent_t *in) {
   if (!weapons) gear_wp = -1;
   if (gear_wp >= 0 && !busy) {
     int pick = in->weapon_pick >= 0 && (weapons & (1u << in->weapon_pick)) ? in->weapon_pick : -1;
-    int step = in->weapon_step ? in->weapon_step : -in->wheel;
+    int step = in->weapon_step;
     if (pick < 0 && step) for (int k = 1; k <= WP_COUNT; k++) { int w = ((gear_wp + step * k) % WP_COUNT + WP_COUNT) % WP_COUNT; if (weapons & (1u << w)) { pick = w; break; } }
     if (pick >= 0 && pick != gear_wp) { gear_wp = pick; if (gear_drawn()) gear_draw(gear_wp); else sfx(SFX_WEAPON, 0, .5f); }
   }

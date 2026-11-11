@@ -5,7 +5,7 @@ export const CAST = {
   vee:    { name: 'Vee', model: 'C', voice: 'af_heart', speed: 1.06, scale: 1.0, color: 0xf2ab1e, pal: NONE },
   dex:    { name: 'Dex', model: 'D', voice: 'am_michael', speed: 1.05, scale: 1.0, color: 0x6cb4ee, pal: NONE },
   ruth:   { name: 'Ruth', model: 'B', voice: 'bf_emma', speed: 1.02, scale: 1.0, color: 0xf07a52, pal: NONE },
-  sam:    { name: 'Sam', model: 'Q', voice: 'af_bella', speed: 1.02, scale: 0.98, color: 0x9bd46e, pal: NONE },
+  sam:    { name: 'Sam', model: 'S', voice: 'af_bella', speed: 1.02, scale: 0.98, color: 0x9bd46e, pal: NONE },
   kai:    { name: 'Kai', model: 'F', voice: 'am_puck', speed: 1.05, scale: 0.97, color: 0xc9a0ff, pal: NONE },
   morgan: { name: 'Morgan', model: 'T', voice: 'af_kore', speed: 1.02, scale: 1.0, color: 0x5fd3c8,
             pal: NONE },

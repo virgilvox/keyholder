@@ -774,7 +774,7 @@ static void player_think(fighter_t *P, const intent_t *in, float dt) {
   if (P->buf_t > 0) { P->buf_t -= dt; if (P->buf_t <= 0) P->buf = 0; }
   if (in->weapon_pick >= 0) player_weapon(in->weapon_pick);
   /* the mouse wheel cycles weapons when nothing is locked on (locked on, it picks the target) */
-  int step = in->weapon_step ? in->weapon_step : FG.lock < 0 ? -in->wheel : 0;
+  int step = in->weapon_step ? in->weapon_step : 0;
   if (step) {
     for (int k = 1; k <= WP_COUNT; k++) {
       int w = ((P->wp + step * k) % WP_COUNT + WP_COUNT) % WP_COUNT;
@@ -1567,7 +1567,8 @@ static void cam_update(const intent_t *in, float rdt) {
   v3 pivot = v3_(P->pos.x, P->pos.y + 1.3f, P->pos.z), pos, look;
   float tfov = 46, rate = 7;
   bool in_lab = world_in_lab(P->pos);
-  float base = in_lab ? 2.9f : 3.6f;
+  if (FG.lock < 0 && in->wheel) player_zoom(in->wheel, false);
+  float base = (in_lab ? 2.9f : 3.6f) * player_cam_zoom();
   fighter_t *T = FG.lock >= 0 ? &FG.foe[FG.lock] : NULL;
 
   if (FG.cine_t >= 0) {

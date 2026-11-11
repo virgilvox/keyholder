@@ -12,6 +12,7 @@ bool bike_shown(void);
  * front wheel's steer, and the wheels' and the cranks' turned angles in radians */
 void bike_pose(v3 pos, float yaw, float lean, float steer, float wheel, float crank);
 v3 bike_pos(void);
+v3 bike_grip(int side);              /* a grip in the world (0 right, 1 left), after bike_pose */
 float bike_yaw(void);
 /* the saddle's and the pedal's places in the bike's frame, for seating a rider */
 #define BIKE_SEAT_Y .9f

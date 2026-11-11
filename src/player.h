@@ -12,6 +12,8 @@ void player_set_actor(actor_t *a);
 actor_t *player_actor(void);
 void player_teleport(v3 pos, float yaw);
 void player_update(float dt, const intent_t *in);  /* moves the actor and the camera */
+float player_cam_zoom(void);                      /* 1 is the default arm */
+void player_zoom(int wheel, bool step);            /* wheel notches, or a step through near, mid, far */
 void player_camera_snap(void);                     /* put the camera behind the player now */
 void player_camera_from(v3 cam_pos);               /* continue from where the camera stands (a fight handing it back) */
 v3 player_pos(void);

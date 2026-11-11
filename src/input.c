@@ -12,9 +12,7 @@ static wc_pad_t pcur[4], pprev[4];
 static intent_t I;
 static int nav_ox, nav_oy;
 static bool last_pad, seen[4], flagged[4], guard_was;
-#define HOLD_FRAMES 17    /* about .28 s at 60 fps: a held left click is a heavy */
 #define MOUSE_GAIN 1.5f   /* a captured mouse turns the camera faster than a full stick can */
-static int lmb_frames; static bool lmb_charged;
 
 #define DOWN(k, c) (((k)[(c) >> 3] >> ((c) & 7)) & 1)
 bool input_key_down(int c) { return c > 0 && c < 256 && DOWN(kcur, c); }
@@ -44,16 +42,12 @@ void input_frame(const wc_pad_t *pads, const uint8_t *keys) {
   o->my = (float)DOWN(kcur, WC_KEY_W) - (float)DOWN(kcur, WC_KEY_S);
   o->ax = (float)DOWN(kcur, WC_KEY_RIGHT) - (float)DOWN(kcur, WC_KEY_LEFT);
   o->ay = (float)DOWN(kcur, WC_KEY_UP) - (float)DOWN(kcur, WC_KEY_DOWN);
-  /* the left button: a tap is a light attack on release; held past HOLD_FRAMES it becomes the heavy
-   * (and stays held, so the staff charges while it is down), the way PC action games charge an attack */
-  bool lmb = DOWN(kcur, KEY_MOUSE_L), lmb_was = DOWN(kprev, KEY_MOUSE_L), lmb_light = false, lmb_heavy = false;
-  if (lmb) {
-    if (!lmb_was) { lmb_frames = 0; lmb_charged = false; }
-    if (++lmb_frames == HOLD_FRAMES) { lmb_heavy = true; lmb_charged = true; }
-  } else if (lmb_was && !lmb_charged) lmb_light = true;
-  o->light = kp(WC_KEY_J) || kp(WC_KEY_LCTRL) || lmb_light;
-  o->light_held = DOWN(kcur, WC_KEY_J) || DOWN(kcur, WC_KEY_LCTRL) || (lmb && !lmb_charged);
-  o->heavy = kp(WC_KEY_K) || lmb_heavy; o->heavy_held = DOWN(kcur, WC_KEY_K) || (lmb && lmb_charged);
+  /* PC action layout (Sekiro, Genshin, Wuthering Waves): the mouse attacks and guards, everything else sits
+   * under the left hand around WASD. Left click fires on the press, with no hold to wait out. */
+  bool lmb = DOWN(kcur, KEY_MOUSE_L);
+  o->light = kp(WC_KEY_J) || kp(WC_KEY_LCTRL) || kp(KEY_MOUSE_L);
+  o->light_held = DOWN(kcur, WC_KEY_J) || DOWN(kcur, WC_KEY_LCTRL) || lmb;
+  o->heavy = kp(WC_KEY_F) || kp(WC_KEY_K); o->heavy_held = DOWN(kcur, WC_KEY_F) || DOWN(kcur, WC_KEY_K);
   o->guard = DOWN(kcur, WC_KEY_L) || DOWN(kcur, KEY_MOUSE_R);
   o->jump = kp(WC_KEY_SPACE); o->jump_held = DOWN(kcur, WC_KEY_SPACE);
   o->dodge = kp(KEY_LSHIFT) || kp(KEY_RSHIFT);
@@ -61,7 +55,7 @@ void input_frame(const wc_pad_t *pads, const uint8_t *keys) {
   o->lock = kp(WC_KEY_TAB) || kp(KEY_MOUSE_M);
   o->wheel = kp(KEY_WHEEL_UP) ? 1 : kp(KEY_WHEEL_DOWN) ? -1 : 0;
   for (int k = 0; k < 5; k++) if (kp(WC_KEY_1 + k)) o->weapon_pick = k;
-  o->interact = kp(WC_KEY_E) || kp(WC_KEY_F);
+  o->interact = kp(WC_KEY_E);
   o->assist = kp(WC_KEY_R);
   o->draw = kp(WC_KEY_G);
   o->bike = kp(WC_KEY_B);

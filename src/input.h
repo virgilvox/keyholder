@@ -3,18 +3,19 @@
  *                       Pad                Keyboard and mouse (web page)
  *   move                left stick         WASD
  *   camera              right stick        mouse (pointer lock), arrows
- *   light attack        X, RT              left click (tap), J, Left Ctrl
- *   heavy attack        Y                  hold left click, K
+ *   light attack        X, RT              left click (fires on the press), J, Left Ctrl
+ *   heavy attack        Y                  F, K
  *   guard (held)        LT                 right click, L          (a tap as a blow lands parries)
  *   dodge               B                  Shift (tap)
  *   sprint (held)       L3, or stick full  Shift (held), Left Alt
  *   jump                A                  Space
  *   special             RB                 Q, U
- *   lock on (toggle)    LB, R3             middle click, Tab
+ *   lock on (toggle)    LB, R3             Tab, middle click       (in roams: a step through three zooms)
  *   switch target       right stick flick  mouse wheel while locked on
- *   weapon              d-pad left/right   1 to 5, mouse wheel when not locked on
+ *   zoom                LB, R3 in roams    mouse wheel (when not locked on)
+ *   weapon              d-pad left/right   1 to 5
  *   assist (call ally)  d-pad up           R
- *   talk, use           X                  E, F
+ *   talk, use           X                  E
  *   draw, sheathe       d-pad up (roam)    G
  *   bike (outdoors)     d-pad down (roam)  B
  *   pause               START              Esc, P
@@ -53,7 +54,7 @@ typedef struct {
   bool ok, back;
   bool used_pad;           /* the last thing touched was a pad */
   /* v1.2 */
-  int wheel;               /* mouse wheel this frame: +1 up, -1 down (fight: targets when locked, else weapons) */
+  int wheel;               /* mouse wheel this frame: +1 up, -1 down (locked on: targets, else the camera zoom) */
   bool mouse_look;         /* the camera rate comes from a captured mouse, not a stick */
   bool draw;               /* pressed: draw or sheathe the weapon (roam) */
   bool bike;               /* pressed: summon or leave the bike (roam, outdoors) */

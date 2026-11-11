@@ -170,7 +170,7 @@ const CLIPS = `Idle_Loop Idle_Talking_Loop Idle_FoldArms_Loop Idle_No_Loop Idle_
  Hit_Chest Hit_Head Hit_Knockback Death01 LayToIdle Sword_Idle Sword_Regular_A Sword_Regular_A_Rec Sword_Regular_B Sword_Regular_B_Rec
  Sword_Regular_C Sword_Regular_Combo Sword_Heavy_Combo Sword_Dash Sword_Block Sword_Attack Idle_Shield_Loop Shield_Dash Shield_OneShot Idle_Shield_Break
  Spell_Simple_Enter Spell_Simple_Idle_Loop Spell_Simple_Shoot Spell_Simple_Exit Punch_Jab Punch_Cross Melee_Hook Melee_Hook_Rec OverhandThrow
- Sitting_Enter Sitting_Exit Sitting_Idle_Loop Sitting_Talking_Loop Interact Fixing_Kneeling PickUp_Table Walk_Carry_Loop Yes Dance_Loop Consume
+ Sitting_Enter Sitting_Exit Sitting_Idle_Loop Sitting_Talking_Loop Driving_Loop Interact Fixing_Kneeling PickUp_Table Walk_Carry_Loop Yes Dance_Loop Consume
  Crouch_Idle_Loop Crouch_Fwd_Loop Zombie_Idle_Loop Zombie_Walk_Fwd_Loop Zombie_Scratch Push_Loop Chest_Open`.split(/\s+/);
 
 function readGlb(path) {

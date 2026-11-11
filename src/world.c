@@ -16,6 +16,12 @@
 #define LGZ 24
 typedef struct { v3 a, b, c, n; float ymin, ymax; } tri_t;
 static tri_t *tris; static int ntri;
+/* the camera probe: world_cam_clear sees only the building (walls and the ceiling, which run past
+ * CAM_PROP_TOP); furniture and shelving below it never pull the lens in. world_cam_clear_all sees
+ * everything, for the follow camera to rise over shelves instead. */
+static bool cam_probe;
+#define CAM_PROP_TOP 2.3f
+
 static int *cell_start, *cell_list;
 static uint32_t *stamp, stamp_now;
 static t3_scene *SC;
@@ -495,6 +501,7 @@ static bool lab_push_sphere(v3 *c, float r, v3 *normal) {
       if (stamp[i] == stamp_now) continue;
       stamp[i] = stamp_now;
       const tri_t *t = &tris[i];
+      if (cam_probe && t->ymax < CAM_PROP_TOP) continue;
       if (c->y + r < t->ymin || c->y - r > t->ymax) continue;
       v3 q = closest_on_tri(*c, t), d = v3_sub(*c, q);
       float l2 = v3_dot(d, d);
@@ -550,6 +557,7 @@ static bool lab_raycast(v3 o, v3 d, float max_dist, float *t_out, v3 *normal) {
       int i = cell_list[k];
       if (stamp[i] == stamp_now) continue;
       stamp[i] = stamp_now;
+      if (cam_probe && tris[i].ymax < CAM_PROP_TOP) continue;
       float tt;
       if (ray_tri(o, d, &tris[i], &tt) && tt < best) { best = tt; best_i = i; }
     }
@@ -581,7 +589,10 @@ bool world_visible(v3 a, v3 b) {
   if (l < 1e-4f) return true;
   return !world_raycast(a, v3_scale(d, 1 / l), l - 0.05f, &t, NULL);
 }
-float world_cam_clear(v3 from, v3 to, float r) {
+static float cam_clear(v3 from, v3 to, float r);
+float world_cam_clear(v3 from, v3 to, float r) { cam_probe = true; float c = cam_clear(from, to, r); cam_probe = false; return c; }
+float world_cam_clear_all(v3 from, v3 to, float r) { return cam_clear(from, to, r); }
+static float cam_clear(v3 from, v3 to, float r) {
   v3 d = v3_sub(to, from); float len = v3_len(d);
   if (len < 1e-4f) return 0;
   d = v3_scale(d, 1 / len);

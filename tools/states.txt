@@ -25,3 +25,4 @@ lambert+l1001
 lambert+map+skin+atest+ds+l1001
 lambert+map+skin+morph+atest+ds+l1001
 basic+skin
+lambert+vcol+ds+l1001

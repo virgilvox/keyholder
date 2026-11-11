@@ -10,18 +10,19 @@ A PS2-style action visual novel for the HeatSync Labs game station (wasmcart, Ba
 |---|---|---|
 | Move | left stick | WASD |
 | Camera | right stick | mouse, arrows |
-| Talk, use | X | E, F |
+| Talk, use | X | E |
 | Pick, advance | A | Enter, Space, left click |
-| Light attack | X, RT | left click, J, Left Ctrl |
-| Heavy attack | Y | hold left click, K |
-| Guard, tap to parry | LT | right click, L |
+| Light attack | X, RT | left click |
+| Heavy attack | Y | F |
+| Guard, tap to parry | LT | right click |
 | Dodge | B | Shift (tap) |
 | Sprint | L3, or the stick pushed all the way | Shift (hold), Left Alt |
 | Jump | A | Space |
-| Special (meter full) | RB | Q, U |
-| Lock on | LB, R3 | middle click, Tab |
+| Special (meter full) | RB | Q |
+| Lock on | LB, R3 | Tab, middle click |
 | Next target (locked on) | flick the right stick | mouse wheel |
-| Weapon | d-pad left, right | 1 to 5, mouse wheel (not locked on) |
+| Camera zoom | LB or R3 in roams (three steps) | mouse wheel (not locked on) |
+| Weapon | d-pad left, right | 1 to 5 |
 | Call a friend (Trust high) | d-pad up | R |
 | Draw or sheathe (walking) | d-pad up | G |
 | Bike (outdoors, once found) | d-pad down | B |

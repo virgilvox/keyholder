@@ -92,5 +92,7 @@ void actor_set_floor(actor_t *a, float floor_y);
 void actor_repalette(actor_t *a, const actor_palette *pal);
 /* both forearms up, open handed, over whatever clip plays: 0..1, eases (a beaten fighter yielding) */
 void actor_hands_up(actor_t *a, float amount);
+/* both hands onto world points (right, left) over the clip, the arms bent to reach: 0..1, eases (the bike's grips) */
+void actor_reach(actor_t *a, v3 right, v3 left, float amount);
 
 #endif
