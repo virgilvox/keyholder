@@ -17,6 +17,8 @@
 // script.json entries, frame ranges inclusive:
 //   { "from": 0, "to": 30, "pad": 0, "buttons": ["A"], "lx": 0, "ly": -32767, "rx": 0, "ry": 0, "lt": 0, "rt": 32767 }
 //   { "from": 10, "to": 12, "keys": ["Enter", "KeyQ", "ArrowDown", "ShiftLeft"] }   keyboard (held over the range)
+//     the mouse as the web page sends it: "MouseLeft" "MouseRight" "MouseMiddle" "WheelUp" "WheelDown",
+//     "MouseLook" (held while captured: pad 0's right stick is then the mouse)
 //   { "from": 300, "to": 400, "pad": 1, "connected": false }   that pad unplugged over the range
 // sticks are -32767..32767 (y positive is down), triggers 0..32767.
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -89,7 +91,9 @@ if (station) {
 }
 const KEYC = { Enter: 0x28, Escape: 0x29, Backspace: 0x2a, Tab: 0x2b, Space: 0x2c, Minus: 0x2d, Quote: 0x34, Comma: 0x36,
   Period: 0x37, Slash: 0x38, ArrowRight: 0x4f, ArrowLeft: 0x50, ArrowDown: 0x51, ArrowUp: 0x52,
-  ShiftLeft: 0xe1, ShiftRight: 0xe5 };
+  ShiftLeft: 0xe1, ShiftRight: 0xe5, AltLeft: 0xe2, ControlLeft: 0xe0,
+  // the web page's mouse, as src/input.h's KEY_MOUSE_* codes
+  MouseLeft: 0xf0, MouseRight: 0xf1, MouseMiddle: 0xf2, WheelUp: 0xf3, WheelDown: 0xf4, MouseLook: 0xf5 };
 const keyCode = (k) => KEYC[k] ?? (/^Key[A-Z]$/.test(k) ? 0x04 + k.charCodeAt(3) - 65 : /^Digit[1-9]$/.test(k) ? 0x1e + +k[5] - 1 : k === 'Digit0' ? 0x27 : null);
 let heldKeys = new Set();
 const audioChunks = [];

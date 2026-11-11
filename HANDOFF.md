@@ -1,8 +1,16 @@
 # KEYHOLDER handoff
 
-State as of 2026-11-10: v1.1.0 (the polish pass) is on GitHub (github.com/virgilvox/keyholder), on Pages (virgilvox.github.io/keyholder), and in the v1.1.0 release (cart md5 `7c1eed841a3ab7541817731a6c077593`). The game station still runs 1.0.2: on 2026-11-10 it did not answer at 172.22.111.83. To update it, wait until `pidof retroarch` is empty, back up the old cart, copy the new one to `.incoming/` and `mv` it into place, check the md5, and add a row to `HeatSync Labs Operations 2026/docs/06-change-log.md`.
+State as of 2026-11-11: v1.2.0 is on GitHub (github.com/virgilvox/keyholder), on Pages (virgilvox.github.io/keyholder) and in the v1.2.0 release. The game station still runs 1.0.2: on 2026-11-10 and 2026-11-11 it did not answer at 172.22.111.83 (not on ARP from the R610 either; likely powered off). To update it, wait until `pidof retroarch` is empty, back up the old cart, copy the new one to `.incoming/` and `mv` it into place, check the md5, and add a row to `HeatSync Labs Operations 2026/docs/06-change-log.md`.
 
 Read `docs/DESIGN.md` for the module contract and the art rules, and `docs/PLACES.md` for every downtown address.
+
+## v1.2 (2026-11-11)
+
+- **Dialogue:** rewritten again against v1.0, the DOLLY mockup and the lab's own tour guides, with a reviewer pass using reader personas (`dialogue-review` notes were not kept in the repo). Full sentences, per-character text for Vee, Dex and Ruth (`{vee, dex, ruth, any}`), action choices (`A()`) that are never spoken. Facts: open to the public, membership is a donation, joining needs no vouch, only 24/7 card access needs a nomination. The lounge scene now builds from Ruth holding the blade to the weapons policy to the orientation question.
+- **Cast:** 42 bodies (26 new, recombined from CC0 VRoid parts). See-through coat tails dropped in `prep-vrm.mjs`.
+- **World and camera:** interior drawing follows the camera subject (`world_subject`), the kitchen door is a gathered black curtain, 63 real seats (`LAB_SEATS`, `sit_snap`), nobody stands on tables (`on_floor`), the follow camera uses a sphere probe and swings around walls, the director rejects cameras across walls, doors open with look-ahead. The Tech Tear Apart bin is on the short blue-bin shelf by member storage; the clamps go to the woodshop pegboard.
+- **Gear:** draw or sheathe at any time in roams (G, d-pad up), the bike from the bike station on Main, summoned outdoors (B, d-pad down), saved in `save_t.bike`. `src/bike.c`.
+- **Mouse and keyboard fights:** left click light (hold for heavy), right click guard, Shift tap dodge and hold sprint, Space jump, Q special, middle click lock on, wheel picks targets when locked and weapons otherwise. The web page sends mouse buttons as `KEY_MOUSE_*` codes (`input.h`); the pointer interface in `main.c` is the cleaner long-term route.
 
 ## What the game is
 
@@ -74,7 +82,9 @@ python3 tools/sheet.py out 5 5 384 216 frames...                                
 - **World:** the laser scraps sign looks mirrored; four venues are still off-map (Republica, Hope's, Pizza Mart, Guadalupe).
 - **Outfits:** body V (High Score) is a fitted bodysuit, body R (Gloria) a schoolgirl skirt, and Shino (char_s) has a bare midriff. Swap if they do not fit the people.
 - **Station:** frame rate in the worst views with the new extras and train (the worst view is about 225k triangles, down from 446k).
-- **Size:** the cart is 34 MB (voices 14.7 MB) and the web page 44 MB.
+- **Size and memory:** the cart is 59 MB (voices 19.7 MB) and the web page 75 MB. Wasm memory is about 540 MB at boot and 680 MB by the end of the day. That is a risk on the station; if it struggles, load bodies per chapter.
+- **Bike and new controls:** bike feel (acceleration, turning circle, lean, camera at speed), the rider's hands rest on her lap, the 0.28 s hold for a heavy attack on left click, mouse sensitivity in pointer lock, the bell and sheathe levels.
+- **Distant faces:** some bodies in lineups read pale at a distance.
 
 ## Combat tuning reference (bots in test_fight.c, 10 fights each)
 

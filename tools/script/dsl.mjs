@@ -1,6 +1,8 @@
 // The beats the day is written in. tools/script/compile.mjs turns them into src/gen/script.c.
 // who: 'me' (the player's character), 'm1', 'm2' (the other two members), or a cast id.
 // Text may use {me}, {m1}, {m2}: names are spliced in and each variant is voiced separately.
+// Text may also be { vee, dex, ruth, any } for S and BARK: the line picked by who fills the slot ('me', 'm1', 'm2',
+// 'shadow'), or by who is playing for any other speaker. 'any' is the fallback. Banter and fight barks take plain text.
 export const lab = (x, z, yaw = 0) => ({ k: 'lab', x, z, yaw });          // HSL-108 plan metres, plan yaw degrees
 export const at = (name, dx = 0, dz = 0, yaw = null) => ({ k: 'place', name, x: dx, z: dz, yaw });   // offset from a world_place, world axes, world degrees
 export const stage = (x = 0, z = 0, yaw = 0) => ({ k: 'stage', x, z, yaw });   // offset from the stage's centre
@@ -23,8 +25,12 @@ export const OBJ = (text) => ({ op: 'objective', text });
 export const ROAM = (place, radius, prompt, o = {}) => ({ op: 'roam', place, radius, prompt, ...o }); // free walk until there; o.sides: side conversations
 export const SIDE = (name, who, mark, prompt, beats, o = {}) => ({ name, who, mark, prompt, beats, ...o });
 export const FIGHT = (id, o = {}) => ({ op: 'fight', id, ...o });
-export const CHOICE = (prompt, options) => ({ op: 'choice', prompt, options }); // {text, say, beats}
+export const CHOICE = (prompt, options) => ({ op: 'choice', prompt, options }); // {text, say, act, beats}
+// O(text, beats, o): an option the player says. text is the menu line and, unless o.say gives other words, the line
+// spoken aloud. o.say may be { vee, dex, ruth } for words that differ by who is playing.
 export const O = (text, beats = [], o = {}) => ({ text, beats, ...o });
+// A(text, beats, o): an action option ("Put it down. Walk over."). It is shown in the menu and never spoken.
+export const A = (text, beats = [], o = {}) => ({ text, beats, ...o, act: true });
 export const IF = (cond, a, b = []) => ({ op: 'if', cond, a, b });             // {stat, gte}, {flag}, {not}
 export const SET = (flag) => ({ op: 'flag', flag });
 export const ADD = (stat, n = 1, quiet = false) => ({ op: 'add', stat, n, quiet });  // trust safety vibe dues energy; aff_sam, aff_kai, aff_morgan, aff_m1, aff_m2

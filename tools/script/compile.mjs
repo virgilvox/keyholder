@@ -24,7 +24,20 @@ const tasks = [];
 const banter = [];
 const TASK_KINDS = ['greet', 'point', 'answer', 'carry', 'fix', 'signin', 'errand'];
 const FIX_MODES = ['timing', 'mash', 'hold', 'stick'];
-const emit = (o) => { beats.push(o); return beats.length - 1; };
+const only = [];   // inside a branch on who is playing: the beats there are voiced for that player only
+const emit = (o) => { if (only.length) o.only = only[only.length - 1]; beats.push(o); return beats.length - 1; };
+// who fills a slot for a given player; for a speaker who is not a slot, the player
+const slotOf = (who, me) => (who === 'me' || who === 'shadow' ? me : who === 'm1' ? ROLES[me].m1 : who === 'm2' ? ROLES[me].m2 : me);
+const textFor = (t, who, me) => { const v = t[slotOf(who, me)] ?? t.any; if (typeof v !== 'string') throw new Error(`no ${slotOf(who, me)} text for ${who}: ${JSON.stringify(t)}`); return v; };
+// a branch on who is playing: a CHOICE with no prompt and one option per playable character, in PLAYABLE order
+// (story.c takes the option by the player and shows no menu)
+function pick(make) {
+  emit({ op: 'choice', prompt: null, n: PLAYABLE.length });
+  const opts = PLAYABLE.map(() => emit({ op: 'option', text: null, say: null, target: 0 }));
+  const ends = [];
+  PLAYABLE.forEach((me, i) => { beats[opts[i]].target = beats.length; only.push(me); flat(make(me)); only.pop(); ends.push(emit({ op: 'jump', target: 0 })); });
+  ends.forEach((e) => (beats[e].target = beats.length));
+}
 const mark = (m) => (m ? m : null);
 function flat(list) { for (const b of list) { if (Array.isArray(b)) flat(b); else one(b); } }
 function one(b) {
@@ -39,10 +52,17 @@ function one(b) {
       return;
     }
     case 'choice': {
+      if (!b.prompt) throw new Error('a choice needs a prompt');
       emit({ op: 'choice', prompt: b.prompt, n: b.options.length });
-      const opts = b.options.map((o) => emit({ op: 'option', text: o.text, say: o.say === undefined ? o.text : o.say, target: 0 }));
+      // an action option is never spoken; a spoken option says its text unless o.say gives other words
+      const said = (o) => (o.act ? null : o.say === undefined ? o.text : typeof o.say === 'object' ? null : o.say);
+      const opts = b.options.map((o) => emit({ op: 'option', text: o.text, say: said(o), target: 0 }));
       const ends = [];
-      b.options.forEach((o, i) => { beats[opts[i]].target = beats.length; flat(o.beats || []); ends.push(emit({ op: 'jump', target: 0 })); });
+      b.options.forEach((o, i) => {
+        beats[opts[i]].target = beats.length;
+        if (!o.act && o.say && typeof o.say === 'object') one({ op: 'say', who: 'me', text: o.say });
+        flat(o.beats || []); ends.push(emit({ op: 'jump', target: 0 }));
+      });
       ends.forEach((e) => (beats[e].target = beats.length));
       return;
     }
@@ -66,6 +86,9 @@ function one(b) {
       if (skip >= 0) beats[skip].target = beats.length;
       return;
     }
+    case 'say': case 'bark':
+      if (b.text && typeof b.text === 'object') { const t = b.text; pick((me) => [{ ...b, text: textFor(t, b.who, me) }]); return; }
+      emit(b); return;
     case 'flag': flags.add(b.flag); emit(b); return;
     case 'fight': if (b.win_flag) flags.add(b.win_flag); if (b.easier_flag) flags.add(b.easier_flag); emit(b); return;
     default: emit(b);
@@ -182,7 +205,10 @@ const addLine = (who, text, me) => {
   const c = CAST[speaker];
   lines.set(speaker + '|' + t, { speaker, voice: c.voice, speed: c.speed, text: t });
 };
+for (const k of banter) if (typeof k.text !== 'string') throw new Error('banter takes plain text: ' + JSON.stringify(k.text));
+for (const F of Object.values(FIGHTS)) for (const k of F.barks || []) if (typeof k.text !== 'string') throw new Error('fight barks take plain text');
 for (const me of PLAYABLE) for (const b of beats) {
+  if (b.only && b.only !== me) continue;
   if (b.op === 'say') addLine(b.who, b.text, me);
   if (b.op === 'option' && b.say) addLine('me', b.say, me);
   if (b.op === 'bark') addLine(b.who, b.text, me);
@@ -194,4 +220,8 @@ for (const me of PLAYABLE) {
 mkdirSync(join(ROOT, 'source'), { recursive: true });
 writeFileSync(process.env.GEN ? join(GEN, 'lines.json') : join(ROOT, 'source/lines.json'), JSON.stringify([...lines.values()], null, 0));
 const chars = [...lines.values()].reduce((a, l) => a + l.text.length, 0);
+// lines that run long for Kokoro (and for the box): over 18 words
+const words = (t) => t.split(/\s+/).filter(Boolean).length;
+const long = [...lines.values()].filter((l) => words(l.text) > 18);
+if (long.length) console.log(`note: ${long.length} lines over 18 words` + (process.env.LONG ? '\n' + long.map((l) => '  ' + l.speaker + ': ' + l.text).join('\n') : ' (LONG=1 lists them)'));
 console.log(`${beats.length} beats, ${sides.length} side talks, ${tasks.length} tasks, ${banter.length} banter, ${flagList.length} flags, ${FIGHT_IDS.length} fights, ${lines.size} voiced takes, ${chars} characters`);

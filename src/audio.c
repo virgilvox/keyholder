@@ -1021,6 +1021,22 @@ void sfx(sfx_t s, float pan, float gain) {
         v = V(W_NOISE, 0, 0, 0.02f, 0.35f * k); v->hp = 2500; v->curve = 2; v->delay = d;
       }
       break; }
+    case SFX_BIKE_BELL: {   /* a thumb bell: brass partials, struck twice */
+      for (int i = 0; i < 2; i++) {
+        v = V(W_SINE, 2960 * j, 2950 * j, 0.5f, 0.3f); v->fm_r = 2.76f; v->fm_i = 1.1f; v->curve = 3; v->delay = i * 0.16f; v->send = 0.25f;
+        v = V(W_SINE, 4430 * j, 4420 * j, 0.25f, 0.12f); v->curve = 3; v->delay = i * 0.16f;
+        v = V(W_NOISE, 0, 0, 0.012f, 0.3f); v->hp = 4000; v->curve = 2; v->delay = i * 0.16f;
+      }
+      break; }
+    case SFX_BIKE_TICK: {   /* one pawl click, small and dry */
+      v = V(W_NOISE, 0, 0, 0.012f, 0.5f); v->hp = 3500; v->lp = 9000; v->curve = 2;
+      v = V(W_SQ, 2600 * j, 2400, 0.008f, 0.08f); v->duty = 0.2f; v->curve = 2;
+      break; }
+    case SFX_SHEATHE: {   /* the blade folding away: a falling shimmer and a soft latch */
+      v = V(W_SINE, 1800 * j, 600, 0.22f, 0.18f); v->fm_r = 1.5f; v->fm_i = 1.5f; v->curve = 2; v->send = 0.3f;
+      v = V(W_NOISE, 0, 0, 0.16f, 0.35f); v->lp = 6000; v->lp1 = 1200; v->hp = 500; v->curve = 2;
+      v = V(W_NOISE, 0, 0, 0.03f, 0.4f); v->hp = 1400; v->delay = 0.16f; v->curve = 2;
+      break; }
     case SFX_ALARM: {
       for (int i = 0; i < 4; i++) { v = V(W_SQ, i & 1 ? 660 : 880, i & 1 ? 660 : 880, 0.17f, 0.6f); v->delay = i * 0.18f; v->duty = 0.4f; v->lp = 3200; v->curve = 1; v->atk = 0.006f; v->send = 0.2f; }
       break; }

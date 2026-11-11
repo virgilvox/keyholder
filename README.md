@@ -9,20 +9,26 @@ A PS2-style action visual novel for the HeatSync Labs game station (wasmcart, Ba
 | | Pad | Keyboard and mouse |
 |---|---|---|
 | Move | left stick | WASD |
-| Camera | right stick | arrows, mouse |
-| Talk, use | X | E |
-| Pick, advance | A | Enter, Space |
-| Light attack | X, RT | J, F, left click |
-| Heavy attack | Y | K |
-| Guard, tap to parry | LT | L, right click |
-| Dodge | B | Shift |
+| Camera | right stick | mouse, arrows |
+| Talk, use | X | E, F |
+| Pick, advance | A | Enter, Space, left click |
+| Light attack | X, RT | left click, J, Left Ctrl |
+| Heavy attack | Y | hold left click, K |
+| Guard, tap to parry | LT | right click, L |
+| Dodge | B | Shift (tap) |
+| Sprint | L3, or the stick pushed all the way | Shift (hold), Left Alt |
 | Jump | A | Space |
-| Special (meter full) | RB | U |
-| Lock on | LB, R3 | Tab |
-| Call a friend (Trust high) | D-pad up | R |
-| Weapon | d-pad left, right | 1 to 5, Q |
+| Special (meter full) | RB | Q, U |
+| Lock on | LB, R3 | middle click, Tab |
+| Next target (locked on) | flick the right stick | mouse wheel |
+| Weapon | d-pad left, right | 1 to 5, mouse wheel (not locked on) |
+| Call a friend (Trust high) | d-pad up | R |
+| Draw or sheathe (walking) | d-pad up | G |
+| Bike (outdoors, once found) | d-pad down | B |
 | Skip scene | hold START | hold Enter |
 | Pause | START | Esc, P |
+
+The mouse is captured when you click the game; Esc lets it go and pauses. The settings button on the web page sets its sensitivity and smoothing. The bike waits at the lab's bike station: walk up to it once, and from then on you can call it up anywhere outdoors.
 
 The day saves at each chapter. Trust, Safety, Vibe and Dues move with your choices and change who shows up, how hard the fights are, and how it ends.
 

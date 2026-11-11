@@ -35,6 +35,10 @@ typedef enum {
   SFX_STYLE,        /* style points: a bright tick that climbs with the rank (gain sets the pitch) */
   SFX_QTE,          /* the finisher's prompt: a held breath */
   SFX_TRAIN_BELL,   /* the light rail's double ding, placed with sfx_at */
+  /* v1.2 roam */
+  SFX_BIKE_BELL,    /* a thumb bell: two bright dings */
+  SFX_BIKE_TICK,    /* the freewheel's pawl, one click (call it at the hub's rate while coasting) */
+  SFX_SHEATHE,      /* a weapon put away: a soft falling shimmer */
   SFX_COUNT
 } sfx_t;
 

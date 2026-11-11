@@ -53,6 +53,8 @@ typedef struct {
   int mg_trip, mg_trips; bool mg_carrying;
   /* banter and barks: a small subtitle, no letterbox */
   const char *sub_name, *sub_text; uint32_t sub_col; float sub_t, sub_dur;
+  /* v1.2 roam gear: the always-on hints (gear_wp NULL when no weapon is owned; gear_bike when it can be ridden here) */
+  const char *gear_wp; bool gear_drawn, gear_bike, gear_riding;
 } story_ui_t;
 extern story_ui_t STORY_UI;
 

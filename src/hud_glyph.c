@@ -3,8 +3,9 @@
  * and a mouse with the right button lit. A control is named once by action
  * (g_act) and each device has its own spec string, so every prompt in the
  * game says the right thing for the pad or the keyboard. Specs are tokens
- * joined by '|': A B X Y LB RB LT RT LS RS DUD DLR SEL START, k:LABEL for a
- * keycap, m:L m:R m:W m:M for the mouse (left, right, wheel, moving). */
+ * joined by '|': A B X Y LB RB LT RT LS RS DUD DLR DU DD SEL START, k:LABEL for a
+ * keycap, m:L m:R m:W m:M m:S for the mouse (left, right, middle click, moving, wheel scrolled),
+ * t:WORD for a small word that leads the next token without a slash ("t:HOLD|m:L"). */
 #include "hud_int.h"
 
 #define INK 0x101218u
@@ -14,15 +15,20 @@ static const act_t ACTS[] = {
   {"MOVE",   "LS",        "k:W|k:A|k:S|k:D"},
   {"LOOK",   "RS",        "m:M|k:ARROWS"},
   {"LIGHT",  "X|RT",      "m:L|k:J"},
-  {"HEAVY",  "Y",         "k:K"},
+  {"HEAVY",  "Y",         "t:HOLD|m:L|k:K"},
   {"GUARD",  "LT",        "m:R|k:L"},
   {"JUMP",   "A",         "k:SPACE"},
   {"DODGE",  "B",         "k:SHIFT"},
-  {"SPECIAL","RB",        "k:U"},
-  {"LOCK",   "LB",        "k:TAB"},
-  {"WEAPON", "DLR",       "k:1-5|k:Q"},
-  {"SPRINT", "LS",        "k:ALT"},
+  {"SPECIAL","RB",        "k:Q"},
+  {"LOCK",   "LB",        "m:W|k:TAB"},
+  {"TARGET", "RS",        "m:S"},
+  {"WEAPON", "DLR",       "k:1-5|m:S"},
+  {"SPRINT", "LS",        "t:HOLD|k:SHIFT"},
   {"USE",    "X",         "k:E"},
+  {"ASSIST", "DU",        "k:R"},
+  {"DRAW",   "DU",        "k:G"},
+  {"BIKE",   "DD",        "k:B"},
+  {"STRIKE", "Y",         "m:L|k:K"},
   {"PAUSE",  "START",     "k:ESC"},
   {"PICK",   "A",         "k:ENTER"},
   {"BACK",   "B",         "k:ESC"},
@@ -76,6 +82,23 @@ static float tok(cv *c, float x, float cy, float h, const char *t, bool draw) {
     }
     return h;
   }
+  if (!strcmp(t, "DU") || !strcmp(t, "DD")) {   /* one arm of the d-pad lit */
+    if (draw) {
+      float a = h * 0.34f, o = (h - a) / 2;
+      cv_fill_hex(c, 0x586070, 1); cv_fill_rect(c, x, cy - a / 2, h, a); cv_fill_rect(c, x + o, cy - h / 2, a, h);
+      cv_fill_hex(c, C_HIVIS, 1);
+      if (t[1] == 'U') cv_fill_rect(c, x + o, cy - h / 2, a, o + a * 0.2f);
+      else cv_fill_rect(c, x + o, cy + a / 2 - a * 0.2f, a, o + a * 0.2f);
+    }
+    return h;
+  }
+  if (t[0] == 't' && t[1] == ':') {   /* a small word */
+    float px = h * 0.42f;
+    cv_font(c, F_MONO, px); cv_letter_spacing(c, 1);
+    float w = cv_measure(c, t + 2) + h * 0.2f;
+    if (draw) p_text(c, F_MONO, px, 1, CV_LEFT, t + 2, x, cy + px * 0.36f, 0xc8ccd6, 1);
+    return w;
+  }
   if (!strcmp(t, "DUD") || !strcmp(t, "DLR")) {
     if (draw) {
       bool ud = t[1] == 'U';
@@ -110,7 +133,7 @@ static float tok(cv *c, float x, float cy, float h, const char *t, bool draw) {
   }
   if (t[0] == 'm' && t[1] == ':') {
     char k = t[2];
-    float bw = h * 0.62f, extra = k == 'M' ? h * 0.5f : 0, w = bw + extra * 2;
+    float bw = h * 0.62f, extra = k == 'M' || k == 'S' ? h * 0.5f : 0, w = bw + extra * 2;
     if (draw) {
       float bx = x + extra, top = cy - h / 2, split = top + h * 0.42f;
       path_rr(c, bx, top, bw, h, bw / 2); cv_fill_hex(c, C_CREAM, 1); cv_fill(c);
@@ -122,6 +145,13 @@ static float tok(cv *c, float x, float cy, float h, const char *t, bool draw) {
       cv_stroke_hex(c, INK, 1); cv_line_width(c, 1.6f);
       path_rr(c, bx, top, bw, h, bw / 2); cv_stroke(c);
       cv_begin(c); cv_move(c, bx, split); cv_line(c, bx + bw, split); cv_move(c, bx + bw / 2, top); cv_line(c, bx + bw / 2, split); cv_stroke(c);
+      if (k == 'S') {   /* the wheel lit, chevrons up and down beside it */
+        path_rr(c, bx + bw / 2 - h * 0.07f, top + h * 0.08f, h * 0.14f, h * 0.28f, h * 0.07f); cv_fill_hex(c, C_HIVIS, 1); cv_fill(c); cv_stroke(c);
+        cv_stroke_hex(c, C_HIVIS, 1); cv_line_width(c, 2.2f); cv_line_cap(c, CV_CAP_ROUND);
+        float ax = x + w - extra * 0.5f;
+        cv_begin(c); cv_move(c, ax - h * 0.12f, cy - h * 0.12f); cv_line(c, ax, cy - h * 0.26f); cv_line(c, ax + h * 0.12f, cy - h * 0.12f); cv_stroke(c);
+        cv_begin(c); cv_move(c, ax - h * 0.12f, cy + h * 0.12f); cv_line(c, ax, cy + h * 0.26f); cv_line(c, ax + h * 0.12f, cy + h * 0.12f); cv_stroke(c);
+      }
       if (k == 'W') { path_rr(c, bx + bw / 2 - h * 0.07f, top + h * 0.08f, h * 0.14f, h * 0.28f, h * 0.07f); cv_fill_hex(c, C_HIVIS, 1); cv_fill(c); cv_stroke(c); }
       if (k == 'M') {   /* motion chevrons either side */
         cv_stroke_hex(c, C_HIVIS, 1); cv_line_width(c, 2.2f); cv_line_cap(c, CV_CAP_ROUND);
@@ -142,6 +172,7 @@ float g_glyphs(cv *c, float x, float cy, float h, const char *spec, bool draw) {
       t[n] = 0; n = 0;
       if (t[0]) x += tok(c, x, cy, h, t, draw);
       if (!*p) break;
+      if (t[0] == 't' && t[1] == ':') continue;
       float sp = h * 0.22f;
       cv_font(c, F_MONO, h * 0.5f); cv_letter_spacing(c, 0);
       if (draw) p_text(c, F_MONO, h * 0.5f, 0, CV_LEFT, "/", x + sp, cy + h * 0.18f, 0x9aa1b2, 1);

@@ -1,4 +1,4 @@
-/* input.c: see input.h. Every connected pad and the keyboard drive the one player;
+/* input.c: see input.h. Every connected pad, the keyboard and the mouse drive the one player;
  * the strongest stick wins and buttons are or'd. */
 #include "input.h"
 #include "ds.h"
@@ -12,6 +12,9 @@ static wc_pad_t pcur[4], pprev[4];
 static intent_t I;
 static int nav_ox, nav_oy;
 static bool last_pad, seen[4], flagged[4], guard_was;
+#define HOLD_FRAMES 17    /* about .28 s at 60 fps: a held left click is a heavy */
+#define MOUSE_GAIN 1.5f   /* a captured mouse turns the camera faster than a full stick can */
+static int lmb_frames; static bool lmb_charged;
 
 #define DOWN(k, c) (((k)[(c) >> 3] >> ((c) & 7)) & 1)
 bool input_key_down(int c) { return c > 0 && c < 256 && DOWN(kcur, c); }
@@ -41,22 +44,32 @@ void input_frame(const wc_pad_t *pads, const uint8_t *keys) {
   o->my = (float)DOWN(kcur, WC_KEY_W) - (float)DOWN(kcur, WC_KEY_S);
   o->ax = (float)DOWN(kcur, WC_KEY_RIGHT) - (float)DOWN(kcur, WC_KEY_LEFT);
   o->ay = (float)DOWN(kcur, WC_KEY_UP) - (float)DOWN(kcur, WC_KEY_DOWN);
-  o->light = kp(WC_KEY_J) || kp(WC_KEY_F) || kp(WC_KEY_LCTRL);
-  o->light_held = DOWN(kcur, WC_KEY_J) || DOWN(kcur, WC_KEY_F) || DOWN(kcur, WC_KEY_LCTRL);
-  o->heavy = kp(WC_KEY_K); o->heavy_held = DOWN(kcur, WC_KEY_K);
-  o->guard = DOWN(kcur, WC_KEY_L);
+  /* the left button: a tap is a light attack on release; held past HOLD_FRAMES it becomes the heavy
+   * (and stays held, so the staff charges while it is down), the way PC action games charge an attack */
+  bool lmb = DOWN(kcur, KEY_MOUSE_L), lmb_was = DOWN(kprev, KEY_MOUSE_L), lmb_light = false, lmb_heavy = false;
+  if (lmb) {
+    if (!lmb_was) { lmb_frames = 0; lmb_charged = false; }
+    if (++lmb_frames == HOLD_FRAMES) { lmb_heavy = true; lmb_charged = true; }
+  } else if (lmb_was && !lmb_charged) lmb_light = true;
+  o->light = kp(WC_KEY_J) || kp(WC_KEY_LCTRL) || lmb_light;
+  o->light_held = DOWN(kcur, WC_KEY_J) || DOWN(kcur, WC_KEY_LCTRL) || (lmb && !lmb_charged);
+  o->heavy = kp(WC_KEY_K) || lmb_heavy; o->heavy_held = DOWN(kcur, WC_KEY_K) || (lmb && lmb_charged);
+  o->guard = DOWN(kcur, WC_KEY_L) || DOWN(kcur, KEY_MOUSE_R);
   o->jump = kp(WC_KEY_SPACE); o->jump_held = DOWN(kcur, WC_KEY_SPACE);
   o->dodge = kp(KEY_LSHIFT) || kp(KEY_RSHIFT);
-  o->special = kp(WC_KEY_U);
-  o->lock = kp(WC_KEY_TAB);
-  if (kp(WC_KEY_Q)) o->weapon_step = 1;
+  o->special = kp(WC_KEY_Q) || kp(WC_KEY_U);
+  o->lock = kp(WC_KEY_TAB) || kp(KEY_MOUSE_M);
+  o->wheel = kp(KEY_WHEEL_UP) ? 1 : kp(KEY_WHEEL_DOWN) ? -1 : 0;
   for (int k = 0; k < 5; k++) if (kp(WC_KEY_1 + k)) o->weapon_pick = k;
-  o->interact = kp(WC_KEY_E);
+  o->interact = kp(WC_KEY_E) || kp(WC_KEY_F);
   o->assist = kp(WC_KEY_R);
-  o->sprint = DOWN(kcur, KEY_LALT);
+  o->draw = kp(WC_KEY_G);
+  o->bike = kp(WC_KEY_B);
+  o->sprint = DOWN(kcur, KEY_LALT) || DOWN(kcur, KEY_LSHIFT) || DOWN(kcur, KEY_RSHIFT);
   o->pause = kp(WC_KEY_ESCAPE) || kp(WC_KEY_P);
-  o->ok = kp(WC_KEY_ENTER) || kp(WC_KEY_SPACE) || kp(WC_KEY_E) || kp(WC_KEY_J);
+  o->ok = kp(WC_KEY_ENTER) || kp(WC_KEY_SPACE) || kp(WC_KEY_E) || kp(WC_KEY_J) || kp(KEY_MOUSE_L);
   o->back = kp(WC_KEY_ESCAPE) || kp(WC_KEY_BACKSPACE);
+  o->mouse_look = DOWN(kcur, KEY_MOUSE_LOOK);
   int dx = (DOWN(kcur, WC_KEY_D) || DOWN(kcur, WC_KEY_RIGHT)) - (DOWN(kcur, WC_KEY_A) || DOWN(kcur, WC_KEY_LEFT));
   int dy = (DOWN(kcur, WC_KEY_S) || DOWN(kcur, WC_KEY_DOWN)) - (DOWN(kcur, WC_KEY_W) || DOWN(kcur, WC_KEY_UP));
   for (int p = 0; p < 4; p++) {
@@ -66,7 +79,9 @@ void input_frame(const wc_pad_t *pads, const uint8_t *keys) {
     float lx = stick(n->left_x), ly = -stick(n->left_y), rx = stick(n->right_x), ry = -stick(n->right_y);
     bool lt = n->left_trigger > WC_TRIGGER_PRESSED, rt = n->right_trigger > WC_TRIGGER_PRESSED;
     bool prt = q->right_trigger > WC_TRIGGER_PRESSED;
-    if (pr || lt || rt || fabsf(lx) + fabsf(ly) + fabsf(rx) + fabsf(ry) > 0.3f) last_pad = true;
+    bool mouse_stick = p == 0 && o->mouse_look;   /* the web page's mouse look rides on pad 0's right stick */
+    if (mouse_stick) { rx *= MOUSE_GAIN; ry *= MOUSE_GAIN; }
+    if (pr || lt || rt || fabsf(lx) + fabsf(ly) + (mouse_stick ? 0 : fabsf(rx) + fabsf(ry)) > 0.3f) last_pad = true;
     if (fabsf(lx) > fabsf(o->mx)) o->mx = lx;
     if (fabsf(ly) > fabsf(o->my)) o->my = ly;
     if (fabsf(rx) > fabsf(o->ax)) o->ax = rx;
@@ -81,10 +96,13 @@ void input_frame(const wc_pad_t *pads, const uint8_t *keys) {
     if (pr & WC_BTN_RIGHT) o->weapon_step = 1;
     if (pr & WC_BTN_LEFT) o->weapon_step = -1;
     o->assist |= (pr & WC_BTN_UP) != 0;
+    o->draw |= (pr & WC_BTN_UP) != 0;     /* d-pad up: the assist in a fight, draw or sheathe in a roam */
+    o->bike |= (pr & WC_BTN_DOWN) != 0;
     o->interact |= (pr & WC_BTN_X) != 0;
     o->sprint |= (b & WC_BTN_L3) != 0;
     o->pause |= (pr & WC_BTN_START) != 0;
-    o->ok |= (pr & (WC_BTN_A | WC_BTN_START)) != 0 || (rt && !prt);   /* the web page's left click is RT */ o->back |= (pr & WC_BTN_B) != 0;
+    o->ok |= (pr & (WC_BTN_A | WC_BTN_START)) != 0 || (rt && !prt);
+    o->back |= (pr & WC_BTN_B) != 0;
     int px = ((b & WC_BTN_RIGHT) || n->left_x > 16000) - ((b & WC_BTN_LEFT) || n->left_x < -16000);
     int py = ((b & WC_BTN_DOWN) || n->left_y > 16000) - ((b & WC_BTN_UP) || n->left_y < -16000);
     if (px) dx = px;

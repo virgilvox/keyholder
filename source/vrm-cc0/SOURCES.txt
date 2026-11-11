@@ -13,7 +13,32 @@ AvatarSample_G.vrm     https://opengameart.org/sites/default/files/avatarsample_
 Base_Female.vrm        https://opengameart.org/sites/default/files/base_female.zip        Base_Female
 Base_Male.vrm          https://opengameart.org/sites/default/files/base_male.zip          Base_Male
 HairSample_Male.vrm    https://opengameart.org/sites/default/files/hairsample_male.zip    HairSample_Male
+HairSample_Female.vrm  https://opengameart.org/sites/default/files/hairsample_female.zip  HairSample_Female
+AvatarSample_D_Darkness.vrm  https://opengameart.org/sites/default/files/avatarsample_d_darkness.zip  AvatarSample_D (the "Darkness Shibu" version)
 
 The copies here were shrunk by tools/slim-vrm.mjs (images over 1024 px scaled down and stored as WebP;
 meshes, skins, morphs and the VRM extension unchanged). tools/prep-vrm.mjs bakes them into
 assets/models/char_{h,m,o,p,u,k,e,v,g,w,r}.glb.
+
+Added 2026-11-11 (v1.2): HairSample_Female and AvatarSample_D_Darkness, from the same OpenGameArt
+collection. Both embed licenseName CC0 and the same hub.vroid.com licence link as above (everyone,
+modification allow, redistribution allow, credit unnecessary). Archive md5: hairsample_female.zip
+6c0a5b411d29cf7106dfac0758d0517c, avatarsample_d_darkness.zip 221c87426e6c4e65efc836866293c058.
+
+The v1.2 bodies (char_a, char_i ... char_p2 in tools/prep-vrm.mjs CAST) are all made from the samples in
+this folder and in source/vrm: another sample's hair or whole head grafted on, garments dropped and grown
+back from the body skin as painted shells, recolours. Nothing else is in them: the shell textures are
+drawn by the bake.
+
+Looked at and not used:
+- VIPE Heroes (Polygonal Mind; listed as CC-BY by the Open Source Avatars registry,
+  github.com/ToxSam/open-source-avatars). Anime styled and varied, but each file's VRM meta says
+  licenseName CC_BY together with allowedUserName ExplicitlyLicensedPerson, and no VIPE page states the
+  terms. Unclear, so skipped.
+- 100Avatars rounds 1 to 3 (Polygonal Mind, CC0). Clear licence, but nearly all are mascots and the few
+  people are a chunky low poly style that does not sit with the VRoid cast.
+- Quaternius character packs (CC0). Fine to use, but a different rig and a realistic low poly look; the
+  VRoid kitbashes covered the need without a second pipeline.
+- The VRoid sample clothing meshes and textures mirrored in github.com/madjin/vrm-samples: no licence of
+  their own stated there, so skipped.
+

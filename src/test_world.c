@@ -67,6 +67,20 @@ static const shot_t SHOTS[] = {
   /* 49 */ ST("sky_up_2230", 22.5f, 0, 1.7f, 14, 0, 30, -20, 55),
   /* 50 */ ST("title_1636_wide", 16.6f, 0, 1.7f, 16, 0, 6, 0, 55),
   /* 51 */ ST("station_stop_13", 13, 330, 1.7f, 12.5f, 360, 2, 19.5f, 55),
+  /* 52.. the back half of the lab, eye positions in world metres (world x = plan z - 2.775, world z = -plan x) */
+  ST("hall_back_13", 13, 2.6f, 1.6f, -27, 2.6f, 1.3f, -40, 55),
+  ST("kitchen_side_door_13", 13, 1.0f, 1.6f, -34.6f, 2.3f, 1.1f, -38.5f, 55),
+  ST("kitchen_in_13", 13, 0.3f, 1.6f, -39.5f, 2.2f, 1.1f, -36.5f, 60),
+  ST("corridor_13", 13, 3.4f, 1.6f, -34.5f, 3.4f, 1.2f, -40, 55),
+  ST("wc_closet_13", 13, 2.2f, 1.6f, -27.5f, -1.5f, 1.1f, -33.5f, 60),
+  ST("biolab_13", 13, -0.5f, 1.6f, -34.5f, 2.6f, 1.1f, -36.2f, 60),
+  /* the entry: a lens crossing the front door, from the portico through the recess to just inside */
+  ST("door_cross_1", 9.2f, 0.3f, 1.6f, -1.5f, 0.6f, 1.3f, -12, 50),
+  ST("door_cross_2", 9.2f, 0.3f, 1.6f, -3.8f, 0.6f, 1.3f, -12, 50),
+  ST("door_cross_3", 9.2f, 0.3f, 1.6f, -5.2f, 0.6f, 1.3f, -12, 50),
+  ST("door_cross_4", 9.2f, 0.3f, 1.6f, -6.0f, 0.6f, 1.3f, -12, 50),
+  /* the Tech Tear Apart bin, from the hall (place lab_teardown) */
+  ST("teardown_bin_13", 13, 2.2f, 1.55f, -19.1f, 1.1f, 1.0f, -19.1f, 55),
 };
 #define NSHOT (int)(sizeof SHOTS / sizeof SHOTS[0])
 static int frame; static int cur = -1;
@@ -133,6 +147,33 @@ void game_frame(float dt) {
     for (int i = 0; i < 100; i++) { v.y -= 9.8f / 60; world_move(&p, &v, .3f, 1.6f, 1.f / 60, &g); }
     ds_log("drop: y %.2f grounded %d", p.y, g);
     world_door_auto(true);
+    /* the automatic front door (the gallery window bay flanks the west side of the entry, so the west angles
+     * are shallow): walkers from several angles at a walk, a jog and a run, in and out. A stall
+     * (slower than half speed for a step) means the door was in the way */
+    {
+      static const float ANG[5] = {0, .5f, -.2f, .9f, -.32f}, SPD[3] = {1.45f, 3.5f, 6.f};
+      for (int dir = 0; dir < 2; dir++) for (int a = 0; a < 5; a++) for (int k = 0; k < 3; k++) {
+        for (int i = 0; i < 180; i++) world_update(1.f / 60, v3_(0, 1.6f, 30));   /* let it close, the lens far off */
+        float sgn = dir ? -1 : 1;   /* 0: from the street in, 1: from inside out */
+        v3 door = v3_(0, 0, -5.45f), from = v3_add(door, v3_(sinf(ANG[a]) * 4.5f * sgn, 0, cosf(ANG[a]) * 4.5f * sgn));
+        v3 to = v3_add(door, v3_(0, 0, -.9f * sgn));
+        if (dir) { from = v3_(sinf(ANG[a]) * .9f, 0, -6.5f); to = v3_add(door, v3_(sinf(ANG[a]) * 2.5f, 0, 3.5f)); }
+        v3 p = from, v; bool g = true; int stalls = 0, steps = 0; float open_at = -1;
+        for (; steps < 900; steps++) {
+          /* through the middle of the doorway, then on: a person steers, a straight line would hit a jamb */
+          static int leg; if (steps == 0) leg = 0;
+          v3 aim = leg == 0 ? door : to, d = v3_sub(aim, p); d.y = 0; float l = v3_len(d);
+          if (leg == 0 && l < .35f) { leg = 1; continue; }
+          if (leg == 1 && l < .3f) break;
+          v = v3_scale(d, SPD[k] / l); v.y = -1;
+          v3 q = p;
+          world_update(1.f / 60, v3_(0, 1.6f, 30)); world_move(&p, &v, .3f, 1.6f, 1.f / 60, &g);
+          if (hypotf(p.x - q.x, p.z - q.z) < SPD[k] / 60 * .5f) stalls++;
+          if (open_at < 0 && fabsf(p.z + 5.45f) < .35f) { extern float world_debug_door(void); open_at = world_debug_door(); }
+        }
+        ds_log("door %s angle %.1f speed %.2f: %s in %d steps, %d stalls, door %.2f open at the threshold", dir ? "out" : "in", ANG[a], SPD[k], steps < 900 ? "through" : "BLOCKED", steps, stalls, open_at);
+      }
+    }
   }
   int s = frame / FRAMES_PER;
   if (s >= NSHOT) s = NSHOT - 1;

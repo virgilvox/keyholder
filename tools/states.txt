@@ -21,3 +21,7 @@ basic+ds
 basic+vcol+fog+ds
 basic+vcol+fog+trans
 lambert+fog+skin+atest+ds+l1001
+lambert+l1001
+lambert+map+skin+atest+ds+l1001
+lambert+map+skin+morph+atest+ds+l1001
+basic+skin

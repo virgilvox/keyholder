@@ -2,18 +2,31 @@
  * per model and cloned, see actor_preload),
  * driven by the mocap clips (anim.c) with cel lit materials, an inverted hull
  * outline, expression morphs (a model without them keeps a still face), a procedural head look, spring bones for hair and
- * skirts, and a palette swap so one model can play several people.
+ * skirts, and a palette swap on top of each body's own colours.
  * Units are metres; an actor stands at about 1.6 m. yaw 0 faces +z. */
 #ifndef KH_ACTOR_H
 #define KH_ACTOR_H
 #include "ds.h"
 #include "three.h"
 
-/* cast_meta order. H young man, messy black hair, hoodie; M man, slicked short hair, vest and tie;
- * O older man, grey hair, glasses, lines; P the M body heavier, stubble; U the H body big, dark stubble;
- * K black bob, school vest and skirt; E brown bob, yellow dress; V silver hair, sci-fi suit;
- * G blonde side ponytail, white dress; W cropped hair, vest and skirt; R the W body older, grey, glasses */
-typedef enum { AM_B, AM_C, AM_D, AM_S, AM_F, AM_H, AM_M, AM_O, AM_P, AM_U, AM_K, AM_E, AM_V, AM_G, AM_W, AM_R, AM_COUNT } actor_model;
+/* cast_meta order (tools/prep-vrm.mjs CAST). B, C, D the playable three; S long black hair, skirt, a shirt
+ * over the crop top; F tall, vest and tie; H young man, messy black hair, hoodie; M man, slicked short hair,
+ * vest and tie; O older man, grey hair, glasses, lines; P the M body heavier, stubble; U the H body big, dark
+ * stubble; K black bob, school vest and skirt; E brown bob, yellow dress (a child); V silver hair, sci-fi suit;
+ * G blonde side ponytail, white dress; W cropped hair, vest and skirt; R the W body older, grey, glasses.
+ * v1.2, one body per named character (kitbashed at bake time: another sample's hair or head, painted
+ * garment shells, recolours): A white bob, long black coat dress; I black twin tails, zip hoodie, jeans;
+ * J sandy crop, sage sweater, jeans; L older woman, grey buns, glasses, cardigan; N a boy, short brown hair,
+ * striped tee, shorts; Q long black hair, striped tee, denim overalls; T black bob, navy blazer, grey slacks;
+ * X dark skin, black pixie cut, fire inspector's uniform; Y silver hair, track jacket, joggers; Z auburn side
+ * tail, tee, brown baker's apron, jeans; A2 long black hair, white shirt and tie, slacks; B2 big, ginger mop,
+ * plaid flannel, jeans; C2 heavy, copper hair, canvas work jacket; D2 dark skin, buzz cut, charcoal tee, cargo
+ * pants; E2 long black hair, open black jacket over a red tee; F2 brown hair, glasses, tan sweater vest, khakis;
+ * G2 swept blond hair, blazer, open collar. Background people (no named character wears them): H2 dark skin,
+ * yellow tee; I2 brown skin, dark ponytail, striped top; J2 tan, maroon hoodie, joggers; K2 tan, twin tails,
+ * orange sweater, leggings; L2 older man, grey, glasses, cardigan; M2 older woman, grey bob, red tunic; N2 big,
+ * stubble, work shirt with reflective bands; O2 auburn bob, denim jacket, chinos; P2 dark hair, green polo, shorts. */
+typedef enum { AM_B, AM_C, AM_D, AM_S, AM_F, AM_H, AM_M, AM_O, AM_P, AM_U, AM_K, AM_E, AM_V, AM_G, AM_W, AM_R, AM_A, AM_I, AM_J, AM_L, AM_N, AM_Q, AM_T, AM_X, AM_Y, AM_Z, AM_A2, AM_B2, AM_C2, AM_D2, AM_E2, AM_F2, AM_G2, AM_H2, AM_I2, AM_J2, AM_K2, AM_L2, AM_M2, AM_N2, AM_O2, AM_P2, AM_COUNT } actor_model;
 typedef enum { EX_BLINK, EX_A, EX_I, EX_U, EX_E, EX_O, EX_JOY, EX_ANGRY, EX_SORROW, EX_FUN, EX_COUNT } actor_expr;
 
 /* a palette swap: a hue turn (degrees) and saturation and value scales per part */

@@ -5,6 +5,9 @@
 #include "voice.h"
 #include "game.h"
 #include "battle.h"
+#include "weapon.h"
+#include "bike.h"
+#include "fx.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -124,6 +127,8 @@ static const struct { const char *n; float x, z, yaw; } LAB_PLACES[] = {
   {"lab_classroom", 10.0f, 8.3f, 0},      /* the wall whiteboard behind the coworking tables */
   {"lab_fridge", 38.95f, 1.3f, 75},       /* the kitchen refrigerator */
   {"lab_bike", 17.5f, 5.2f, 0},           /* the bike station bench */
+  {"lab_teardown", 19.1f, 4.55f, 180},    /* the Tech Tear Apart bin: the short blue bin shelf at the end of member storage, facing the hall, across from electronics */
+  {"lab_clamps", 24.2f, 8.7f, 0},         /* the woodshop pegboard where the clamps hang */
 };
 static bool lab_place(const char *n, v3 *p, float *y) {
   if (!n) return false;
@@ -136,6 +141,30 @@ static bool place_of(const char *n, v3 *p, float *y) {
   if (!n) return false;
   if (lab_place(n, p, y)) return true;
   return world_place(n, p, y);
+}
+static bool nav_free(int ix, int iz);
+static int nav_ix(float v);
+/* the ground at a mark, never a table, bench or sofa top (the old probe from 1.2 m up took the highest
+ * surface, and people stood on tables). A mark inside furniture moves to the nearest clear floor; a
+ * sitting clip puts its sitter back on a real seat (sit_snap). */
+static v3 on_floor(v3 p) {
+  float base = p.y, g = world_floor_y(v3_(p.x, base + .35f, p.z));
+  if (g < -1e8f) g = world_floor_y(v3_(p.x, base + 1.2f, p.z));
+  if (g > -1e8f) p.y = g;
+  if (world_get_stage() != STAGE_TOWN) return p;
+  /* a body at the mark: does the world push it out? */
+  v3 q = v3_(p.x, p.y, p.z), v = v3_(0, 0, 0); bool gr = true;
+  world_move(&q, &v, .22f, 1.5f, 1 / 60.f, &gr);
+  if (hypotf(q.x - p.x, q.z - p.z) < .04f) return p;
+  int cx = nav_ix(p.x), cz = nav_ix(p.z); float bd = 1e9f; v3 best = p;
+  for (int r = 1; r <= 5 && bd > 1e8f; r++) for (int dx = -r; dx <= r; dx++) for (int dz = -r; dz <= r; dz++) {
+    if (abs(dx) != r && abs(dz) != r) continue;
+    v3 c = v3_((cx + dx) * .3f, p.y, (cz + dz) * .3f);   /* NAV_R, the grid below */ float d = hypotf(c.x - p.x, c.z - p.z);
+    if (d < bd && nav_free(cx + dx, cz + dz)) { bd = d; best = c; }
+  }
+  if (bd > 1e8f) return p;
+  float f = world_floor_y(v3_(best.x, base + .35f, best.z)); if (f > -1e8f) best.y = f;
+  return best;
 }
 static v3 resolve(const sc_mark *m, float *yaw, bool *has_yaw) {
   v3 p = v3_(0, 0, 0); float y = 0; bool hy = m->yaw > -9000;
@@ -151,11 +180,35 @@ static v3 resolve(const sc_mark *m, float *yaw, bool *has_yaw) {
     case MK_STAGE: { v3 c; float r; world_stage_floor(world_get_stage(), &c, &r); p = v3_add(c, v3_(m->x, 0, m->z)); y = hy ? m->yaw * DS_PI / 180 : 0; break; }
     default: break;
   }
-  float f = world_floor_y(v3_(p.x, p.y + 1.2f, p.z));
-  if (f > -1e8f) p.y = f;
+  p = on_floor(p);
   if (yaw) *yaw = y;
   if (has_yaw) *has_yaw = hy;
   return p;
+}
+/* ---- the sit snap: a sitting clip sits on a real seat ---- */
+/* The script asks for Sitting_* clips at marks that may have no chair. The nearest free seat of the lab
+ * model within 1.5 m takes the sitter (the sofa and the lounge chair reach .9 m further: people flop
+ * there), turned the way the seat faces. Nobody near a seat stands instead. Returns the clip to play. */
+static const char *sit_snap(actor_t *a, const char *clip) {
+  if (!a || !clip || strncmp(clip, "Sitting", 7) || world_get_stage() != STAGE_TOWN) return clip;
+  const float SIT_H = .45f;   /* the clip's seat: its hips ride .55 m over the root, straight above it */
+  v3 p = actor_pos(a), s, bp = p; float y, by = 0, best = 1.5f; bool soft, found = false;
+  for (int i = 0; world_seat(i, &s, &y, &soft); i++) {
+    float d = hypotf(s.x - p.x, s.z - p.z);
+    if (d < .12f && fabsf(p.y - (s.y - SIT_H)) < .1f) return clip;   /* already on it */
+    float sc = d - (soft ? .9f : 0);
+    if (sc >= best) continue;
+    bool taken = false;
+    for (int j = 0; j < WHO_COUNT && !taken; j++) if (A[j].a && A[j].a != a && actor_is_visible(A[j].a) && hypotf(actor_pos(A[j].a).x - s.x, actor_pos(A[j].a).z - s.z) < .35f) taken = true;
+    if (taken) continue;
+    best = sc; bp = s; by = y; found = true;
+  }
+  if (!found) return strstr(clip, "Talking") ? "Idle_Talking_Loop" : "Idle_Loop";
+  float g = world_floor_y(v3_(bp.x, .3f, bp.z));
+  v3 at = v3_(bp.x - sinf(by) * .04f, fmaxf(bp.y - SIT_H, (g > -1e8f ? g : 0) - .05f), bp.z - cosf(by) * .04f);
+  actor_place(a, at, by);
+  actor_set_floor(a, g > -1e8f ? g : 0);
+  return clip;
 }
 static void face_now(int who, int target) {
   actor_t *a = actor_of(who), *b = actor_of(target);
@@ -382,8 +435,12 @@ static void auto_cover(int who, int to, sh_type asked) {
   last_speaker = w; lines_in_shot = 0;
 }
 
+/* v1.2 roam gear (see the gear section by story_update): the bike, once found, rides with the save */
+#define GEAR_BIKE 0x42
+static bool gear_bike_have;
+static void gear_use_first(const intent_t *in);
 /* ---- saves: the day's save stays under byte 520 of DS_SAVE.data (the Battle Zone keeps the rest) ---- */
-typedef struct { uint32_t magic; int pc, me; unsigned weapons; float hour, x, y, z, yaw; int stats[ST_COUNT]; uint8_t flags[64]; char objective[160]; } save_t;
+typedef struct { uint32_t magic; int pc, me; unsigned weapons; float hour, x, y, z, yaw; int stats[ST_COUNT]; uint8_t flags[64]; char objective[160]; uint8_t bike; } save_t;   /* bike: GEAR_BIKE once the bike is unlocked */
 _Static_assert(sizeof(save_t) <= 520, "the day's save must stay under DS_SAVE.data[520]");
 static void autosave(void) {
   save_t *s = (save_t *)DS_SAVE.data;
@@ -392,6 +449,7 @@ static void autosave(void) {
   memcpy(s->stats, STORY_UI.stats, sizeof s->stats);
   for (int i = 0; i < FLAG_COUNT && i < 64; i++) s->flags[i] = flags[i];
   snprintf(s->objective, sizeof s->objective, "%s", obj_buf);
+  s->bike = gear_bike_have ? GEAR_BIKE : 0;
   DS_SAVE.magic = DS_SAVE_MAGIC;
 }
 bool story_has_save(void) { return DS_SAVE.magic == DS_SAVE_MAGIC && ((save_t *)DS_SAVE.data)->magic == DS_SAVE_MAGIC; }
@@ -420,6 +478,7 @@ void story_new_game(int p) {
   STORY_UI.stats[ST_TRUST] = 5; STORY_UI.stats[ST_SAFETY] = 5; STORY_UI.stats[ST_VIBE] = 5; STORY_UI.stats[ST_DUES] = 5; STORY_UI.stats[ST_ENERGY] = 5;
   obj_buf[0] = 0; STORY_UI.objective = NULL;
   weapons = 0; hour = hour_target = 8.9f; world_set_time(hour);
+  gear_bike_have = false;
   pc = 0;
   boot();
 }
@@ -427,6 +486,7 @@ void story_continue(void) {
   save_t *s = (save_t *)DS_SAVE.data;
   memset(&STORY_UI, 0, sizeof STORY_UI);
   set_cast(s->me); pc = s->pc; weapons = s->weapons; hour = hour_target = s->hour;
+  gear_bike_have = s->bike == GEAR_BIKE;   /* a save from before v1.2 holds no such byte */
   memcpy(STORY_UI.stats, s->stats, sizeof s->stats);
   for (int i = 0; i < FLAG_COUNT && i < 64; i++) flags[i] = s->flags[i] != 0;
   snprintf(obj_buf, sizeof obj_buf, "%s", s->objective);
@@ -574,7 +634,8 @@ static const actor_palette VIS_PAL[NVIS] = {
   {{-30, .9f, .8f}, {160, .8f, 1.0f}, {30, .7f, .7f}, {0, 1, 1}},
   {{90, .5f, 1.3f}, {280, .7f, 1.1f}, {200, .5f, .6f}, {0, 1, 1}},
 };
-static const actor_model VIS_MODEL[NVIS] = {AM_S, AM_D, AM_C};
+/* bodies no named character wears, so a walk in is never somebody's twin */
+static const actor_model VIS_MODEL[NVIS] = {AM_W, AM_M, AM_S};
 /* the props people carry */
 #define NBOX 4
 static t3_mesh *BOX[NBOX]; static t3_material *box_mat;
@@ -1047,7 +1108,7 @@ static void step(void) {
         int w = canon(b->who);
         actor_t *a = actor_of(w);
         if (b->i >= 0) { actor_expr_clear(a); actor_expr_set(a, (actor_expr)b->i, b->f); A[w].ex = (actor_expr)b->i; A[w].ex_t = 4; }
-        if (b->s2) { actor_play(a, b->s2, 1, !strstr(b->s2, "Interact"), .25f); A[w].base = b->s2; }
+        if (b->s2) { const char *clip = sit_snap(a, b->s2); actor_play(a, clip, 1, !strstr(clip, "Interact"), .25f); A[w].base = clip; }
         else if (A[w].base && !strcmp(A[w].base, "Idle_Loop")) actor_play(a, "Idle_Talking_Loop", 1, true, .3f);
         expand(line_buf, sizeof line_buf, b->s);
         snprintf(name_buf, sizeof name_buf, "%s", display_name(w));
@@ -1094,8 +1155,9 @@ static void step(void) {
       case OP_LOOK: actor_look(actor_of(b->who), actor_head_pos(actor_of(b->who2)), .9f); break;
       case OP_CLIP: {
         actor_t *a = actor_of(b->who);
-        actor_play(a, b->s, b->f, b->i != 0, .25f);
-        if (b->i) A[canon(b->who)].base = b->s;
+        const char *clip = sit_snap(a, b->s);   /* sitting: onto a real seat, or standing */
+        actor_play(a, clip, b->f, b->i != 0, .25f);
+        if (b->i) A[canon(b->who)].base = clip;
         break;
       }
       case OP_EMOTE: actor_expr_set(actor_of(b->who), (actor_expr)b->i, b->f); break;
@@ -1104,6 +1166,7 @@ static void step(void) {
         break;
       case OP_ROAM: {
         roam = b; roam_follow = b->who >= 0 ? canon(b->who) : -1;
+        world_door_auto(true); door_forced = false;   /* a scene's DOOR(0) turned the automatic door off; free play needs it back */
         if (b->f2 > 0) { hour_target = b->f2; }
         roam_h0 = hour_target; roam_t = 0;
         v3 p; float y;
@@ -1136,6 +1199,11 @@ static void step(void) {
         begin_fight(b, 0);
         break;
       case OP_CHOICE: {
+        if (!b->s) {   /* no prompt: a branch on who is playing (options in order Vee, Dex, Ruth), no menu */
+          int k = me_id == W_DEX ? 1 : me_id == W_RUTH ? 2 : 0;
+          pc = SCRIPT[pc + 1 + (k < b->i ? k : 0)].target - 1;
+          break;
+        }
         skip_scene = false;
         STORY_UI.choosing = true; STORY_UI.prompt = b->s; STORY_UI.nopt = b->i; STORY_UI.sel = 0; STORY_UI.choose_t = 0;
         choice_first = pc + 1;
@@ -1228,17 +1296,21 @@ static int extras_list(actor_t **L, int n) {
   for (int i = 0; i < EXTRAS; i++) if (X[i].a && actor_is_visible(X[i].a)) L[n++] = X[i].a;
   return n;
 }     /* mode: 0 day, 1 Arduino Night, 2 night, 3 none; zone: 0 street, 1 lab */
+/* each extra its own body, none a named character's or a walk in's (actor.h: the background bodies),
+ * adults first: the street uses the first nine, the lab by day eight, Arduino Night all ten. The bodies
+ * carry their own colours, so the palettes only nudge a top or a pair of trousers. */
+static const actor_model EX_MODEL[EXTRAS] = {AM_H2, AM_I2, AM_L2, AM_O2, AM_N2, AM_K2, AM_J2, AM_M2, AM_P2, AM_E};
 static const actor_palette EX_PAL[EXTRAS] = {
-  {{20, .9f, 1.2f}, {200, .9f, .9f}, {40, .7f, .9f}, {0, 1, 1}},
-  {{10, .6f, .9f}, {120, .5f, 1.5f}, {210, .7f, .9f}, {0, 1, 1}},
-  {{-150, .8f, 1.3f}, {60, .8f, 1.1f}, {90, .6f, .8f}, {0, 1, 1}},
-  {{40, .9f, .9f}, {330, .8f, 1.1f}, {210, .4f, .7f}, {0, 1, 1}},
-  {{130, .7f, 1.1f}, {30, 1, 1.1f}, {180, .8f, .8f}, {0, 1, 1}},
-  {{70, .8f, 1.3f}, {260, .7f, 1.2f}, {30, .6f, .7f}, {0, 1, 1}},
-  {{300, .7f, .7f}, {100, .7f, .9f}, {300, .6f, .6f}, {0, 1, 1}},
-  {{0, .2f, .5f}, {15, .9f, .8f}, {200, .3f, .5f}, {0, 1, 1}},
-  {{220, .9f, 1.0f}, {-20, .6f, 1.3f}, {60, .5f, .8f}, {0, 1, 1}},
-  {{160, .6f, 1.2f}, {200, .3f, 1.4f}, {340, .5f, .6f}, {0, 1, 1}},
+  {{0, 1, 1}, {0, 1, 1}, {0, 1, 1}, {0, 1, 1}},
+  {{0, 1, 1}, {30, 1, 1}, {0, 1, 1.1f}, {0, 1, 1}},
+  {{0, 1, 1}, {0, 1, 1}, {0, 1, 1}, {0, 1, 1}},
+  {{0, 1, 1}, {0, .9f, 1}, {-20, 1, 1}, {0, 1, 1}},
+  {{0, 1, 1}, {0, 1, 1}, {0, 1, 1}, {0, 1, 1}},
+  {{0, 1, 1}, {-40, 1, 1}, {0, 1, 1}, {0, 1, 1}},
+  {{0, 1, 1}, {100, .8f, 1}, {0, 1, 1}, {0, 1, 1}},
+  {{0, 1, 1}, {0, 1, 1}, {0, 1, 1}, {0, 1, 1}},
+  {{0, 1, 1}, {150, 1, 1}, {0, 1, 1}, {0, 1, 1}},
+  {{0, 1, 1}, {0, 1, 1}, {0, 1, 1}, {0, 1, 1}},
 };
 /* a spot in the lab: plan x, z, yaw and what they do there */
 typedef struct { float x, z, yaw; const char *clip; } spot_t;
@@ -1261,8 +1333,7 @@ static const spot_t LAB_NIGHT[] = {   /* Arduino Night: around the tables and th
 static const spot_t LAB_LATE[] = { {6.9f, 5.85f, 0, "Sitting_Idle_Loop"}, {18.9f, 8.0f, 0, "Interact"} };
 static void extras_make(void) {
   for (int i = 0; i < EXTRAS; i++) if (!X[i].a) {
-    actor_model m = (actor_model)((i * 3 + 1) % AM_COUNT);   /* every body the models agent has made, new ones too */
-    X[i].a = actor_new(m, &EX_PAL[i], ds_rr(.96f, 1.04f), scene);
+    X[i].a = actor_new(EX_MODEL[i], &EX_PAL[i], ds_rr(.96f, 1.04f), scene);
     actor_visible(X[i].a, false);
   }
 }
@@ -1367,6 +1438,7 @@ static void auto_log(const char *what, const char *s) { ds_log("[auto] pc=%d %.1
 /* the roam: free walking, side talks, tasks, the way on */
 static void roam_frame(float dt, const intent_t *in) {
   story_ui_t *U = &STORY_UI;
+  gear_use_first(in);
   if (tcur >= 0 && tphase == TP_PRE) { tphase = TP_PLAY; mg_setup(tcur); if (block != B_ROAM) return; }
   if (tcur >= 0 && tphase == TP_POST) { tcur = -1; tphase = TP_NONE; }
   roam_t += dt;
@@ -1520,6 +1592,123 @@ static void roam_frame(float dt, const intent_t *in) {
     actor_play(me, "Idle_Loop", 1, true, .2f);
     last_speaker = -1;
   }
+}
+
+/* ---- v1.2 roam gear: the drawn weapon and the bike ----
+ * Kept here, apart from the roam itself: input in, the player's weapon and ride out, the HUD's hints. A weapon
+ * is drawn and sheathed at will (input draw) and swung at nothing; the bike is unlocked at the lab's bike
+ * station and then summoned anywhere outdoors (input bike). Talking, a task, a scene or a fight puts both
+ * away first. Effects and weapon ribbons age here outside fights (fight.c ages them during one). */
+static int gear_wp = -1;
+static bool gear_was_roam, gear_prompt_was;
+static actor_t *gear_me(void) { return actor_of(W_ME); }
+static bool gear_drawn(void) { actor_t *m = gear_me(); return m && weapon_of(m) >= 0; }
+static void gear_draw(int w) {
+  actor_t *m = gear_me();
+  weapon_equip(m, w); weapon_draw_flash(m); sfx(SFX_SUMMON, 0, .75f);
+}
+static void gear_sheathe(void) {
+  actor_t *m = gear_me();
+  if (!m || weapon_of(m) < 0) return;
+  v3 b, t; uint32_t col = weapon_color(weapon_of(m));
+  if (weapon_points(m, 0, &b, &t)) { fx_streak(b, t, col, .08f, .2f); fx_motes(t, col, 6, 1.2f); }
+  weapon_equip(m, -1); weapon_trail(m, false);
+  sfx(SFX_SHEATHE, 0, .7f);
+}
+static void gear_stow(void) { if (player_riding()) player_ride(false); gear_sheathe(); }
+/* a press that talks or uses: put the gear away before it happens */
+static void gear_use_first(const intent_t *in) {
+  if (in->interact && gear_prompt_was && (gear_drawn() || player_riding())) gear_stow();
+}
+static int gear_lowest(void) { for (int w = 0; w < WP_COUNT; w++) if (weapons & (1u << w)) return w; return -1; }
+static void gear_frame(float dt, const intent_t *in) {
+  story_ui_t *U = &STORY_UI;
+  if (block != B_FIGHT) { fx_update(dt, cam); weapon_update(dt); }
+  bool roaming = block == B_ROAM && roam;
+  if (!roaming) {
+    /* a scene, a talk or a fight begins: off the bike (it goes away) and the weapon put up */
+    /* (the roam ends inside roam_frame, so this runs before the next beat can draw anything for the scene) */
+    if (gear_was_roam) { gear_stow(); bike_show(false); }
+    gear_was_roam = false; gear_prompt_was = false;
+    U->gear_wp = NULL; U->gear_bike = U->gear_riding = U->gear_drawn = false;
+    return;
+  }
+  bike_init(scene);
+  actor_t *me = gear_me();
+  v3 p = player_pos();
+  bool lab = world_in_lab(p), outdoors = world_get_stage() == STAGE_TOWN && !lab;
+  if (!gear_was_roam) {
+    gear_was_roam = true;
+#ifdef KH_GEAR_TEST
+    ds_log("[gear] roam %s at frame %d, %s", roam->s ? roam->s : "", (int)(ds_now() * 60 + .5), lab ? "lab" : "outdoors");
+    /* a test run: every weapon, and a lab roam starts a few steps from the bike station */
+    weapons |= (1u << WP_COUNT) - 1;
+    if (roam->s && !strcmp(roam->s, "lab_door")) player_teleport(v3_(.3f, 0, 7.f), DS_PI);   /* facing the front door, for a ride in */
+    { static bool once; v3 bp; float by; if (!once && lab && lab_place("lab_bike", &bp, &by)) { once = true; player_teleport(v3_sub(bp, v3_scale(fwd_of(by), 3.f)), by); } }
+#endif
+  }
+#if defined(KH_GEAR_TEST) && defined(KH_AUTO)
+  /* hold the autoplay off the first lab roam (25 s) and every outdoor one (45 s), for a test to drive */
+  { static float held; static int nroam; static const sc_beat *last;
+    if (roam != last) { last = roam; held = 0; nroam++; }
+    held += dt;
+    if ((outdoors && held < 45) || (nroam == 1 && held < 25)) auto_t = 0; }
+#endif
+  bool busy = tcur >= 0 || (U->mg && U->mg != MG_GREET && U->mg != MG_POINT);
+  /* which weapon: the one the story last drew, else the first owned; 1 to 5, Q, the d-pad or the wheel change it */
+  if (weapons && (gear_wp < 0 || !(weapons & (1u << gear_wp)))) {
+    int sw = A[canon(W_ME)].weapon;
+    gear_wp = sw >= 0 && (weapons & (1u << sw)) ? sw : gear_lowest();
+  }
+  if (!weapons) gear_wp = -1;
+  if (gear_wp >= 0 && !busy) {
+    int pick = in->weapon_pick >= 0 && (weapons & (1u << in->weapon_pick)) ? in->weapon_pick : -1;
+    int step = in->weapon_step ? in->weapon_step : -in->wheel;
+    if (pick < 0 && step) for (int k = 1; k <= WP_COUNT; k++) { int w = ((gear_wp + step * k) % WP_COUNT + WP_COUNT) % WP_COUNT; if (weapons & (1u << w)) { pick = w; break; } }
+    if (pick >= 0 && pick != gear_wp) { gear_wp = pick; if (gear_drawn()) gear_draw(gear_wp); else sfx(SFX_WEAPON, 0, .5f); }
+  }
+  /* work in hand puts both away */
+  if (busy) gear_stow();
+  if (in->draw && gear_wp >= 0 && !busy) {
+    if (gear_drawn()) gear_sheathe();
+    else { if (player_riding()) player_ride(false); gear_draw(gear_wp); }
+  }
+  if (gear_drawn() && !busy && !U->prompt_use && !player_riding() && me) {
+    if (in->heavy) player_swing(true); else if (in->light) player_swing(false);
+  }
+  /* the bike */
+  if (in->bike && gear_bike_have && !busy) {
+    if (player_riding()) player_ride(false);
+    else if (outdoors) { gear_sheathe(); player_ride(true); }
+    else { U->note = "The bike is for outside. Ride it once you are out the door."; U->note_t = 2.5f; sfx(SFX_UI, 0, .6f); }
+  }
+  if (!gear_bike_have) {
+    /* the bike station: the first walk up to it takes the lab's loaner bike for the day */
+    v3 bp; float by;
+    if (lab && lab_place("lab_bike", &bp, &by)) {
+      v3 stand = v3_add(world_lab(17.5f, 6.55f), v3_(0, 0, 0));
+      float d = flat_dist(bp, p);
+      if (d < 20) { if (!bike_shown()) bike_show(true); bike_pose(stand, world_lab_yaw(-90), .08f, .3f, 0, 0); }
+      if (d < 1.8f && !U->prompt_use && !busy) {
+        bool take = in->interact;
+#ifdef KH_AUTO
+        take = input_get()->interact;   /* the autoplay hides the use button from the story; a test drives it */
+#endif
+        U->prompt_use = "Take the bike";
+        if (take) {
+          gear_bike_have = true; bike_show(false);
+          U->note = "The lab's loaner bike is yours for the day. Outdoors, call it up any time."; U->note_t = 4;
+          sfx(SFX_BIKE_BELL, 0, .8f); sfx(SFX_PICKUP, 0, .7f);
+          gesture("Interact", 1.2f);
+        }
+      }
+    } else if (bike_shown() && !player_riding()) bike_show(false);
+  } else if (bike_shown() && !player_riding() && flat_dist(bike_pos(), p) > 70) bike_show(false);   /* left far behind */
+  U->gear_wp = gear_wp >= 0 ? weapon_name((weapon_id)gear_wp) : NULL;
+  U->gear_drawn = gear_drawn();
+  U->gear_riding = player_riding();
+  U->gear_bike = gear_bike_have && (outdoors || U->gear_riding);
+  gear_prompt_was = U->prompt_use != NULL;
 }
 
 void story_update(float dt, const intent_t *in) {
@@ -1687,6 +1876,7 @@ void story_update(float dt, const intent_t *in) {
     }
     default: break;
   }
+  gear_frame(dt, in);
   extras_update(dt);
   /* the light rail: its bell, and the people out on Main turn to look */
   { v3 bp; if (world_train_bell(&bp)) { sfx_at(SFX_TRAIN_BELL, bp.x, bp.y, bp.z, 1); extras_look(bp); } }

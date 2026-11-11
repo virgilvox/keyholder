@@ -9,3 +9,7 @@ _ref/
 tools/node_modules/
 source/wav/
 source/vrm-cc0/*.vrm
+source/vrm-cc0/*.zip
+source/vrm-cc0/*.glb
+source/vrm-cc0/*.fbx
+source/vrm-cc0/*.vroid

@@ -28,6 +28,7 @@ typedef struct { t3_mesh *m; float z, z0, z1; int tris; bool always; int twin; b
 static lab_mesh lmesh[48]; static int nlmesh;
 static t3_object *door_pivot[2];
 static float door_open, door_target; static bool door_auto = true;
+static float door_call;   /* seconds the automatic door stays called by someone walking at it (world_move) */
 static t3_material *lab_mat, *lab_glow_mat, *lab_glass_mat;
 
 static inline int cx_of(float x) { int i = (int)floorf((x - LGX0) / CELL); return i < 0 ? 0 : i >= LGX ? LGX - 1 : i; }
@@ -398,14 +399,24 @@ void world_stage_floor(world_stage s, v3 *center, float *radius) {
 #define LAB_X0 (-LAB_DOOR_Z - .1f)
 #define LAB_X1 (9.5f - LAB_DOOR_Z)
 bool world_in_lab(v3 p) { return p.x > LAB_X0 && p.x < LAB_X1 && p.z < -LAB_DOOR_X + .1f && p.z > -40.5f; }
+/* under the portico, in front of the glass and in the recessed entry: everything inside is in view */
+static bool at_storefront(v3 p) { return p.x > LAB_X0 - .5f && p.x < LAB_X1 + .5f && p.z < 1.5f && p.z > -LAB_DOOR_X - .5f && p.y < 4; }
+static v3 subj_p; static float subj_t;
+void world_subject(v3 p) { subj_p = p; subj_t = .5f; }
 void world_update(float dt, v3 focus) {
   t3_object_set_position(dome, focus.x, focus.y, focus.z);
   t3_object_set_position(stars, focus.x, focus.y, focus.z);
   t3_object_set_position(sundisc, sun_at.x * (DOME_R - 6) + focus.x, sun_at.y * (DOME_R - 6) + focus.y, sun_at.z * (DOME_R - 6) + focus.z);
   if (stage != STAGE_TOWN) { if (arena_update(dt)) apply_lights(); return; }
   /* the door */
-  if (door_auto) door_target = (hypotf(focus.x, focus.z + LAB_DOOR_X) < 3.2f) ? 1.f : 0.f;
-  door_open = ds_damp(door_open, door_target, 7, dt);
+  /* the subject, else the lens */
+  bool has_subj = subj_t > 0; subj_t -= dt;
+  v3 subj = has_subj ? subj_p : focus;
+  /* the automatic door: called by anyone walking at it or standing in it (the player, walkers: world_move
+   * notes them), or by the subject of a scene close to it. Not by the lens: a camera does not open doors */
+  door_call -= dt;
+  if (door_auto) door_target = (door_call > 0 || (has_subj && hypotf(subj.x, subj.z + LAB_DOOR_X) < 2.6f)) ? 1.f : 0.f;
+  door_open = ds_damp(door_open, door_target, door_target > door_open ? 12.f : 5.f, dt);
   if (door_pivot[0]) {
     t3_object_set_rotation(door_pivot[0], 0, -door_open * 1.55f, 0);
     t3_object_set_rotation(door_pivot[1], 0, door_open * 1.55f, 0);
@@ -417,11 +428,16 @@ void world_update(float dt, v3 focus) {
     lab_glow_mat->color = (t3_color){k, k, k}; lab_glow_mat->version++;
   }
   /* lights: blend to the lab's inside */
-  bool in = world_in_lab(focus);
-  float nw = ds_damp(in_lab_w, in ? 1.f : 0.f, 5, dt);
-  if (fabsf(nw - in_lab_w) > .001f) { in_lab_w = nw; apply_lights(); } else if (in_lab_w != (in ? 1.f : 0.f)) { in_lab_w = in ? 1.f : 0.f; apply_lights(); }
+  /* the lights are the subject's: someone inside is lit by the lab wherever the lens stands */
+  bool in = world_in_lab(focus), in_s = world_in_lab(subj);
+  float nw = ds_damp(in_lab_w, in_s ? 1.f : 0.f, 5, dt);
+  if (fabsf(nw - in_lab_w) > .001f) { in_lab_w = nw; apply_lights(); } else if (in_lab_w != (in_s ? 1.f : 0.f)) { in_lab_w = in_s ? 1.f : 0.f; apply_lights(); }
   /* far from the lab it does not draw, deep inside the city does not */
   float dl = hypotf(ds_clamp(focus.x, LAB_X0, LAB_X1) - focus.x, ds_clamp(focus.z, -40.5f, 0) - focus.z);
+  /* the interior draws whole when the lens is in it, at the glass or in the entry, or near the building
+   * with the subject inside (a lens out the back door, through a window). It used to key on the lens
+   * alone, and a lens between the glass and the doors saw an empty box */
+  bool open = in || at_storefront(focus) || (in_s && dl < 15);
   /* inside, a band more than LAB_NEAR away along the hall draws its far twin. Outside, only from in front of
    * the glass: the first bands near, the next ones far */
   const float LAB_NEAR = 6.5f;
@@ -432,7 +448,7 @@ void world_update(float dt, v3 focus) {
     bool on, near = true;
     float dz = focus.z > L->z1 ? focus.z - L->z1 : focus.z < L->z0 ? L->z0 - focus.z : 0;
     if (L->always) on = dl < 260;
-    else if (in) { on = true; near = dz < LAB_NEAR; }
+    else if (open) { on = true; near = dz < LAB_NEAR; }
     else if (!facing) on = false;
     else { on = L->z > -16.f && dl < 60; near = L->z > -8.f && dl < 11 && fabsf(focus.x - (LAB_X0 + LAB_X1) * .5f) < 9; }
     if (L->twin < 0) { ((t3_object *)L->m)->visible = on; continue; }
@@ -565,6 +581,29 @@ bool world_visible(v3 a, v3 b) {
   if (l < 1e-4f) return true;
   return !world_raycast(a, v3_scale(d, 1 / l), l - 0.05f, &t, NULL);
 }
+float world_cam_clear(v3 from, v3 to, float r) {
+  v3 d = v3_sub(to, from); float len = v3_len(d);
+  if (len < 1e-4f) return 0;
+  d = v3_scale(d, 1 / len);
+  v3 rt = v3_cross(d, v3_(0, 1, 0));
+  rt = v3_len(rt) < 1e-3f ? v3_(1, 0, 0) : v3_norm(rt);
+  v3 up = v3_cross(rt, d);
+  /* the centre and four points on the rim: a ray alone lets the near plane's corners into a wall */
+  const v3 off[5] = { v3_(0, 0, 0), v3_scale(rt, r), v3_scale(rt, -r), v3_scale(up, r), v3_scale(up, -r) };
+  float best = len;
+  for (int i = 0; i < 5; i++) {
+    float t; v3 n;
+    if (world_raycast(v3_add(from, off[i]), d, best + r, &t, &n)) best = fminf(best, t - (i ? r * .5f : r));
+  }
+  best = fmaxf(0, best);
+  /* a sphere test in the lab for edges the rays straddle: step back toward from until it is clear */
+  if (stage == STAGE_TOWN) for (int k = 0; k < 8 && best > 0; k++) {
+    v3 c = v3_add(from, v3_scale(d, best));
+    if (!lab_push_sphere(&c, r, NULL)) break;
+    best = fmaxf(0, best - r * .5f);
+  }
+  return best;
+}
 static float lab_floor(v3 p, float up) {
   if (!tris || !near_lab(p, 0)) return -1e9f;
   float t; v3 n, o = v3_(p.x, p.y + up, p.z);
@@ -594,7 +633,9 @@ static float ground_under(v3 p, float r, float up) {
 }
 /* the closed front door blocks the doorway */
 static void door_push(v3 *p, float r, v3 *n, bool *hit) {
-  if (door_open > .6f) return;
+  /* only a door that is shut and staying shut blocks: one that has begun to open lets people through,
+   * so arriving at a run never bumps a half open leaf */
+  if (door_open > .12f || door_target > .5f) return;
   float z = -LAB_DOOR_X;
   if (fabsf(p->x) < .9f && fabsf(p->z - z) < r + .04f) {
     float s = p->z > z ? 1 : -1;
@@ -603,6 +644,13 @@ static void door_push(v3 *p, float r, v3 *n, bool *hit) {
 }
 void world_move(v3 *p, v3 *vel, float r, float h, float dt, bool *grounded) {
   bool was = *grounded;
+  /* someone moving at the front door, or standing in it, calls it open: where they are, and where they will
+   * be in .8 s. A body with no velocity at all is a path probe (story.c's nav grid), which never calls it */
+  if (stage == STAGE_TOWN && door_auto && (vel->x != 0 || vel->y != 0 || vel->z != 0)) {
+    float dz = -LAB_DOOR_X;
+    float near = hypotf(p->x, p->z - dz), ahead = hypotf(p->x + vel->x * .8f, p->z + vel->z * .8f - dz);
+    if (near < 1.6f || (ahead < 1.8f && near < 6.f)) door_call = .35f;
+  }
   *grounded = false;
   v3 step = v3_scale(*vel, dt);
   float len = v3_len(step);
@@ -649,8 +697,16 @@ float world_lab_yaw(float plan_deg) {
   return DS_PI * .5f + plan_deg * DS_PI / 180.f;
 }
 bool world_place(const char *name, v3 *pos, float *yaw) { return city_place(name, pos, yaw); }
+bool world_seat(int i, v3 *pos, float *yaw, bool *soft) {
+  if (i < 0 || i >= LAB_SEAT_N) return false;
+  if (pos) *pos = v3_(LAB_SEATS[i].x, LAB_SEATS[i].top, LAB_SEATS[i].z);
+  if (yaw) *yaw = LAB_SEATS[i].yaw;
+  if (soft) *soft = LAB_SEATS[i].soft != 0;
+  return true;
+}
 void world_door(float open) { door_auto = false; door_target = ds_clamp(open, 0, 1); }
 void world_door_auto(bool on) { door_auto = on; }
+float world_debug_door(void) { return door_open; }   /* for the world test */
 void world_arena_phase(int phase) { arena_set_phase(phase); }
 void world_traffic(bool on) { city_traffic(on); }
 bool world_train_bell(v3 *at) { return stage == STAGE_TOWN && city_train_bell(at); }

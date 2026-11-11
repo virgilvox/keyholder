@@ -405,7 +405,7 @@ static void draw_assist(float t) {
   cv *c = layer_begin(&L_ally, 380, 44, key);
   if (c) {
     p_plate(c, 0, 0, 380, 44, 10, INK, .84f);
-    char m[80]; snprintf(m, sizeof m, FG.ally_on ? "WITH YOU  %s" : ready ? "{=%s}  CALL %s" : "RECHARGING  %s", FG.ally_on ? (nm ? nm : "") : ready ? (pad ? "DUD" : "k:R") : (nm ? nm : ""), ready ? (nm ? nm : "") : "");
+    char m[80]; snprintf(m, sizeof m, FG.ally_on ? "WITH YOU  %s" : ready ? "{=%s}  CALL %s" : "RECHARGING  %s", FG.ally_on ? (nm ? nm : "") : ready ? g_act("ASSIST", pad) : (nm ? nm : ""), ready ? (nm ? nm : "") : "");
     g_markup(c, 14, 30, CV_LEFT, F_DISPLAY, 16, 1, ready || FG.ally_on ? C_CREAM : 0x8a90a0, 22, pad, m, true);
     layer_end(&L_ally, c);
   }
@@ -423,7 +423,7 @@ static void draw_fin(float t) {
   if (FG.fin_t < .3f) return;
   bool pad = input_get()->used_pad;
   cv *c = layer_begin(&L_fin, 420, 70, 0x5100u | (pad ? 1 : 0));
-  if (c) { g_markup(c, 210, 52, CV_CENTER, F_DISPLAY, 36, 2, 0xffffff, 48, pad, "{HEAVY}  FINISH IT", true); layer_end(&L_fin, c); }
+  if (c) { g_markup(c, 210, 52, CV_CENTER, F_DISPLAY, 36, 2, 0xffffff, 48, pad, "{STRIKE}  FINISH IT", true); layer_end(&L_fin, c); }
   float cx = 640, cy = 470;
   hg_circle(cx, cy - 20, 60 + 140 * left, C_HIVIS, .25f + .2f * sinf(t * 20));
   hg_tex(&L_fin, cx - 210, cy - 52, 1);

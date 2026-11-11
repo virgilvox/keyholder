@@ -1,26 +1,41 @@
-/* input.h: the player's intent each frame, from every pad and the keyboard.
+/* input.h: the player's intent each frame, from every pad and the keyboard and mouse.
  *
- *                       Pad                Keyboard            Mouse (web page)
+ *                       Pad                Keyboard and mouse (web page)
  *   move                left stick         WASD
- *   camera              right stick        arrows              move (pointer lock)
- *   light attack        X, RT              J, F, Left Ctrl     left button
- *   heavy attack        Y                  K
- *   guard (held)        LT                 L                   right button
+ *   camera              right stick        mouse (pointer lock), arrows
+ *   light attack        X, RT              left click (tap), J, Left Ctrl
+ *   heavy attack        Y                  hold left click, K
+ *   guard (held)        LT                 right click, L          (a tap as a blow lands parries)
+ *   dodge               B                  Shift (tap)
+ *   sprint (held)       L3, or stick full  Shift (held), Left Alt
  *   jump                A                  Space
- *   dodge               B                  Shift
- *   special             RB                 U                   wheel
- *   lock on (toggle)    LB, R3             Tab                 wheel
- *   weapon              d-pad left/right   1 to 5, Q
+ *   special             RB                 Q, U
+ *   lock on (toggle)    LB, R3             middle click, Tab
+ *   switch target       right stick flick  mouse wheel while locked on
+ *   weapon              d-pad left/right   1 to 5, mouse wheel when not locked on
  *   assist (call ally)  d-pad up           R
- *   talk, use           X                  E
- *   sprint (held)       L3, or stick full  Left Alt
+ *   talk, use           X                  E, F
+ *   draw, sheathe       d-pad up (roam)    G
+ *   bike (outdoors)     d-pad down (roam)  B
  *   pause               START              Esc, P
- *   menus: stick, d-pad or arrows; A, RT, a click or Enter picks, B or Esc backs out. */
+ *   menus: stick, d-pad or arrows; A, START, a left click or Enter picks, B or Esc backs out.
+ *
+ * The mouse: the web page reports its buttons and wheel as key codes in the HID reserved range
+ * (KEY_MOUSE_* below), so they sit in the same bitmap as the keyboard and count as the keyboard for
+ * the glyphs. Mouse motion still arrives as pad 0's right stick, and KEY_MOUSE_LOOK is held while the
+ * pointer is captured, so that motion does not switch the prompts to pad glyphs. */
 #ifndef DS_INPUT_H
 #define DS_INPUT_H
 #include <stdbool.h>
 #include <stdint.h>
 #include "wasmcart.h"
+
+#define KEY_MOUSE_L 0xF0      /* left button */
+#define KEY_MOUSE_R 0xF1      /* right button */
+#define KEY_MOUSE_M 0xF2      /* middle button */
+#define KEY_WHEEL_UP 0xF3     /* pulsed a few frames per notch */
+#define KEY_WHEEL_DOWN 0xF4
+#define KEY_MOUSE_LOOK 0xF5   /* held while the pointer is captured */
 
 typedef struct {
   float mx, my;            /* move, -1..1 (y +1 = forward) */
@@ -37,6 +52,11 @@ typedef struct {
   int nav_x, nav_y;        /* menus: edges, y +1 = down */
   bool ok, back;
   bool used_pad;           /* the last thing touched was a pad */
+  /* v1.2 */
+  int wheel;               /* mouse wheel this frame: +1 up, -1 down (fight: targets when locked, else weapons) */
+  bool mouse_look;         /* the camera rate comes from a captured mouse, not a stick */
+  bool draw;               /* pressed: draw or sheathe the weapon (roam) */
+  bool bike;               /* pressed: summon or leave the bike (roam, outdoors) */
 } intent_t;
 
 void input_frame(const wc_pad_t *pads, const uint8_t *keys);

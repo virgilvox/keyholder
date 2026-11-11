@@ -773,9 +773,11 @@ static void player_think(fighter_t *P, const intent_t *in, float dt) {
   if (in->heavy) { P->buf = 'H'; P->buf_t = .36f; }
   if (P->buf_t > 0) { P->buf_t -= dt; if (P->buf_t <= 0) P->buf = 0; }
   if (in->weapon_pick >= 0) player_weapon(in->weapon_pick);
-  if (in->weapon_step) {
+  /* the mouse wheel cycles weapons when nothing is locked on (locked on, it picks the target) */
+  int step = in->weapon_step ? in->weapon_step : FG.lock < 0 ? -in->wheel : 0;
+  if (step) {
     for (int k = 1; k <= WP_COUNT; k++) {
-      int w = ((P->wp + in->weapon_step * k) % WP_COUNT + WP_COUNT) % WP_COUNT;
+      int w = ((P->wp + step * k) % WP_COUNT + WP_COUNT) % WP_COUNT;
       if (FG.def.weapons & (1u << w)) { player_weapon(w); break; }
     }
   }
@@ -1532,12 +1534,16 @@ static void lock_input(const intent_t *in, float rdt) {
     sfx(SFX_UI, 0, .5f);
   }
   if (lock_flick > 0) lock_flick -= rdt;
-  if (FG.lock >= 0 && lock_flick <= 0 && fabsf(in->ax) > .72f && foes_up() > 1) {
+  /* the next target: a right stick flick, or the mouse wheel (a captured mouse never flicks: looking
+   * around with it must not keep changing who you are locked on to) */
+  bool wheel = FG.lock >= 0 && in->wheel != 0;
+  float flick = wheel ? (float)-in->wheel : in->mouse_look ? 0 : in->ax;
+  if (FG.lock >= 0 && (wheel || lock_flick <= 0) && fabsf(flick) > .72f && foes_up() > 1) {
     /* the next foe that way round, seen from the camera */
     v3 f = v3_norm(flat(v3_sub(FG.cam_look, FG.cam_pos)));
     v3 r = v3_(f.z, 0, -f.x);
     float cur = v3_dot(flat(v3_sub(FG.foe[FG.lock].pos, FG.cam_pos)), r), best = 1e9f; int pick = -1;
-    float s = in->ax > 0 ? -1.f : 1.f;   /* r here points left of the view */
+    float s = flick > 0 ? -1.f : 1.f;   /* r here points left of the view */
     for (int i = 0; i < FG.nfoe; i++) {
       if (i == FG.lock || !alive_foe(&FG.foe[i])) continue;
       float x = v3_dot(flat(v3_sub(FG.foe[i].pos, FG.cam_pos)), r);

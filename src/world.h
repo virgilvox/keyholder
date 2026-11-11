@@ -38,6 +38,19 @@ bool world_raycast(v3 origin, v3 dir, float max_dist, float *t, v3 *normal);
 bool world_visible(v3 a, v3 b);
 float world_floor_y(v3 p);                     /* the first surface at or below p, or -1e9 */
 bool world_in_lab(v3 p);
+/* v1.1: who the frame is about (the player in a roam, the people in a cutscene). The lab's lights, its
+ * interior and the front door follow the subject, not the lens: a lens outside the glass looking in at
+ * someone inside still sees the lab. Call it each frame before world_update; it lapses after half a
+ * second, and then the focus passed to world_update stands in. */
+void world_subject(v3 p);
+/* v1.1: a camera probe. How far from `from` toward `to` a sphere of radius r can travel before it
+ * touches a wall, a prop or the ground (rays at its centre and its rim, then a sphere test in the lab).
+ * Pick r so the sphere covers the near plane's corners. Returns a distance, 0..|to - from|. */
+float world_cam_clear(v3 from, v3 to, float r);
+/* v1.1: the lab's seats, from the HSL-108 model's chairs, stools and sofa (i from 0 until it returns false):
+ * the middle of the seat on the floor (pos.y is the seat's height), the yaw a sitter faces, and soft for the
+ * sofa and the lounge chair */
+bool world_seat(int i, v3 *pos, float *yaw, bool *soft);
 
 /* the HSL-108 plan (metres: x from the street to the back, z across from the west wall) to world */
 v3 world_lab(float plan_x, float plan_z);

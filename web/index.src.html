@@ -83,7 +83,7 @@ h1 { margin: 14px 0 0; white-space: nowrap; font-size: min(60px, 11.2cqw); lette
   clip-path: polygon(0 0, 100% 0, calc(100% - 7px) 100%, 0 100%); }
 .ctl table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .ctl th { text-align: left; color: var(--dim); font-weight: 400; letter-spacing: .14em; font-size: 10px; padding: 4px 6px 8px; }
-.ctl td { padding: 5px 6px; border-top: 1px solid #23272f; color: var(--dim); white-space: nowrap; }
+.ctl td { padding: 3px 6px; border-top: 1px solid #23272f; color: var(--dim); white-space: nowrap; }
 .ctl td:first-child { color: var(--text); font-weight: 700; letter-spacing: .04em; }
 kbd { display: inline-block; min-width: 22px; padding: 3px 6px 4px; margin: 0 1px; text-align: center; background: #f2ead8; color: #101218; border-radius: 4px;
   font: 700 11px/1.1 ui-monospace, Menlo, monospace; box-shadow: inset 0 -3px 0 #b8b2a2; }
@@ -97,7 +97,8 @@ kbd.m { background: #c9ccd1; box-shadow: inset 0 -3px 0 #8d9098; }
   repeating-linear-gradient(90deg, #101218 0 2px, transparent 2px 120px) bottom / 100% 16px no-repeat, #c9ccd1; opacity: .9; }
 .foot { grid-column: 1 / -1; color: #a9ab9e; font-size: 11px; line-height: 1.6; max-width: 1080px; background: rgba(12,13,16,.82); padding: 8px 12px; border-left: 3px solid var(--tan); }
 .foot a, .foot button { color: var(--orange); background: none; border: 0; font: inherit; cursor: pointer; padding: 0; text-decoration: underline; }
-@media (max-height: 720px) { .card { padding-top: 34px; gap: 18px 30px; } .left { gap: 16px; } .pitch { font-size: 12.5px; line-height: 1.5; } .ctl td { padding: 3px 6px; } #go { font-size: 22px; padding: 15px 36px 15px 30px; } }
+@media (max-height: 860px) { .ctl { padding-top: 14px; padding-bottom: 10px; } .ctl td { padding: 2px 6px; } .ctl th { padding-bottom: 5px; } }
+@media (max-height: 720px) { .card { padding-top: 34px; gap: 18px 30px; } .left { gap: 16px; } .pitch { font-size: 12.5px; line-height: 1.5; } .ctl td { padding: 1px 6px; } #go { font-size: 22px; padding: 15px 36px 15px 30px; } }
 @media (max-height: 600px) { .pitch { display: none; } }
 @media (max-width: 900px) { .card { grid-template-columns: minmax(0, 560px); } .stamp { width: 66px; height: 66px; right: 22px; } .stamp strong { font-size: 19px; } }
 @media (max-width: 520px) { .warn b { font-size: 22px; } .warn span { font-size: 15px; } .tri { border-left-width: 24px; border-right-width: 24px; border-bottom-width: 42px; }
@@ -145,16 +146,21 @@ kbd.m { background: #c9ccd1; box-shadow: inset 0 -3px 0 #8d9098; }
         <tr><th></th><th>KEYBOARD AND MOUSE</th><th>GAMEPAD</th></tr>
         <tr><td>MOVE</td><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></td><td><span class="pb s">L STICK</span></td></tr>
         <tr><td>CAMERA</td><td><kbd class="m">MOUSE</kbd> or arrows</td><td><span class="pb s">R STICK</span></td></tr>
-        <tr><td>TALK, USE, PICK</td><td><kbd>E</kbd> <kbd>ENTER</kbd></td><td><span class="pb x">X</span> <span class="pb a">A</span></td></tr>
+        <tr><td>TALK, USE</td><td><kbd>E</kbd> <kbd>F</kbd></td><td><span class="pb x">X</span></td></tr>
+        <tr><td>PICK</td><td><kbd>ENTER</kbd> <kbd class="m">CLICK</kbd></td><td><span class="pb a">A</span></td></tr>
         <tr><td>LIGHT ATTACK</td><td><kbd class="m">LEFT CLICK</kbd> <kbd>J</kbd></td><td><span class="pb x">X</span> <span class="pb t">RT</span></td></tr>
-        <tr><td>HEAVY ATTACK</td><td><kbd>K</kbd></td><td><span class="pb y">Y</span></td></tr>
-        <tr><td>GUARD, PARRY</td><td><kbd class="m">RIGHT CLICK</kbd> <kbd>L</kbd></td><td><span class="pb t">LT</span></td></tr>
-        <tr><td>DODGE</td><td><kbd>SHIFT</kbd></td><td><span class="pb b">B</span></td></tr>
+        <tr><td>HEAVY ATTACK</td><td>hold <kbd class="m">LEFT CLICK</kbd> <kbd>K</kbd></td><td><span class="pb y">Y</span></td></tr>
+        <tr><td>GUARD, TAP TO PARRY</td><td><kbd class="m">RIGHT CLICK</kbd> <kbd>L</kbd></td><td><span class="pb t">LT</span></td></tr>
+        <tr><td>DODGE</td><td>tap <kbd>SHIFT</kbd></td><td><span class="pb b">B</span></td></tr>
+        <tr><td>SPRINT</td><td>hold <kbd>SHIFT</kbd> <kbd>ALT</kbd></td><td><span class="pb s">L3</span></td></tr>
         <tr><td>JUMP</td><td><kbd>SPACE</kbd></td><td><span class="pb a">A</span></td></tr>
-        <tr><td>SPECIAL</td><td><kbd>U</kbd></td><td><span class="pb t">RB</span></td></tr>
-        <tr><td>LOCK ON</td><td><kbd>TAB</kbd></td><td><span class="pb t">LB</span></td></tr>
+        <tr><td>SPECIAL</td><td><kbd>Q</kbd> <kbd>U</kbd></td><td><span class="pb t">RB</span></td></tr>
+        <tr><td>LOCK ON</td><td><kbd class="m">MIDDLE CLICK</kbd> <kbd>TAB</kbd></td><td><span class="pb t">LB</span></td></tr>
+        <tr><td>NEXT TARGET</td><td><kbd class="m">WHEEL</kbd> while locked</td><td>flick <span class="pb s">R STICK</span></td></tr>
+        <tr><td>WEAPON</td><td><kbd>1</kbd>-<kbd>5</kbd> <kbd class="m">WHEEL</kbd></td><td><span class="pb s">D-PAD</span> left, right</td></tr>
         <tr><td>CALL A FRIEND</td><td><kbd>R</kbd></td><td><span class="pb s">D-PAD UP</span></td></tr>
-        <tr><td>WEAPON</td><td><kbd>1</kbd>-<kbd>5</kbd> <kbd>Q</kbd></td><td><span class="pb s">D-PAD</span></td></tr>
+        <tr><td>DRAW, SHEATHE</td><td><kbd>G</kbd></td><td><span class="pb s">D-PAD UP</span></td></tr>
+        <tr><td>BIKE, OUTDOORS</td><td><kbd>B</kbd></td><td><span class="pb s">D-PAD DOWN</span></td></tr>
         <tr><td>SKIP SCENE</td><td>hold <kbd>ENTER</kbd></td><td>hold <span class="pb s">START</span></td></tr>
         <tr><td>PAUSE</td><td><kbd>ESC</kbd> <kbd>P</kbd></td><td><span class="pb s">START</span></td></tr>
       </table>
@@ -280,13 +286,29 @@ window.addEventListener('keyup', (e) => {
   pressed.delete(c); host.keyUp(c, 0);
 }, true);
 function releaseAllKeys() { if (!host) return; for (const c of pressed) host.keyUp(c, 0); pressed.clear(); }
-window.addEventListener('blur', releaseAllKeys);
+window.addEventListener('blur', () => { releaseAllKeys(); releaseMouse(); });
 
 /* ---------- mouse: pointer lock, look = right stick ---------- */
 let sens = +lsGet('ds.sens', '1'), smooth = +lsGet('ds.smooth', '0.5');
 if (!(sens >= 0.2 && sens <= 3)) sens = 1;
 if (!(smooth >= 0 && smooth <= 0.9)) smooth = 0.5;
-let locked = false, accX = 0, accY = 0, lookX = 0, lookY = 0, mouseBtn = 0, wheelR = 0, wheelL = 0;
+let locked = false, accX = 0, accY = 0, lookX = 0, lookY = 0;
+// the mouse reaches the cart as key codes in the HID reserved range (src/input.h KEY_MOUSE_*):
+// buttons, wheel notches as short pulses, and one held while the pointer is captured
+const MOUSE_KEY = [0xF0, 0xF2, 0xF1], WHEEL_UP = 0xF3, WHEEL_DOWN = 0xF4, MOUSE_LOOK = 0xF5;
+const mouseHeld = new Set();
+function mouseKey(c, down) {
+  if (!host) return;
+  if (down) { if (!mouseHeld.has(c)) { mouseHeld.add(c); host.keyDown(c, 0); } }
+  else if (mouseHeld.has(c)) { mouseHeld.delete(c); host.keyUp(c, 0); }
+}
+function releaseMouse() { for (const c of [...mouseHeld]) mouseKey(c, false); }
+let wheelBusy = 0;
+function wheelPulse(c) {
+  if (!host || performance.now() < wheelBusy) return;   // one notch at a time, so a free spin does not race the list
+  wheelBusy = performance.now() + 120;
+  host.keyDown(c, 0); setTimeout(() => { if (host) host.keyUp(c, 0); }, 60);
+}
 const lockSupported = !!canvas.requestPointerLock;
 function takeLock() {
   if (!lockSupported || locked) return;
@@ -295,7 +317,8 @@ function takeLock() {
 }
 document.addEventListener('pointerlockchange', () => {
   const was = locked; locked = document.pointerLockElement === canvas;
-  if (!locked) { accX = accY = 0; mouseBtn = 0; if (was && gateGone()) tapEscape(); }
+  if (!locked) { accX = accY = 0; releaseMouse(); if (was && gateGone()) tapEscape(); }
+  else mouseKey(MOUSE_LOOK, true);
   $('hint').classList.toggle('show', !locked && gateGone() && lockSupported);
 });
 document.addEventListener('pointerlockerror', () => {});
@@ -303,14 +326,14 @@ function gateGone() { return $('gate').classList.contains('gone'); }
 canvas.addEventListener('mousedown', (e) => {
   e.preventDefault(); canvas.focus();
   if (!locked) { takeLock(); return; }       // the capturing click is not a shot
-  mouseBtn |= 1 << e.button;
+  if (MOUSE_KEY[e.button] !== undefined) mouseKey(MOUSE_KEY[e.button], true);
 });
-window.addEventListener('mouseup', (e) => { mouseBtn &= ~(1 << e.button); });
+window.addEventListener('mouseup', (e) => { if (MOUSE_KEY[e.button] !== undefined) mouseKey(MOUSE_KEY[e.button], false); });
 window.addEventListener('mousemove', (e) => { if (locked) { accX += e.movementX; accY += e.movementY; } });
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
   if (!locked) return;
-  if (e.deltaY < 0) wheelR = 3; else if (e.deltaY > 0) wheelL = 3;   // a few frames so the cart sees the edge
+  if (e.deltaY < 0) wheelPulse(WHEEL_UP); else if (e.deltaY > 0) wheelPulse(WHEEL_DOWN);   // held a few frames so the cart sees the edge
 }, { passive: false });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 window.addEventListener('wheel', (e) => { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
@@ -342,9 +365,8 @@ window.addEventListener('mousemove', () => { if (locked) return; document.body.c
 const BTN_MAP = [1, 2, 4, 8, 16, 32, 0, 0, 128, 64, 4096, 8192, 256, 512, 1024, 2048, 16384];
 const i16 = (v) => Math.round(Math.max(-1, Math.min(1, v)) * 32767);
 // Each gamepad is its own pad, so a second controller is player 2 in co-op (the
-// cart lets any pad drive player 1 when one person plays). The mouse rides on
-// pad 0 with the first gamepad: left button the right trigger, right button the
-// left trigger, wheel taps R and L.
+// cart lets any pad drive player 1 when one person plays). Mouse motion rides on
+// pad 0's right stick with the first gamepad; its buttons and wheel are keys (above).
 const pick = (cur, v) => (Math.abs(v) > Math.abs(cur) ? v : cur);
 function readPad(gp, withMouse) {
   const pad = { connected: true, buttons: 0, leftX: 0, leftY: 0, rightX: 0, rightY: 0, leftTrigger: 0, rightTrigger: 0 };
@@ -355,10 +377,6 @@ function readPad(gp, withMouse) {
     lt = gp.buttons[6] ? gp.buttons[6].value : 0; rt = gp.buttons[7] ? gp.buttons[7].value : 0;
   }
   if (withMouse) {
-    if (mouseBtn & 1) rt = 1;
-    if (mouseBtn & 2) lt = 1;
-    if (wheelR > 0) { pad.buttons |= 32; wheelR--; }
-    if (wheelL > 0) { pad.buttons |= 16; wheelL--; }
     mouseStick();
     rx = pick(rx, lookX); ry = pick(ry, lookY);
   }

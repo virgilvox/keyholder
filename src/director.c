@@ -221,6 +221,16 @@ static bool near_wall(v3 p, float r) {
   for (int i = 0; i < 6; i++) { float t; v3 n; if (world_raycast(p, D[i], r, &t, &n)) return true; }
   return false;
 }
+/* the lens stands where its people are: in the lab with someone in the lab, outside with someone
+ * outside. A lens on the far side of the storefront or a wall sees the building, not the scene
+ * (a group split across the door may be framed from either side) */
+static bool same_space(const dir_spec *s, v3 pos) {
+  if (world_get_stage() != STAGE_TOWN) return true;
+  int nin = 0, nout = 0;
+  if (s->nsubj) for (int i = 0; i < s->nsubj; i++) { if (world_in_lab(actor_pos(s->subj[i]))) nin++; else nout++; }
+  else { if (world_in_lab(s->type == SH_INSERT ? s->fpos : s->flook)) nin++; else nout++; }
+  return world_in_lab(pos) ? nin > 0 : nout > 0;
+}
 static float vis_score(const dir_spec *s, v3 pos) {
   float got = 0, n = 0;
   if (s->type == SH_INSERT) {
@@ -251,6 +261,7 @@ static float min_dist(sh_type t) {
 static float rate(const dir_spec *s, frame_t f, bool *fail) {
   *fail = false;
   if (near_wall(f.pos, .2f)) { *fail = true; return -100; }
+  if (!same_space(s, f.pos)) { *fail = true; return -100; }
   float v = vis_score(s, f.pos);
   float sc = v * 3 - (v < .6f ? 2 : 0);
   if (v < .5f) *fail = true;
@@ -594,7 +605,7 @@ static void recheck(float dt) {
   float nsc = solve_any(&s, &bc, S.t, &here);
   frame_t f = frame_of(&s, &bc, S.t);
   /* a short move with a clear path eases; a long or blocked one cuts */
-  bool path = v3_len(v3_sub(f.pos, here)) < 1.6f && world_visible(here, f.pos);
+  bool path = v3_len(v3_sub(f.pos, here)) < 1.6f && world_visible(here, f.pos) && world_in_lab(here) == world_in_lab(f.pos);   /* never sweep through the door: cut */
   for (int i = 0; path && i < NOCC; i++) {
     if (!actor_is_visible(OCC[i])) continue;
     v3 h = head(OCC[i]);
@@ -617,6 +628,8 @@ void director_update(float dt) {
   track(dt);
   recheck(dt);
   frame_t f = frame_of(&S.s, &S.c, S.t);
+  /* the lab's interior and lights follow who the shot is about, not the lens */
+  world_subject(S.s.nsubj ? center(&S.s) : S.s.type == SH_INSERT ? S.s.fpos : f.look);
   /* lead a moving subject by the rig's lag, so the lens keeps its distance */
   if (S.s.type != SH_FIXED && S.s.type != SH_TOP && S.s.nsubj) {
     v3 v = vel_of(S.s.subj[0]);
@@ -657,10 +670,11 @@ void director_update(float dt) {
   /* the boom: the last guard against a wall between the lens and what it looks at. The solver keeps
    * this rare; a pull of more than a little asks the live check for a new angle */
   if (S.s.type != SH_FIXED) {
+    /* a sphere over the near plane's corners, not a ray: a ray lets the frame's edges into the wall */
     v3 d = v3_sub(pos, look); float len = v3_len(d); d = v3_norm(d);
-    float t; v3 n;
-    if (world_raycast(look, d, len + .15f, &t, &n) && t > .45f) {
-      pos = v3_add(look, v3_scale(d, fmaxf(.45f, t - .22f)));
+    float t = world_cam_clear(look, pos, .14f);
+    if (t < len - 1e-3f && t > .45f) {
+      pos = v3_add(look, v3_scale(d, t));
       if (t < len * .85f) S.bad += 2;
     }
   }

@@ -41,6 +41,73 @@ static const lab_area_t LAB_AREAS[LAB_AREA_N] = {
   {"window display: robot counter", {-0.47f, 0.10f, -14.28f}, {6.52f, 3.05f, -3.61f}, {3.61f, 0.10f, 2.31f}, {14.28f, 3.05f, 9.29f}},
   {"woodshop", {2.32f, 0.00f, -28.84f}, {6.54f, 2.30f, -22.69f}, {22.69f, 0.00f, 5.09f}, {28.84f, 2.30f, 9.31f}},
 };
+/* seats (generated from the model's chairs, stools and sofa): world x, z, the seat's height, the world yaw a sitter faces, and soft (a sofa or a lounge chair) */
+#define LAB_SEAT_N 63
+static const struct { float x, z, top, yaw; int soft; } LAB_SEATS[LAB_SEAT_N] = {
+  {5.35f, -6.13f, 0.50f, 1.57f, 0},   /* Office chair, plan 6.13 8.13 */
+  {3.14f, -6.90f, 0.50f, 1.57f, 0},   /* Office chair, plan 6.90 5.91 */
+  {4.75f, -6.90f, 0.50f, -1.57f, 0},   /* Office chair, plan 6.90 7.53 */
+  {-0.86f, -7.62f, 0.50f, 1.57f, 0},   /* Office chair, plan 7.62 1.91 */
+  {0.75f, -7.62f, 0.50f, -1.57f, 0},   /* Office chair, plan 7.62 3.52 */
+  {3.14f, -7.71f, 0.50f, 1.57f, 0},   /* Office chair, plan 7.71 5.91 */
+  {4.75f, -7.71f, 0.50f, -1.57f, 0},   /* Office chair, plan 7.71 7.53 */
+  {-0.86f, -8.44f, 0.50f, 1.57f, 0},   /* Office chair, plan 8.44 1.91 */
+  {0.75f, -8.44f, 0.50f, -1.57f, 0},   /* Office chair, plan 8.44 3.52 */
+  {3.14f, -8.52f, 0.50f, 1.57f, 0},   /* Office chair, plan 8.52 5.91 */
+  {4.75f, -8.52f, 0.50f, -1.57f, 0},   /* Office chair, plan 8.52 7.53 */
+  {-0.86f, -9.25f, 0.50f, 1.57f, 0},   /* Office chair, plan 9.25 1.91 */
+  {0.75f, -9.25f, 0.50f, -1.57f, 0},   /* Office chair, plan 9.25 3.52 */
+  {3.14f, -9.47f, 0.50f, 1.57f, 0},   /* Office chair, plan 9.47 5.91 */
+  {4.75f, -9.47f, 0.50f, -1.57f, 0},   /* Office chair, plan 9.47 7.53 */
+  {-1.53f, -9.95f, 0.46f, -1.57f, 0},   /* Chair, plan 9.95 1.24 */
+  {3.14f, -10.29f, 0.50f, 1.57f, 0},   /* Office chair, plan 10.29 5.91 */
+  {4.75f, -10.29f, 0.50f, -1.57f, 0},   /* Office chair, plan 10.29 7.53 */
+  {3.14f, -11.10f, 0.50f, 1.57f, 0},   /* Office chair, plan 11.10 5.91 */
+  {4.75f, -11.10f, 0.50f, -1.57f, 0},   /* Office chair, plan 11.10 7.53 */
+  {-0.29f, -11.52f, 0.46f, -3.14f, 0},   /* Chair, plan 11.52 2.49 */
+  {0.50f, -11.52f, 0.46f, -3.14f, 0},   /* Chair, plan 11.52 3.28 */
+  {3.14f, -12.23f, 0.50f, 1.57f, 0},   /* Office chair, plan 12.23 5.91 */
+  {4.75f, -12.23f, 0.50f, -1.57f, 0},   /* Office chair, plan 12.23 7.53 */
+  {-0.96f, -12.77f, 0.46f, 1.57f, 0},   /* Chair, plan 12.77 1.82 */
+  {1.17f, -12.77f, 0.46f, -1.57f, 0},   /* Chair, plan 12.77 3.94 */
+  {3.14f, -13.05f, 0.50f, 1.57f, 0},   /* Office chair, plan 13.05 5.91 */
+  {4.75f, -13.05f, 0.50f, -1.57f, 0},   /* Office chair, plan 13.05 7.53 */
+  {-0.96f, -13.28f, 0.46f, 1.57f, 0},   /* Chair, plan 13.28 1.82 */
+  {1.17f, -13.28f, 0.46f, -1.57f, 0},   /* Chair, plan 13.28 3.94 */
+  {-0.96f, -13.80f, 0.46f, 1.57f, 0},   /* Chair, plan 13.80 1.82 */
+  {1.17f, -13.80f, 0.46f, -1.57f, 0},   /* Chair, plan 13.80 3.94 */
+  {3.14f, -13.86f, 0.50f, 1.57f, 0},   /* Office chair, plan 13.86 5.91 */
+  {4.75f, -13.86f, 0.50f, -1.57f, 0},   /* Office chair, plan 13.86 7.53 */
+  {3.37f, -14.89f, 0.41f, 3.14f, 1},   /* Sofa seat cushion, plan 14.89 6.14 */
+  {3.92f, -14.89f, 0.41f, 3.14f, 1},   /* Sofa seat cushion, plan 14.89 6.70 */
+  {4.48f, -14.89f, 0.41f, 3.14f, 1},   /* Sofa seat cushion, plan 14.89 7.26 */
+  {5.47f, -14.98f, 0.49f, 1.57f, 0},   /* Keyboard stool, plan 14.98 8.25 */
+  {-0.29f, -15.04f, 0.46f, -0.00f, 0},   /* Chair, plan 15.04 2.49 */
+  {0.50f, -15.04f, 0.46f, -0.00f, 0},   /* Chair, plan 15.04 3.28 */
+  {-1.56f, -15.29f, 0.46f, -1.57f, 0},   /* Chair, plan 15.29 1.21 */
+  {4.65f, -15.57f, 0.46f, 3.14f, 1},   /* Camp chair seat, plan 15.57 7.42 */
+  {5.48f, -18.56f, 0.74f, 1.57f, 0},   /* Bar stool, plan 18.56 8.25 */
+  {5.48f, -19.17f, 0.74f, 1.57f, 0},   /* Bar stool, plan 19.17 8.25 */
+  {4.47f, -19.65f, 0.74f, -1.57f, 0},   /* Bar stool, plan 19.65 7.25 */
+  {5.48f, -19.77f, 0.74f, 1.57f, 0},   /* Bar stool, plan 19.77 8.25 */
+  {4.47f, -20.26f, 0.74f, -1.57f, 0},   /* Bar stool, plan 20.26 7.25 */
+  {5.65f, -20.59f, 0.46f, 1.57f, 0},   /* Chair, plan 20.59 8.43 */
+  {4.47f, -20.87f, 0.74f, -1.57f, 0},   /* Bar stool, plan 20.87 7.25 */
+  {-1.53f, -22.90f, 0.46f, -1.57f, 0},   /* Chair, plan 22.90 1.24 */
+  {-0.32f, -23.84f, 0.74f, 1.57f, 0},   /* Bar stool, plan 23.84 2.46 */
+  {1.14f, -23.84f, 0.74f, -1.57f, 0},   /* Bar stool, plan 23.84 3.91 */
+  {2.74f, -24.02f, 0.74f, 1.57f, 0},   /* Bar stool, plan 24.02 5.52 */
+  {-0.32f, -24.60f, 0.74f, 1.57f, 0},   /* Bar stool, plan 24.60 2.46 */
+  {1.14f, -24.60f, 0.74f, -1.57f, 0},   /* Bar stool, plan 24.60 3.91 */
+  {2.74f, -24.87f, 0.74f, 1.57f, 0},   /* Bar stool, plan 24.87 5.52 */
+  {-0.32f, -25.35f, 0.74f, 1.57f, 0},   /* Bar stool, plan 25.35 2.46 */
+  {1.14f, -25.35f, 0.74f, -1.57f, 0},   /* Bar stool, plan 25.35 3.91 */
+  {-0.32f, -26.05f, 0.74f, 1.57f, 0},   /* Bar stool, plan 26.05 2.46 */
+  {1.14f, -26.05f, 0.74f, -1.57f, 0},   /* Bar stool, plan 26.05 3.91 */
+  {-1.12f, -27.50f, 0.50f, -2.36f, 0},   /* Office chair, plan 27.50 1.65 */
+  {1.20f, -38.18f, 0.46f, 3.14f, 0},   /* Chair, plan 38.18 3.97 */
+  {1.20f, -39.22f, 0.46f, 0.00f, 0},   /* Chair, plan 39.22 3.97 */
+};
 enum {
   AREA_3D_PRINTING = 0,
   AREA_AV_STATION = 1,

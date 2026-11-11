@@ -11,7 +11,7 @@
 #define INK 0x12121au
 #define PAPER 0xf4eee2u
 #define DIMT 0xa8a49au
-static layer_t L_box, L_name, L_opt[5], L_prompt, L_ch, L_card, L_note, L_obj, L_clock, L_use, L_toast, L_got, L_title, L_menu, L_cards[3], L_retry, L_end, L_mk, L_tasks, L_mgt, L_mgh, L_seq, L_sub, L_trip, L_greet;
+static layer_t L_box, L_name, L_opt[5], L_prompt, L_ch, L_card, L_note, L_obj, L_clock, L_use, L_toast, L_got, L_title, L_menu, L_cards[3], L_retry, L_end, L_mk, L_tasks, L_mgt, L_mgh, L_seq, L_sub, L_trip, L_greet, L_gear[2];
 
 static float ez(float t) { t = ds_clamp(t, 0, 1); return 1 - (1 - t) * (1 - t) * (1 - t); }
 
@@ -200,6 +200,34 @@ static void draw_roam(const story_ui_t *U) {
     hg_tex(&L_use, 330, U->mg && U->mg != MG_GREET && U->mg != MG_POINT ? 450 : 556, 1);
   }
 }
+/* the roam's standing hints, bottom left: the weapon (once one is owned) and the bike (once it is unlocked,
+ * outdoors), in the use prompt's style, with this device's glyphs */
+static int gear_rows(const story_ui_t *U) {
+  if (U->mg && U->mg != MG_GREET && U->mg != MG_POINT) return 0;
+  return (U->gear_wp ? 1 : 0) + (U->gear_bike ? 1 : 0);
+}
+static void draw_gear(const story_ui_t *U) {
+  if (U->mg && U->mg != MG_GREET && U->mg != MG_POINT) return;
+  bool pad = input_get()->used_pad;
+  char s[2][120]; int n = 0;
+  if (U->gear_wp) {
+    if (U->gear_drawn) snprintf(s[n++], sizeof s[0], "{DRAW} SHEATHE    {LIGHT} SWING");
+    else { char up[48]; int k = 0; for (const char *p = U->gear_wp; *p && k < 47; p++) up[k++] = (*p >= 'a' && *p <= 'z') ? (char)(*p - 32) : *p; up[k] = 0;
+      snprintf(s[n++], sizeof s[0], "{DRAW} DRAW %s", up); }
+  }
+  if (U->gear_bike) snprintf(s[n++], sizeof s[0], U->gear_riding ? "{BIKE} GET OFF THE BIKE" : "{BIKE} RIDE THE BIKE");
+  for (int i = 0; i < n; i++) {
+    cv *c = layer_begin(&L_gear[i], 560, 40, hash_str(s[i], 61 + pad));
+    if (c) {
+      float w = g_markup(c, 0, 26, CV_LEFT, F_DISPLAY, 16, 1, PAPER, 26, pad, s[i], false) + 40;
+      cv_fill_hex(c, INK, .72f); cv_begin(c); cv_move(c, 0, 2); cv_line(c, w + 12, 2); cv_line(c, w, 38); cv_line(c, 0, 38); cv_close(c); cv_fill(c);
+      cv_fill_hex(c, ORANGE, 1); cv_fill_rect(c, 0, 2, 5, 36);
+      g_markup(c, 18, 26, CV_LEFT, F_DISPLAY, 16, 1, PAPER, 26, pad, s[i], true);
+      layer_end(&L_gear[i], c);
+    }
+    hg_tex(&L_gear[i], 0, DS_H - 30 - (n - i) * 46, .95f);
+  }
+}
 /* the roam's task list: required bright, optional grey, done ticked, the marker's one arrowed */
 static void draw_tasks(const story_ui_t *U) {
   if (!U->ntask) return;
@@ -347,7 +375,7 @@ static void draw_sub(const story_ui_t *U) {
     for (int i = 0; i < lines; i++) p_text(c, F_TYPE, 22, 0, CV_LEFT, w[i], 188, 30 + i * 30, PAPER, 1);
     layer_end(&L_sub, c);
   }
-  float y = DS_H - 60 - lines * 30 - U->letterbox * 62 - (U->prompt_use ? 70 : 0);
+  float y = DS_H - 60 - lines * 30 - U->letterbox * 62 - (U->prompt_use ? 100 : U->roam ? gear_rows(U) * 46 : 0);
   hg_grad(640, y + 22 + lines * 15, 1100, lines * 30 + 26, 0, INK, 0, .0f);
   hg_rect(120, y + 2, 1040, lines * 30 + 18, INK, .55f * a);
   hg_tex(&L_sub, 120, y, a);
@@ -399,7 +427,7 @@ void hud_vn_draw(void) {
   hg_begin();
   if (U->dim > .01f) hg_rect(0, 0, DS_W, DS_H, 0x05060c, U->dim);
   if (U->letterbox > .01f) { float h = 62 * U->letterbox; hg_rect(0, 0, DS_W, h, 0x000000, 1); hg_rect(0, DS_H - h, DS_W, h, 0x000000, 1); }
-  if (U->roam) { draw_roam(U); draw_tasks(U); if (U->mg) draw_minigame(U); }
+  if (U->roam) { draw_roam(U); draw_tasks(U); draw_gear(U); if (U->mg) draw_minigame(U); }
   if (U->sub_text && U->sub_t > 0 && !U->talking) draw_sub(U);
   if (U->chapter) draw_chapter(U);
   if (U->note) draw_note(U);
@@ -463,11 +491,17 @@ void hud_pause_draw(int sel, bool music) {
       cv_fill_hex(c, s ? ORANGE : 0x24242e, 1); cv_fill_rect(c, 0, 84 + i * 56, 470, 48);
       p_text(c, F_TYPE, 19, 0, CV_LEFT, rows[i], 18, 115 + i * 56, s ? INK : PAPER, 1);
     }
-    static const char *K[][2] = { {"Move", "WASD"}, {"Camera", "Arrows, mouse"}, {"Light attack", "J, F, click"}, {"Heavy attack", "K"}, {"Guard, parry", "L, right click"}, {"Dodge", "Shift"}, {"Jump", "Space"}, {"Special", "U"}, {"Lock on", "Tab"}, {"Call a friend", "R"}, {"Weapon", "1 to 5, Q"}, {"Talk, use", "E"}, {"Skip scene", "hold Enter"} };
-    static const char *P[] = {"Left stick", "Right stick", "X or RT", "Y", "LT", "B", "A", "RB", "LB or R3", "D-pad up", "D-pad left, right", "X", "Hold START"};
-    for (int i = 0; i < 13; i++) {
-      p_text(c, F_MONO, 15, 0, CV_LEFT, K[i][0], 520, 104 + i * 30, DIMT, 1);
-      p_text(c, F_MONO, 15, 0, CV_LEFT, in->used_pad ? P[i] : K[i][1], 700, 104 + i * 30, PAPER, 1);
+    static const char *K[][2] = { {"Move", "WASD"}, {"Camera", "Mouse, arrows"}, {"Light attack", "Left click, J"}, {"Heavy attack", "Hold left click, K"},
+      {"Guard, parry", "Right click, L (tap to parry)"}, {"Dodge, sprint", "Shift tap; sprint hold Shift, Alt"}, {"Jump", "Space"}, {"Special", "Q, U"},
+      {"Lock on", "Middle click, Tab"}, {"Next target", "Wheel while locked on"}, {"Weapon", "1 to 5, wheel"}, {"Call a friend", "R"},
+      {"Talk, use", "E, F"}, {"Draw, sheathe", "G"}, {"Bike (outdoors)", "B"}, {"Skip scene", "Hold Enter"} };
+    static const char *P[] = {"Left stick", "Right stick", "X or RT", "Y", "LT (tap to parry)", "B; sprint L3 or full stick", "A", "RB", "LB or R3",
+      "Flick right stick", "D-pad left, right", "D-pad up", "X", "D-pad up", "D-pad down", "Hold START"};
+    enum { NK = sizeof K / sizeof K[0] };
+    _Static_assert(sizeof P / sizeof P[0] == NK, "a pad row for every keyboard row");
+    for (int i = 0; i < NK; i++) {
+      p_text(c, F_MONO, 15, 0, CV_LEFT, K[i][0], 510, 100 + i * 28, DIMT, 1);
+      p_text(c, F_MONO, 15, 0, CV_LEFT, in->used_pad ? P[i] : K[i][1], 680, 100 + i * 28, PAPER, 1);
     }
     layer_end(&L_menu, c);
   }

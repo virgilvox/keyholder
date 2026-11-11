@@ -79,9 +79,9 @@ void game_frame(float dt) {
     return;
   }
   f -= end;
-  if (f == 0 || f == 30) {   /* the line up, in model order left to right: the first half, then the rest */
+  if (f % 12 == 0 && f < 60) {   /* the line up, in model order left to right, nine at a time (five groups, 12 frames each) */
     hide_all();
-    int lo = f ? (AM_COUNT + 1) / 2 : 0, hi = f ? AM_COUNT : (AM_COUNT + 1) / 2;
+    int lo = f / 12 * 9, hi = lo + 9 < AM_COUNT ? lo + 9 : AM_COUNT;
     for (int i = lo; i < hi; i++) {
       actor_visible(A[i], true); actor_expr_clear(A[i]); actor_mouth(A[i], 0, 0); actor_look(A[i], v3_(0, 0, 0), 0);
       actor_place(A[i], v3_((i - lo - (hi - lo - 1) * .5f) * .7f, 0, 0), 0);
