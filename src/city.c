@@ -703,7 +703,7 @@ static void far_tree(t3_object *r, uint32_t h, float s) {
   }
 }
 static void far_car(t3_object *r, int colour) {
-  t3_material *m = CP.paint[colour % 6];
+  t3_material *m = CP.paint[colour % 10];
   prop(r, P_.box, m, 0, .62f, 0, 4.5f, .55f, 1.75f);
   prop(r, P_.box, CP.glass, -.1f, 1.18f, 0, 2.4f, .56f, 1.5f);
   prop(r, P_.box, m, -.15f, 1.48f, 0, 1.35f, .05f, 1.44f);
@@ -724,48 +724,7 @@ static void far_pole(t3_object *r) {
     prop(r, P_.box, M_teal, 0, 8.25f, side * 3.2f, .34f, .1f, .34f);
   }
 }
-/* ── the cars: Kenney's Car Kit (CC0) through tools/prep-cars.mjs, assets/models/cars.glb. Per kind a mesh in
- * its own colours and one of white body paint that a material recolours. The order is prep-cars.mjs's ── */
-enum { CK_SEDAN, CK_SUV, CK_HATCH, CK_SPORTS, CK_LUXURY, CK_VAN, CK_PICKUP, CK_TAXI, CK_POLICE, CK_DELIVERY, CK_N };
-static const char *const CK_NAME[CK_N] = {"sedan", "suv", "hatch", "sports", "luxury", "van", "pickup", "taxi", "police", "delivery"};
-static t3_mesh *CK_OWN[CK_N], *CK_PAINT[CK_N];
-static t3_gltf *cars_gltf;
-static t3_material *M_carvc;
-static void load_cars(void) {
-  size_t n; uint8_t *b = ds_asset("cars.glb", &n);
-  if (!b) { ds_log("city: cars.glb missing, boxes stand in"); return; }
-  cars_gltf = t3_gltf_parse(b, n, NULL, NULL);
-  free(b);
-  if (!cars_gltf) return;
-  M_carvc = toy_paint(1, 1, 1); M_carvc->vertex_colors = true;
-  t3_object *root = cars_gltf->scene;
-  for (int i = 0; i < root->child_count; i++) {
-    t3_object *o = root->children[i];
-    if (o->type != T3_MESH || !o->name) continue;
-    for (int k = 0; k < CK_N; k++) {
-      char a[40], pnt[40]; snprintf(a, sizeof a, "car_%s", CK_NAME[k]); snprintf(pnt, sizeof pnt, "car_%s_paint", CK_NAME[k]);
-      if (!strcmp(o->name, a)) CK_OWN[k] = (t3_mesh *)o;
-      if (!strcmp(o->name, pnt)) CK_PAINT[k] = (t3_mesh *)o;
-    }
-  }
-}
-/* one car into g (its length along local x, the front at +x): the kind's meshes, the paint recoloured */
-static bool kenney_car(t3_object *g, int kind, int colour) {
-  if (!CK_OWN[kind]) return false;
-  for (int k = 0; k < 2; k++) {
-    t3_mesh *src = k ? CK_PAINT[kind] : CK_OWN[kind];
-    if (!src) continue;
-    t3_mesh *m = add(g, src->geometry, k ? CP.paint[colour % 6] : M_carvc, false);
-    m->base.position = src->base.position; m->base.scale = src->base.scale;
-  }
-  return true;
-}
 /* parked and passing: mostly sedans and SUVs, some pickups and vans, now and then a taxi or a police car */
-static int car_kind(uint32_t h) {
-  static const unsigned char MIX[20] = {CK_SEDAN, CK_SEDAN, CK_SEDAN, CK_SEDAN, CK_SEDAN, CK_SUV, CK_SUV, CK_SUV, CK_SUV, CK_HATCH, CK_HATCH,
-    CK_PICKUP, CK_PICKUP, CK_PICKUP, CK_LUXURY, CK_LUXURY, CK_VAN, CK_SPORTS, CK_TAXI, CK_POLICE};
-  return MIX[h % 20];
-}
 static void build_props(void) {
   G_lowball = t3_sphere_geometry_new(1, 6, 4);
   for (int lod = 1; lod <= 2; lod++) for (int i = 0; i < CITY_NPROP; i++) {
@@ -786,7 +745,7 @@ static void build_props(void) {
         else fk_planter(g, &P_, M_conc, M_dirt, M_bark, M_leaf, M_leaf2, h);
         rx = 1.6f; rz = .8f; top = .24f; break;
       case CP_BENCH: if (far) prop(g, P_.box, M_gspl, 0, .5f, -.1f, 1.8f, .45f, .5f); else fk_bench(g, &P_, M_gspl); rx = .92f; rz = .3f; top = .5f; break;
-      case CP_CAR: if (far) far_car(g, q->v); else if (!kenney_car(g, car_kind(h >> 3), q->v)) fk_car(g, &P_, &CP, q->v); rx = 2.3f; rz = .95f; top = 1.45f; break;
+      case CP_CAR: if (far) far_car(g, (int)((h >> 5) % 10)); else fk_car(g, &P_, &CP, (int)((h >> 5) % 10), (int)((h >> 9) % 5)); rx = 2.3f; rz = .95f; top = 1.45f; break;
       case CP_SIGNAL: fk_signal(g, &P_, M_teal); r = .16f; break;
       case CP_TOWER: fk_tower(g, &P_, M_steel, q->v ? 26 : 15, q->v ? 3.2f : 2.1f); r = q->v ? 3.3f : 2.2f; top = .5f; break;
       case CP_SHELTER: fk_shelter(g, &P_, M_teal, M_gspl); rx = 2.1f; rz = .3f; top = .5f; break;
@@ -1083,8 +1042,7 @@ static bool traffic = true;
 static void build_cars(void) {
   for (int i = 0; i < NCAR; i++) {
     t3_object *g = t3_group_new();
-    static const int KIND[NCAR] = {CK_SEDAN, CK_SUV, CK_PICKUP, CK_HATCH, CK_VAN, CK_TAXI};
-    if (!kenney_car(g, KIND[i % NCAR], (i * 5 + 1) % 6)) fk_car(g, &P_, &CP, (i * 5 + 1) % 6);
+    fk_car(g, &P_, &CP, (i * 7 + 2) % 10, i % 5);
     CAR[i].g = t3_group_new();
     private_meshes(g, CAR[i].g);
     t3_object_add(croot, CAR[i].g);
@@ -1101,7 +1059,7 @@ static void build_cars(void) {
 static t3_object *TRUCK;
 static void build_truck(void) {
   t3_object *g = t3_group_new();
-  if (!kenney_car(g, CK_PICKUP, 3)) fk_car(g, &P_, &CP, 3);
+  fk_car(g, &P_, &CP, 6, 3);   /* the crew's pickup */
   TRUCK = t3_group_new();
   private_meshes(g, TRUCK);
   t3_release(g);
@@ -1182,8 +1140,10 @@ void city_init(t3_object *root) {
   M_bark = toy_paint(.36f, .29f, .22f); M_leaf = toy_paint(.36f, .47f, .2f); M_leaf2 = toy_paint(.46f, .54f, .24f); M_frond = toy_paint(.3f, .47f, .2f); M_palebark = toy_paint(.5f, .42f, .34f);
   M_conc = toy_paint(.74f, .71f, .65f); M_dirt = toy_paint(.46f, .36f, .26f); M_steel = toy_paint(.8f, .82f, .84f); M_gspl = toy_paint(.13f, .33f, .22f); M_bronze = toy_paint(.36f, .25f, .15f);
   CP.body = car_shell(false); CP.cabin = car_shell(true); CP.disc = t3_cylinder_geometry_new(1, 1, 1, 10, 1, false);
-  const float pc[6][3] = {{.66f, .68f, .7f}, {.2f, .3f, .42f}, {.45f, .08f, .1f}, {.86f, .85f, .8f}, {.1f, .1f, .12f}, {.16f, .42f, .7f}};
-  for (int i = 0; i < 6; i++) CP.paint[i] = toy_paint(pc[i][0], pc[i][1], pc[i][2]);
+  /* the paints you see in a Mesa lot: silver, white, black, grey, navy, red, sky blue, sage, tan, maroon */
+  const float pc[10][3] = {{.66f, .68f, .7f}, {.88f, .87f, .83f}, {.08f, .08f, .1f}, {.38f, .39f, .41f}, {.14f, .2f, .33f},
+                           {.55f, .08f, .08f}, {.24f, .48f, .72f}, {.42f, .5f, .4f}, {.64f, .56f, .42f}, {.36f, .1f, .14f}};
+  for (int i = 0; i < 10; i++) CP.paint[i] = toy_paint(pc[i][0], pc[i][1], pc[i][2]);
   CP.glass = toy_paint(.1f, .14f, .18f); CP.rubber = toy_paint(.03f, .03f, .035f); CP.alloy = toy_paint(.55f, .57f, .6f);
   CP.head = glow(.9f, .95f, 1); CP.tail = glow(1, .05f, .03f);
 
@@ -1211,7 +1171,6 @@ void city_init(t3_object *root) {
   build_ground();
   build_buildings();
   build_lots();
-  load_cars();
   build_props();
   build_sets();
   build_pools();

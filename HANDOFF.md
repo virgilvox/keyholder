@@ -1,6 +1,6 @@
 # KEYHOLDER handoff
 
-State as of 2026-11-11: v1.3.0 is on GitHub (github.com/virgilvox/keyholder), on Pages (virgilvox.github.io/keyholder) and in the v1.3.0 release (cart md5 `8dfbe390f1a2bc5373865846daff1280`). The game station still runs 1.0.2: on 2026-11-10 and 2026-11-11 it did not answer at 172.22.111.83 (not on ARP from the R610 either; likely powered off). To update it, wait until `pidof retroarch` is empty, back up the old cart, copy the new one to `.incoming/` and `mv` it into place, check the md5, and add a row to `HeatSync Labs Operations 2026/docs/06-change-log.md`.
+State as of 2026-11-11: v1.3.1 is on GitHub (github.com/virgilvox/keyholder), on Pages (virgilvox.github.io/keyholder) and in the v1.3.1 release (cart md5 `18763a2c457ba486679b8828694f0ad7`). The game station still runs 1.0.2: on 2026-11-10 and 2026-11-11 it did not answer at 172.22.111.83 (not on ARP from the R610 either; likely powered off). To update it, wait until `pidof retroarch` is empty, back up the old cart, copy the new one to `.incoming/` and `mv` it into place, check the md5, and add a row to `HeatSync Labs Operations 2026/docs/06-change-log.md`.
 
 Read `docs/DESIGN.md` for the module contract and the art rules, and `docs/PLACES.md` for every downtown address.
 
@@ -9,7 +9,7 @@ Read `docs/DESIGN.md` for the module contract and the art rules, and `docs/PLACE
 - **Nights:** tools/script/night1.mjs to night3.mjs (Open Hack Night, Hack Your Hackerspace, Second Friday) run after the day, with carry-over flags, a NIGHTS row on the title, and do-ocracy lessons in scenes. KH_AUTO plays everything and ends with `[auto] END FINAL KEYHOLDERS`.
 - **Roams:** once required tasks are done the goal is shown and reached in a generous circle (some roams end on a timer). The wayfinder sticks to one labelled target and routes round walls.
 - **Street:** src/street.c, tools/script/street.mjs (24 stranger types, documented in its header), `node tools/script/street_compile.mjs`, then bake. Doors into five interiors (src/interior.c, one table line per room). Moheeb and Luis on the Chupacabra patio from 4:30 pm (Kyutai voices via tools/voices_kyutai.py).
-- **Town:** Mesa Arts Center, Chupacabra (14 N Robson), the lab's back alley, Kenney cars (tools/prep-cars.mjs), original printer models in prep-lab.mjs. Sources in docs/PLACES.md.
+- **Town:** Mesa Arts Center, Chupacabra (14 N Robson), the lab's back alley, parked cars facing their stalls, original printer models in prep-lab.mjs. Sources in docs/PLACES.md.
 - **Pages:** the one-file page is now 106 MB, over GitHub's 100 MB file limit, so tools/publish-pages.sh publishes a small loader page that fetches keyholder.wasc beside it. The one-file page ships in each release.
 - **Memory:** about 586 MB at boot and 728 MB after the nights (voices are 44 MB). Too much for the station is likely; an actor free in actor.c would let each night release the day's bodies.
 

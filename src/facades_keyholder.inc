@@ -192,7 +192,7 @@ static void fk_generic(t3_object *r, const whimsy_parts *p, t3_material *brick, 
 }
 
 /* ── the street ── */
-typedef struct { t3_geometry *body, *cabin, *tire, *disc; t3_material *paint[6], *glass, *rubber, *alloy, *head, *tail; } car_parts;
+typedef struct { t3_geometry *body, *cabin, *tire, *disc; t3_material *paint[10], *glass, *rubber, *alloy, *head, *tail; } car_parts;
 static t3_geometry *car_shell(bool cabin) {
   static const float body[][4] = {{-2.3f, .45f, .75f, .75f}, {-2.23f, .40f, .83f, .82f}, {-2.05f, .35f, .91f, .88f}, {-1.25f, .35f, 1, .91f}, {1.15f, .35f, .96f, .91f}, {2.05f, .39f, .83f, .86f}, {2.23f, .43f, .76f, .79f}, {2.3f, .47f, .69f, .72f}};
   static const float roof[][4] = {{-1.35f, .94f, .98f, .8f}, {-.75f, .96f, 1.48f, .74f}, {.48f, .94f, 1.48f, .74f}, {1.18f, .92f, .96f, .8f}};
@@ -222,20 +222,60 @@ static t3_geometry *car_shell(bool cabin) {
   }
   return mb_done(&b);
 }
-static void fk_car(t3_object *r, const whimsy_parts *p, const car_parts *c, int colour) {
-  t3_material *m = c->paint[colour % 6];
-  prop(r, c->body, m, 0, .03f, 0, 1, 1, 1);
-  prop(r, c->cabin, c->glass, 0, .03f, 0, 1, 1, 1);
-  prop(r, p->box, m, -.15f, 1.5f, 0, 1.35f, .05f, 1.44f);
+/* A parked or passing car. One rounded shell (car_shell) scaled into five kinds, so the street has variety
+ * without a second art style: 0 sedan, 1 hatchback, 2 SUV, 3 pickup, 4 minivan. Ten real-world paints.
+ * Mirrors, a grille, plates, a door seam and hubs make it read up close. Length runs along x, the front at +x. */
+#define CAR_KINDS 5
+#define CAR_PAINTS 10
+static void fk_car(t3_object *r, const whimsy_parts *p, const car_parts *c, int colour, int kind) {
+  /* per kind: length, body height, cabin x offset, cabin length, cabin height, wheel radius, track */
+  static const float K[CAR_KINDS][7] = {
+    {1.00f, 1.00f,  0.00f, 1.00f, 1.00f, .35f, .90f},   /* sedan */
+    {0.86f, 1.02f, -0.22f, 1.18f, 1.04f, .34f, .88f},   /* hatchback: short, the roof runs to the back */
+    {1.04f, 1.22f, -0.12f, 1.22f, 1.22f, .42f, .95f},   /* SUV: tall, long roof, big wheels */
+    {1.12f, 1.12f,  0.55f, 0.62f, 1.14f, .41f, .95f},   /* pickup: a short cab up front, a bed behind */
+    {1.06f, 1.30f, -0.05f, 1.42f, 1.42f, .36f, .93f},   /* minivan: tall and long */
+  };
+  kind = ((kind % CAR_KINDS) + CAR_KINDS) % CAR_KINDS;
+  const float *k = K[kind];
+  float L = k[0], Hb = k[1], wr = k[5], tr = k[6];
+  t3_material *m = c->paint[((colour % CAR_PAINTS) + CAR_PAINTS) % CAR_PAINTS];
+  float lift = (wr - .35f) * .9f;   /* bigger wheels sit the body higher */
+  prop(r, c->body, m, 0, .03f + lift, 0, L, Hb, 1);
+  /* the cabin: glass, with the roof panel over it in paint */
+  float cx = k[2], cl = k[3], ch = k[4];
+  float body_top = .91f * Hb + lift;
+  if (kind != 3) {
+    prop(r, c->cabin, c->glass, cx, .03f + lift + (body_top - .9f - lift), 0, cl * L, ch, 1);
+    prop(r, p->box, m, cx - .15f * cl, .03f + lift + (body_top - .9f - lift) + 1.5f * ch - .02f, 0, 1.35f * cl * L, .05f, 1.44f);
+  } else {
+    /* pickup: the cab forward, the open bed behind it with its side walls and tailgate */
+    prop(r, c->cabin, c->glass, cx, body_top - .9f + .03f, 0, cl, ch, 1);
+    prop(r, p->box, m, cx - .15f * cl, body_top - .9f + .03f + 1.5f * ch - .02f, 0, 1.35f * cl, .05f, 1.44f);
+    float bx0 = -2.3f * L + .08f, bx1 = cx - .95f * cl, bl = bx1 - bx0, bm = (bx0 + bx1) * .5f;
+    prop(r, p->box, c->rubber, bm, body_top + .02f, 0, bl, .04f, 1.6f);                         /* bed floor */
+    for (int sd = -1; sd <= 1; sd += 2) prop(r, p->box, m, bm, body_top + .2f, sd * .86f, bl, .38f, .07f);   /* bed sides */
+    prop(r, p->box, m, bx0, body_top + .2f, 0, .07f, .38f, 1.7f);                                /* tailgate */
+  }
   for (int side = -1; side <= 1; side += 2) {
     for (int axle = -1; axle <= 1; axle += 2) {
-      float wx = axle * 1.43f, wz = side * .9f;
-      t3_mesh *t = prop(r, c->disc, c->rubber, wx, .35f, wz, .35f, .22f, .35f); t3_object_set_rotation(t, 1.5707963f, 0, 0);
-      t3_mesh *h = prop(r, c->disc, c->alloy, wx, .35f, wz + side * .115f, .2f, .02f, .2f); t3_object_set_rotation(h, 1.5707963f, 0, 0);
+      float wx = axle * 1.43f * L, wz = side * tr;
+      t3_mesh *t = prop(r, c->disc, c->rubber, wx, wr, wz, wr, .22f, wr); t3_object_set_rotation(t, 1.5707963f, 0, 0);
+      t3_mesh *h = prop(r, c->disc, c->alloy, wx, wr, wz + side * .115f, wr * .58f, .02f, wr * .58f); t3_object_set_rotation(h, 1.5707963f, 0, 0);
     }
-    prop(r, p->box, c->head, 2.28f, .72f, side * .56f, .06f, .12f, .33f);
-    prop(r, p->box, c->tail, -2.28f, .75f, side * .58f, .06f, .14f, .3f);
+    float fx = 2.3f * L - .02f, rx = -2.3f * L + .02f;
+    prop(r, p->box, c->head, fx, .72f * Hb + lift, side * .56f, .06f, .12f, .33f);
+    prop(r, p->box, c->tail, rx, .75f * Hb + lift, side * .58f, .06f, .14f, .3f);
+    /* mirrors on short stalks, by the front of the cabin */
+    float mx = (kind == 3 ? cx : cx) + .62f * cl * L;
+    prop(r, p->box, m, mx, body_top + .08f, side * 1.02f, .12f, .1f, .14f);
+    /* the door seam: a thin dark line down each side */
+    prop(r, p->box, c->rubber, cx + .05f, .62f * Hb + lift, side * .985f, .02f, .42f * Hb, .02f);
   }
+  /* grille and plates */
+  prop(r, p->box, c->rubber, 2.3f * L, .55f * Hb + lift, 0, .05f, .16f * Hb, .7f);
+  prop(r, p->box, c->alloy, 2.31f * L, .4f * Hb + lift, 0, .03f, .1f, .3f);
+  prop(r, p->box, c->alloy, -2.31f * L, .5f * Hb + lift, 0, .03f, .1f, .3f);
 }
 /* the catenary pole: teal, tapering, with a curved double lamp arm to each side, and two cross arms for the wires */
 static void fk_pole(t3_object *r, const whimsy_parts *p, t3_material *teal, t3_material *wire) {

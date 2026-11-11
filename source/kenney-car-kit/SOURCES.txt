@@ -1,4 +1,0 @@
-Kenney Car Kit 3.1 (www.kenney.nl), Creative Commons Zero (CC0): License.txt.
-The GLB models used by the game and the kit's colour map, as distributed (Models/GLB format).
-tools/prep-cars.mjs converts them into assets/models/cars.glb: vertex colours sampled from the
-colour map, low poly wheels, scaled to real car lengths, turned so the length runs along +x.

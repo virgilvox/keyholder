@@ -18,7 +18,7 @@ TOBJ="$OUT/obj/three_core"
 GOBJ="$OUT/obj/game"
 JOBS="$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)"
 NAME=keyholder
-VERSION=1.3.0
+VERSION=1.3.1
 
 if ! command -v emcc >/dev/null; then
   [ -f "$HOME/emsdk/emsdk_env.sh" ] && source "$HOME/emsdk/emsdk_env.sh" >/dev/null 2>&1
