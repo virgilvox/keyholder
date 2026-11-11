@@ -350,7 +350,7 @@ static void draw_twist(float t) {
 static void draw_lesson(void) {
   static const struct { const char *label, *act; } L[TUT_FREE] = {
     {"MOVE AROUND", "MOVE"}, {"LIGHT ATTACK: LAND THREE", "LIGHT"}, {"HEAVY ATTACK: LAND TWO", "HEAVY"}, {"DODGE THROUGH A SWING", "DODGE"},
-    {"GUARD: HOLD AND TAKE ONE", "GUARD"}, {"PARRY: TAP GUARD AS IT LANDS", "GUARD"}, {"SPECIAL: THE METER IS FULL", "SPECIAL"} };
+    {"GUARD: HOLD AND TAKE ONE", "GUARD"}, {"PARRY (OPTIONAL): TAP GUARD, OR JUST BLOCK", "GUARD"}, {"SPECIAL: THE METER IS FULL", "SPECIAL"} };
   const twist_t *T = &FG.tw;
   bool pad = input_get()->used_pad;
   int st = T->step;

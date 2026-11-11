@@ -1,8 +1,11 @@
 # KEYHOLDER handoff
 
-State as of 2026-11-11: v1.3.3 is on GitHub (github.com/virgilvox/keyholder), on Pages (virgilvox.github.io/keyholder) and in the v1.3.3 release (cart md5 `78f2baf7958df1b9a1d539385b57fa54`). The game station still runs 1.0.2: on 2026-11-10 and 2026-11-11 it was off. Its address is from the pool and not reserved: on 2026-11-11 172.22.111.83 was a different machine (new SSH host key, no game API on :1234, `batocerahsl.local` silent), so find the station by `batocerahsl.local` and check the host key against known_hosts before sending the password. To update it, wait until `pidof retroarch` is empty, back up the old cart, copy the new one to `.incoming/` and `mv` it into place, check the md5, and add a row to `HeatSync Labs Operations 2026/docs/06-change-log.md`.
+State as of 2026-11-11: v1.3.4 is on GitHub (github.com/virgilvox/keyholder), on Pages (virgilvox.github.io/keyholder) and in the v1.3.4 release (cart md5 `adaaebd97fee6126533d45b5a1914cb9`). The game station still runs 1.0.2: on 2026-11-10 and 2026-11-11 it was off. Its address is from the pool and not reserved: on 2026-11-11 172.22.111.83 was a different machine (new SSH host key, no game API on :1234, `batocerahsl.local` silent), so find the station by `batocerahsl.local` and check the host key against known_hosts before sending the password. To update it, wait until `pidof retroarch` is empty, back up the old cart, copy the new one to `.incoming/` and `mv` it into place, check the md5, and add a row to `HeatSync Labs Operations 2026/docs/06-change-log.md`.
 
 Read `docs/DESIGN.md` for the module contract and the art rules, and `docs/PLACES.md` for every downtown address.
+
+## v1.3.4 (2026-11-11)
+- Orientation tutorial: the parry lesson is optional now. Blocking a hit clears it, and if you do neither it moves on after 6 s (was a 18 s wait for a clean parry). Parry is still a bonus. The lesson reads "PARRY (OPTIONAL): TAP GUARD, OR JUST BLOCK". Verified with guard-only input through the KH_TEST_FIGHT tier 7: lesson 6 of 7 cleared without a timed parry.
 
 ## v1.3.3 (2026-11-11)
 - Moheeb and Luis are on the Chupacabra patio all day and every night (CAMEO.hours [0, 30]); they load at the first roam, and the opening roam's banter says where they are.

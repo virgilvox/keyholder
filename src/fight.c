@@ -339,7 +339,7 @@ static bool land_blow(fighter_t *att, fighter_t *def, float dmg, float stun, flo
     }
     float chip = dmg * .12f;
     def->hp = fmaxf(1, def->hp - chip);   /* a guard is never the blow that ends it */
-    if (def->player) { FG.damage_taken += chip; tut_done(TUT_GUARD); }
+    if (def->player) { FG.damage_taken += chip; tut_done(TUT_GUARD); tut_done(TUT_PARRY); }   /* a block clears the parry lesson too: parry is a bonus, not a gate */
     fx_clash(pt, col); sound(SFX_CLASH, pt, 1); shake(.15f);
     att->freeze = fmaxf(att->freeze, hitstop * .6f); def->freeze = fmaxf(def->freeze, hitstop * .6f);
     return true;
@@ -2394,7 +2394,8 @@ static void twist_update(float dt) {
       if (!fight) break;
       T->step_t += dt;
       if (T->step == TUT_MOVE && P->st == F_FREE && v3_len(flat(P->vel)) > 1.f) T->step_n += dt;
-      if (T->step < TUT_FREE && (T->step_n >= TUT_NEED[T->step] || T->step_t > 18)) tut_next();
+      float step_cap = T->step == TUT_PARRY ? 6 : 18;   /* parry is optional: don't make a mouse player wait it out */
+      if (T->step < TUT_FREE && (T->step_n >= TUT_NEED[T->step] || T->step_t > step_cap)) tut_next();
       bool calm = T->step < TUT_DODGE || T->step == TUT_SPECIAL;
       /* the lessons that need a swing to meet get one every couple of seconds */
       for (int i = 0; i < FG.nfoe; i++) FG.foe[i].atk_cd = calm ? fmaxf(FG.foe[i].atk_cd, .6f) : fminf(FG.foe[i].atk_cd, 1.6f);
