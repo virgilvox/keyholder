@@ -32,5 +32,12 @@ void director_set_occluders(actor_t *const *list, int n);
 void director_cut(const dir_spec *s);
 void director_update(float dt);
 bool director_active(void);
+/* v1.1 moods bias coverage (the SH_AUTO pick), lens, handheld and how long a shot holds */
+typedef enum { DM_CALM, DM_TENSE, DM_COMIC, DM_EMOTIONAL, DM_COUNT } dir_mood;
+void director_set_mood(int mood);
+int director_mood(void);
+/* how many more lines a shot holds on the same speaker before auto coverage changes the angle */
+int director_hold_lines(void);
+/* director_cut with SH_AUTO picks the coverage by mood: subj[0] speaks, subj[1] (optional) listens */
 void director_stop(void);
 #endif

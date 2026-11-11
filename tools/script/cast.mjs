@@ -19,26 +19,41 @@ export const CAST = {
   // the people who walk in today
   vic:    { name: 'Vinyl Vic', model: 'F', voice: 'am_fenrir', speed: 1.05, scale: 1.0, color: 0xe05a9c,
             pal: { hair: hue(300, 1.2, 1), top: hue(280, 1.4, 1), bottom: hue(250, 1, .8), shoes: hue(0) } },
-  lim:    { name: 'Inspector Lim', model: 'S', voice: 'af_sarah', speed: 1.0, scale: 1.0, color: 0xc8d4e0,
-            pal: { hair: hue(190, .5, .55), top: hue(190, .35, .7), bottom: hue(210, .5, .45), shoes: hue(0, .5, .6) } },
-  rennick:{ name: 'Rennick', model: 'F', voice: 'am_liam', speed: 1.1, scale: 1.0, color: 0xa8d060,
-            pal: { hair: hue(60, 1.3, 1.2), top: hue(90, 1.3, .9), bottom: hue(40, .9, .7), shoes: hue(0) } },
+  lim:    { name: 'Inspector Lim', model: 'W', voice: 'af_sarah', speed: 1.0, scale: 1.0, color: 0xc8d4e0,
+            pal: NONE },
+  rennick:{ name: 'Rennick', model: 'H', voice: 'am_liam', speed: 1.1, scale: 1.0, color: 0xa8d060,
+            pal: NONE },
   dobbs:  { name: 'Dobbs', model: 'D', voice: 'am_onyx', speed: 1.0, scale: 1.08, color: 0xb09060,
             pal: { hair: hue(20, 1.2, 1.1), top: hue(30, 1.3, 1.1), bottom: hue(25, .6, .7), shoes: hue(0) } },
-  champ:  { name: 'High Score', model: 'C', voice: 'af_nova', speed: 1.1, scale: 1.0, color: 0x60e0e0,
-            pal: { hair: hue(180, 1.2, 1.1), top: hue(120, 1.2, 1), bottom: hue(150, 1, 1), shoes: hue(0) } },
+  champ:  { name: 'High Score', model: 'V', voice: 'af_nova', speed: 1.1, scale: 1.0, color: 0x60e0e0,
+            pal: NONE },
   bex:    { name: 'Bex', model: 'C', voice: 'af_nicole', speed: 1.02, scale: 1.0, color: 0x90d8f0,
             pal: { hair: hue(-70, .7, 1.25), top: hue(200, .7, 1.1), bottom: hue(-120, .6, 1.1), shoes: hue(0) } },
   cal:    { name: 'Copper Cal', model: 'D', voice: 'am_adam', speed: 1.0, scale: 1.1, color: 0xd07030,
             pal: { hair: hue(15, 1.5, 1.2), top: hue(20, 1.5, 1.3), bottom: hue(15, .8, .7), shoes: hue(0) } },
-  root:   { name: 'Root', model: 'F', voice: 'bm_george', speed: .98, scale: 1.04, color: 0x88a0a8,
-            pal: { hair: hue(0, .1, 1.6), top: hue(200, .4, .7), bottom: hue(200, .4, .6), shoes: hue(0) } },
-  brant:  { name: 'Brant Holloway', model: 'D', voice: 'am_eric', speed: 1.08, scale: 1.02, color: 0xe8c860,
-            pal: { hair: hue(30, 1.2, 1.5), top: hue(45, .4, 2.2), bottom: hue(45, .4, 2.0), shoes: hue(40, .6, 1.3) } },
+  root:   { name: 'Root', model: 'O', voice: 'bm_george', speed: .98, scale: 1.04, color: 0x88a0a8,
+            pal: NONE },
+  brant:  { name: 'Brant Holloway', model: 'M', voice: 'am_eric', speed: 1.08, scale: 1.02, color: 0xe8c860,
+            pal: { hair: hue(-145, .9, 1.35), top: hue(0), bottom: hue(0), shoes: hue(0) } },
+  // v1.1: more people. Each has a small beat in the day.
+  wes:    { name: 'Wes', model: 'M', voice: 'bm_fable', speed: 1.04, scale: 1.0, color: 0x7fa8d8,     // seventh grade science teacher
+            pal: NONE },
+  hal:    { name: 'Hal', model: 'P', voice: 'am_santa', speed: .96, scale: 1.02, color: 0xb8b0a0,   // retired machinist
+            pal: { hair: hue(0, .1, 1.4), top: hue(0), bottom: hue(0), shoes: hue(0) } },
+  reggie: { name: 'Reggie', model: 'U', voice: 'bm_daniel', speed: 1.08, scale: 1.0, color: 0x8c6a3c, // delivery driver
+            pal: { hair: hue(0), top: hue(0, 1, .55), bottom: hue(0), shoes: hue(0) } },
+  dana:   { name: 'Dana', model: 'G', voice: 'af_jessica', speed: 1.06, scale: 1.0, color: 0xe0a0b0,  // a parent at Tech Tear Apart
+            pal: NONE },
+  milo:   { name: 'Milo', model: 'E', voice: 'af_alloy', speed: 1.12, scale: .86, color: 0xf0d050,     // Dana's kid
+            pal: NONE },
+  ines:   { name: 'Ines', model: 'K', voice: 'bf_isabella', speed: 1.06, scale: .98, color: 0x70c0a0, // a student with a robot
+            pal: NONE },
+  gloria: { name: 'Gloria', model: 'R', voice: 'bf_alice', speed: .98, scale: .97, color: 0xc8a0e0,   // a neighbor from the apartments
+            pal: NONE },
   intern: { name: 'Intern', model: 'S', voice: 'af_sky', speed: 1.1, scale: .98, color: 0xd8d8d8,
             pal: { hair: hue(0, .4, .9), top: hue(45, .4, 1.1), bottom: hue(0, .2, .6), shoes: hue(0) } },
-  crew:   { name: 'Scrapper', model: 'D', voice: 'am_adam', speed: 1.0, scale: 1.0, color: 0xa06030,
-            pal: { hair: hue(10, .6, .7), top: hue(15, 1.0, .7), bottom: hue(10, .6, .5), shoes: hue(0) } },
+  crew:   { name: 'Scrapper', model: 'H', voice: 'am_adam', speed: 1.0, scale: 1.0, color: 0xa06030,
+            pal: { hair: hue(20, .8, .8), top: hue(0, 1, .5), bottom: hue(0), shoes: hue(0) } },
 };
 // who the three playable members are. Choosing one makes the other two m1 and m2.
 export const PLAYABLE = ['vee', 'dex', 'ruth'];

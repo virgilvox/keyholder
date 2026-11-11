@@ -9,13 +9,15 @@
 #include "world.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "facades_common.inc"
 #include "facades_mesa.inc"
 #include "facades_keyholder.inc"
 
 /* ── the sinks ── */
-enum { MC_PLAIN, MC_BRICK, MC_ASPHALT, MC_PAVER, MC_CONCRETE, MC_SIGN, MC_NEON, MC_LAMP, MC_WIN, MC_POOL, MC_COUNT };
+/* MC_PROP and MC_FPROP: the street props, near (full) and far (a few boxes); their lamps go in MC_LAMP */
+enum { MC_PLAIN, MC_BRICK, MC_ASPHALT, MC_PAVER, MC_CONCRETE, MC_SIGN, MC_NEON, MC_LAMP, MC_WIN, MC_POOL, MC_PROP, MC_FPROP, MC_COUNT };
 #define CELL 90.f
 #define GX0 (CITY_X0 - 60)
 #define GZ0 (CITY_Z0 - 60)
@@ -105,7 +107,8 @@ static void bins_build(void) {
 }
 
 /* ── capture: a tree of props into the sinks ── */
-typedef struct { int cell; bool collide; } cap_ctx;
+static t3_material *M_winglow_fwd;
+typedef struct { int cell; bool collide; int lod; } cap_ctx;  /* lod: 0 none, 1 near props, 2 far props */
 static void capture(t3_object *o, void *vctx) {
   cap_ctx *ctx = vctx;
   if (o->type != T3_MESH) return;
@@ -118,7 +121,10 @@ static void capture(t3_object *o, void *vctx) {
   bool uvs = false;
   if (sign) { mc = sign->neon ? MC_NEON : MC_SIGN; uvs = true; col = (t3_color){1, 1, 1}; }
   else if (mt == FAC_BRICK) { mc = MC_BRICK; uvs = true; col = (t3_color){1, 1, 1}; }
+  else if (mt == M_winglow_fwd) mc = MC_WIN;
   else if (mt->type == T3_MESH_BASIC_MATERIAL) mc = MC_LAMP;
+  if (ctx->lod == 2 && mc == MC_LAMP) return;      /* the near pass already put the lamps in */
+  if (ctx->lod && mc != MC_LAMP) mc = ctx->lod == 1 ? MC_PROP : MC_FPROP;
   sink_t *s = sink_at(ctx->cell, mc);
   const float *e = o->matrix_world.e;
   float a = e[0], b = e[4], c = e[8], d = e[1], f = e[5], h = e[9], i = e[2], j = e[6], l = e[10];
@@ -168,7 +174,7 @@ static t3_material *M_white, *M_timber, *M_teal, *M_ink, *M_wire, *M_bark, *M_le
 static car_parts CP;
 static void capture_group(t3_object *g, float cx, float cz, bool collide) {
   t3_object_update_matrix_world(g, true);
-  cap_ctx ctx = {cell_of(cx, cz), collide};
+  cap_ctx ctx = {cell_of(cx, cz), collide, 0};
   t3_object_traverse(g, capture, &ctx);
 }
 
@@ -523,34 +529,73 @@ static void build_pools(void) {
 }
 
 /* ── props ── */
+/* far versions of the props: the same outline from a few boxes and low balls */
+static t3_geometry *G_lowball;
+static void far_tree(t3_object *r, uint32_t h, float s) {
+  prop(r, P_.box, M_bark, 0, 1.2f * s, 0, .14f * s, 2.4f * s, .14f * s);
+  for (int i = 0; i < 3; i++) {
+    float a = i * 2.1f + h % 5, rr = .35f * s;
+    prop(r, G_lowball, i % 2 ? M_leaf : M_leaf2, cosf(a) * rr, (2.5f + i * .45f) * s, sinf(a) * rr, .85f * s, .7f * s, .85f * s);
+  }
+}
+static void far_car(t3_object *r, int colour) {
+  t3_material *m = CP.paint[colour % 6];
+  prop(r, P_.box, m, 0, .62f, 0, 4.5f, .55f, 1.75f);
+  prop(r, P_.box, CP.glass, -.1f, 1.18f, 0, 2.4f, .56f, 1.5f);
+  prop(r, P_.box, m, -.15f, 1.48f, 0, 1.35f, .05f, 1.44f);
+  for (int ax = -1; ax <= 1; ax += 2) prop(r, P_.box, CP.rubber, ax * 1.43f, .35f, 0, .7f, .7f, 1.8f);
+  for (int side = -1; side <= 1; side += 2) { prop(r, P_.box, CP.head, 2.28f, .72f, side * .56f, .06f, .12f, .33f); prop(r, P_.box, CP.tail, -2.28f, .75f, side * .58f, .06f, .14f, .3f); }
+}
+static void far_lamp(t3_object *r) {
+  prop(r, P_.box, M_ink, 0, 2.3f, 0, .14f, 4.6f, .14f);
+  prop(r, P_.box, M_ink, .3f, 4.45f, 0, .6f, .06f, .06f);
+  prop(r, P_.box, M_ink, .55f, 4.55f, 0, .4f, .16f, .4f);
+  prop(r, P_.box, P_.lamp, .55f, 4.4f, 0, .24f, .12f, .24f);
+}
+static void far_pole(t3_object *r) {
+  prop(r, P_.box, M_teal, 0, 4.5f, 0, .26f, 9, .26f);
+  for (int side = -1; side <= 1; side += 2) {
+    t3_mesh *a = prop(r, P_.box, M_teal, 0, 7.6f, side * 1.6f, .08f, .08f, 3.4f); t3_object_set_rotation(a, side * -.35f, 0, 0);
+    prop(r, P_.box, P_.lamp, 0, 8.05f, side * 3.2f, .26f, .3f, .26f);
+    prop(r, P_.box, M_teal, 0, 8.25f, side * 3.2f, .34f, .1f, .34f);
+  }
+}
 static void build_props(void) {
-  for (int i = 0; i < CITY_NPROP; i++) {
+  G_lowball = t3_sphere_geometry_new(1, 6, 4);
+  for (int lod = 1; lod <= 2; lod++) for (int i = 0; i < CITY_NPROP; i++) {
     const city_prop *q = &CITY_PROP[i];
     t3_object *g = t3_group_new();
     uint32_t h = hash2(q->x, q->z);
     float gy = city_floor_y(q->x, q->z, 0.4f);
     if (gy < -1e8f) gy = 0;
     float r = 0, rx = 0, rz = 0, top = 2.4f;
+    bool far = lod == 2;
     switch (q->t) {
-      case CP_POLE: fk_pole(g, &P_, M_teal, M_wire); r = .3f; break;
-      case CP_LAMP: fk_lamp(g, &P_, M_ink); r = .18f; break;
-      case CP_TREE: fk_tree(g, &P_, M_bark, M_leaf, M_leaf2, h, .9f + q->v * .22f); r = .2f; break;
+      case CP_POLE: if (far) far_pole(g); else fk_pole(g, &P_, M_teal, M_wire); r = .3f; break;
+      case CP_LAMP: if (far) far_lamp(g); else { whimsy_parts pl = P_; pl.ball = G_lowball; fk_lamp(g, &pl, M_ink); } r = .18f; break;
+      case CP_TREE: if (far) far_tree(g, h, .9f + q->v * .22f); else fk_tree(g, &P_, M_bark, M_leaf, M_leaf2, h, .9f + q->v * .22f); r = .2f; break;
       case CP_PALM: fk_palm(g, &P_, M_palebark, M_frond, 6.5f + (h % 5) * 1.4f, h); r = .32f; break;
-      case CP_PLANTER: fk_planter(g, &P_, M_conc, M_dirt, M_bark, M_leaf, M_leaf2, h); rx = 1.6f; rz = .8f; top = .24f; break;
-      case CP_BENCH: fk_bench(g, &P_, M_gspl); rx = .92f; rz = .3f; top = .5f; break;
-      case CP_CAR: fk_car(g, &P_, &CP, q->v); rx = 2.3f; rz = .95f; top = 1.45f; break;
+      case CP_PLANTER:
+        if (far) { prop(g, P_.box, M_conc, 0, .1f, 0, 3.2f, .22f, 1.6f); far_tree(g, h, .85f); }
+        else fk_planter(g, &P_, M_conc, M_dirt, M_bark, M_leaf, M_leaf2, h);
+        rx = 1.6f; rz = .8f; top = .24f; break;
+      case CP_BENCH: if (far) prop(g, P_.box, M_gspl, 0, .5f, -.1f, 1.8f, .45f, .5f); else fk_bench(g, &P_, M_gspl); rx = .92f; rz = .3f; top = .5f; break;
+      case CP_CAR: if (far) far_car(g, q->v); else fk_car(g, &P_, &CP, q->v); rx = 2.3f; rz = .95f; top = 1.45f; break;
       case CP_SIGNAL: fk_signal(g, &P_, M_teal); r = .16f; break;
       case CP_TOWER: fk_tower(g, &P_, M_steel, q->v ? 26 : 15, q->v ? 3.2f : 2.1f); r = q->v ? 3.3f : 2.2f; top = .5f; break;
       case CP_SHELTER: fk_shelter(g, &P_, M_teal, M_gspl); rx = 2.1f; rz = .3f; top = .5f; break;
-      case CP_TRASH: prop(g, P_.cyl, M_gspl, 0, .5f, 0, .32f, 1, .32f); prop(g, P_.cyl, M_ink, 0, 1.03f, 0, .34f, .06f, .34f); r = .36f; top = 1.05f; break;
+      case CP_TRASH: prop(g, far ? P_.box : P_.cyl, M_gspl, 0, .5f, 0, .32f * (far ? 1.7f : 1), 1, .32f * (far ? 1.7f : 1)); if (!far) prop(g, P_.cyl, M_ink, 0, 1.03f, 0, .34f, .06f, .34f); r = .36f; top = 1.05f; break;
       case CP_STATUE: fk_statue(g, &P_, M_bronze, M_conc); rx = .62f; rz = .62f; top = 2; break;
       case CP_TRELLIS: fk_trellis_shelter(g, &P_, M_timber, M_leaf, M_teal); rx = 0; break;
       default: break;
     }
     t3_object_set_position(g, q->x, gy, q->z);
     t3_object_set_rotation(g, 0, q->yaw, 0);
-    capture_group(g, q->x, q->z, false);
+    t3_object_update_matrix_world(g, true);
+    cap_ctx ctx = {cell_of(q->x, q->z), false, lod};
+    t3_object_traverse(g, capture, &ctx);
     t3_release(g);
+    if (far) continue;
     if (q->t == CP_TRELLIS) { for (int sx = -1; sx <= 1; sx += 2) for (int sz = -1; sz <= 1; sz += 2) box_add(q->x + sx * 4.2f - .15f, q->z + sz * 1.5f - .15f, q->x + sx * 4.2f + .15f, q->z + sz * 1.5f + .15f, gy, gy + 3.7f); continue; }
     if (r > 0) box_add(q->x - r, q->z - r, q->x + r, q->z + r, gy, gy + top);
     else if (rx > 0) {
@@ -608,14 +653,14 @@ static t3_texture *tex_noise(int r, int g, int b, int amp, int joints) {
 }
 
 /* ── the meshes ── */
-typedef struct { t3_mesh *mesh; float x, z, r, reach; int mc; int tris; } chunk_t;
+typedef struct { t3_mesh *mesh; float x, z, r, reach; int mc; int tris; int cell; } chunk_t;
+#define PROP_NEAR 30.f   /* a cell draws its full props while the focus is this close to its edge (90 m cells) */
 static chunk_t *chunks; static int nchunks;
 static t3_material *cmat[MC_COUNT];
 static t3_object *croot;
-static t3_mesh *train; static float train_x, train_dir = 1, train_wait = 25, train_speed; static t3_object *train_g;
 static float city_night;
 static t3_color city_tint = {1, 1, 1};
-static const float REACH[MC_COUNT] = {390, 230, 460, 240, 460, 170, 280, 340, 400, 170};
+static const float REACH[MC_COUNT] = {390, 230, 460, 240, 460, 170, 280, 340, 400, 170, PROP_NEAR, 330};
 static void finish_meshes(void) {
   chunks = malloc(sizeof(chunk_t) * (NCX * NCZ * MC_COUNT));
   long total = 0;
@@ -633,11 +678,13 @@ static void finish_meshes(void) {
     t3_geometry_compute_bounding_sphere(g);
     t3_mesh *m = t3_mesh_new(g, cmat[mc]);
     t3_object_add(croot, m);
-    chunks[nchunks++] = (chunk_t){m, g->bounding_sphere.center.x, g->bounding_sphere.center.z, g->bounding_sphere.radius, REACH[mc], mc, s->ni / 3};
+    chunks[nchunks++] = (chunk_t){m, g->bounding_sphere.center.x, g->bounding_sphere.center.z, g->bounding_sphere.radius, REACH[mc], mc, s->ni / 3, i / MC_COUNT};
     total += s->ni / 3;
     t3_release(g); t3_release(m);
     free(s->pos); free(s->nor); free(s->uv); free(s->col); free(s->idx); free(s); sinks[i] = NULL;
   }
+  /* a cell's far props switch on exactly where its near ones switch off: one sphere for both */
+  for (int i = 0; i < nchunks; i++) if (chunks[i].mc == MC_FPROP) for (int k = 0; k < nchunks; k++) if (chunks[k].mc == MC_PROP && chunks[k].cell == chunks[i].cell) { chunks[i].x = chunks[k].x; chunks[i].z = chunks[k].z; chunks[i].r = chunks[k].r; }
   ds_log("city: %d chunks, %ld tris, %d boxes, %d segments", nchunks, total, nboxes, nsegs);
 }
 static t3_material *lit(bool mapped, t3_texture *tx) {
@@ -646,9 +693,41 @@ static t3_material *lit(bool mapped, t3_texture *tx) {
   if (mapped) t3_material_set_map(m, tx);
   return m;
 }
+/* a tree of props into meshes of its own under parent: lit, lamps (follow the clock) and lit windows */
+static t3_material *M_winglow;
+static void private_meshes(t3_object *src, t3_object *parent) {
+  t3_object_update_matrix_world(src, true);
+  sink_t *keep[MC_COUNT];
+  for (int mc = 0; mc < MC_COUNT; mc++) { keep[mc] = sinks[mc]; sinks[mc] = NULL; }
+  cap_ctx ctx = {0, false, 0};
+  t3_object_traverse(src, capture, &ctx);
+  for (int mc = 0; mc < MC_COUNT; mc++) {
+    sink_t *k = sinks[mc];
+    sinks[mc] = keep[mc];
+    if (!k) continue;
+    if (k->ni) {
+      t3_geometry *G = t3_geometry_new();
+      set_attr(G, T3_ATTR_POSITION, t3_attribute_new(T3_FLOAT32, k->pos, k->nv, 3));
+      set_attr(G, T3_ATTR_NORMAL, t3_attribute_new(T3_FLOAT32, k->nor, k->nv, 3));
+      set_attr(G, T3_ATTR_COLOR, t3_attribute_new(T3_FLOAT32, k->col, k->nv, 3));
+      t3_attribute *ix = t3_attribute_new(T3_UINT32, k->idx, k->ni, 1); t3_geometry_set_index(G, ix); t3_release(ix);
+      t3_geometry_compute_bounding_sphere(G);
+      t3_mesh *m = t3_mesh_new(G, cmat[mc == MC_LAMP || mc == MC_WIN ? mc : MC_PLAIN]);
+      t3_object_add(parent, m); t3_release(m); t3_release(G);
+    }
+    free(k->pos); free(k->nor); free(k->uv); free(k->col); free(k->idx); free(k);
+  }
+}
+
+/* ── things that move: the light rail and cars in the through lanes ── */
+#define STOP_X 352.f            /* Center and Main station, the middle of the platform */
+typedef enum { TR_WAIT, TR_RUN, TR_DWELL } tr_state;
+static struct { t3_object *g; float x, dir, v, wait; tr_state st; bool stopped; float bell_t; } TR;
+static int bell_q; static v3 bell_at;
+static void bell(float x, float z) { bell_q = 1; bell_at = v3_(x, 2.5f, z); }
 static void build_train(void) {
-  /* a two section car; it runs along the near track and comes back on the far one */
-  train_g = t3_group_new();
+  /* a two section car; east along the south track, back west along the north one */
+  TR.g = t3_group_new();
   t3_object *g = t3_group_new();
   t3_material *body = toy_paint(.86f, .88f, .88f), *band = toy_paint(.1f, .42f, .46f), *gl = toy_paint(.1f, .14f, .17f), *dark = toy_paint(.1f, .1f, .11f);
   for (int s = -1; s <= 1; s += 2) {
@@ -658,40 +737,96 @@ static void build_train(void) {
     prop(g, P_.box, band, x, 1.1f, 0, 13.55f, .5f, 2.7f);
     prop(g, P_.box, gl, x, 2.35f, 0, 13.0f, 1.1f, 2.7f);
     for (int k = -2; k <= 2; k++) prop(g, P_.box, body, x + k * 2.6f, 2.35f, 0, .12f, 1.1f, 2.72f);
+    /* the cabin lights in the windows: lit after dark */
+    for (int k = -2; k < 2; k++) for (int z = -1; z <= 1; z += 2) prop(g, P_.box, M_winglow, x + k * 2.6f + 1.3f, 2.35f, z * 1.365f, 2.3f, .9f, .02f);
     prop(g, P_.box, gl, x + s * 6.72f, 2.3f, 0, .06f, 1.2f, 2.2f);
     prop(g, P_.box, dark, x, 3.42f, 0, 2.5f, .25f, 1.2f);
   }
   prop(g, P_.box, dark, 0, 2, 0, 1.2f, 2.6f, 2.4f);
   t3_mesh *arm = prop(g, P_.box, dark, 0, 4.2f, 0, 2.2f, .06f, .06f); t3_object_set_rotation(arm, 0, 0, .55f);
   prop(g, P_.box, dark, 0, 4.82f, 0, .08f, .06f, 1.5f);
-  for (int s = -1; s <= 1; s += 2) { prop(g, P_.ball, P_.lamp, s * 14.2f, 1.3f, .9f, .1f, .1f, .1f); prop(g, P_.ball, P_.lamp, s * 14.2f, 1.3f, -.9f, .1f, .1f, .1f); }
-  /* into one mesh of its own */
-  t3_object_update_matrix_world(g, true);
-  int cell = NCX * NCZ;                                   /* an extra slot past the grid */
-  static sink_t ts[MC_COUNT];
-  sink_t *save[MC_COUNT]; (void)cell; (void)ts; (void)save;
-  cap_ctx ctx = {0, false};
-  sink_t *keep = sinks[0 * MC_COUNT + MC_PLAIN], *keepl = sinks[0 * MC_COUNT + MC_LAMP];
-  sinks[0 * MC_COUNT + MC_PLAIN] = NULL; sinks[0 * MC_COUNT + MC_LAMP] = NULL;
-  t3_object_traverse(g, capture, &ctx);
-  sink_t *tp = sinks[MC_PLAIN], *tl = sinks[MC_LAMP];
-  /* the lamps go in the same mesh: they are small and always on at a distance */
-  if (tl) { int base = tp->nv; for (int v = 0; v < tl->nv; v++) s_v(tp, tl->pos[v * 3], tl->pos[v * 3 + 1], tl->pos[v * 3 + 2], tl->nor[v * 3], tl->nor[v * 3 + 1], tl->nor[v * 3 + 2], 0, 0, 1, .9f, .7f); for (int t = 0; t + 2 < tl->ni; t += 3) s_t(tp, base + tl->idx[t], base + tl->idx[t + 1], base + tl->idx[t + 2]); }
-  t3_geometry *G = t3_geometry_new();
-  set_attr(G, T3_ATTR_POSITION, t3_attribute_new(T3_FLOAT32, tp->pos, tp->nv, 3));
-  set_attr(G, T3_ATTR_NORMAL, t3_attribute_new(T3_FLOAT32, tp->nor, tp->nv, 3));
-  set_attr(G, T3_ATTR_COLOR, t3_attribute_new(T3_FLOAT32, tp->col, tp->nv, 3));
-  t3_attribute *ix = t3_attribute_new(T3_UINT32, tp->idx, tp->ni, 1); t3_geometry_set_index(G, ix); t3_release(ix);
-  t3_geometry_compute_bounding_sphere(G);
-  train = t3_mesh_new(G, cmat[MC_PLAIN]);
-  t3_object_add(croot, train);
-  free(tp->pos); free(tp->nor); free(tp->uv); free(tp->col); free(tp->idx); free(tp);
-  if (tl) { free(tl->pos); free(tl->nor); free(tl->uv); free(tl->col); free(tl->idx); free(tl); }
-  sinks[MC_PLAIN] = keep; sinks[MC_LAMP] = keepl;
-  t3_release(g); t3_release(body); t3_release(band); t3_release(gl); t3_release(dark);
-  train_x = CITY_X0 - 80;
-  ((t3_object *)train)->visible = false;
+  /* head lamps white at one end, tail lamps red at the other, and a destination sign over each cab */
+  t3_material *head = glow(1, .95f, .8f), *tail = glow(1, .08f, .05f), *dest = glow(1, .7f, .2f);
+  for (int s = -1; s <= 1; s += 2) {
+    for (int z = -1; z <= 1; z += 2) prop(g, P_.box, s > 0 ? head : tail, s * 14.22f, 1.3f, z * .9f, .06f, .2f, .3f);
+    prop(g, P_.box, dest, s * 14.24f, 3.0f, 0, .04f, .25f, 1.4f);
+  }
+  private_meshes(g, TR.g);
+  t3_object_add(croot, TR.g);
+  t3_release(g); t3_release(body); t3_release(band); t3_release(gl); t3_release(dark); t3_release(head); t3_release(tail); t3_release(dest);
+  TR.x = CITY_X0 - 60; TR.dir = 1; TR.wait = 8; TR.st = TR_WAIT; TR.v = 0;
+  TR.g->visible = false;
 }
+#define NCAR 6
+#define LANE_W 11.6f            /* westbound, the north half of Main */
+#define LANE_E 27.4f            /* eastbound, the south half */
+static struct { t3_object *g; float x, dir, v, vmax, wait; } CAR[NCAR];
+static bool traffic = true;
+static void build_cars(void) {
+  for (int i = 0; i < NCAR; i++) {
+    t3_object *g = t3_group_new();
+    fk_car(g, &P_, &CP, (i * 5 + 1) % 6);
+    CAR[i].g = t3_group_new();
+    private_meshes(g, CAR[i].g);
+    t3_object_add(croot, CAR[i].g);
+    t3_release(g);
+    CAR[i].dir = i % 2 ? -1 : 1;
+    CAR[i].x = CITY_X0 + (i * 137) % (int)(CITY_X1 - CITY_X0);
+    CAR[i].vmax = 9 + (i * 7 % 4); CAR[i].v = CAR[i].vmax;
+    CAR[i].wait = 0;
+  }
+}
+static float train_off(float x) { return fabsf(x - STOP_X) < 54 ? 2 : fabsf(x - STOP_X) < 74 ? 2 * (74 - fabsf(x - STOP_X)) / 20 : 0; }
+static void movers_update(float dt, v3 focus) {
+  /* the train: runs, slows into the station, dwells with the bell, runs on, and comes back the other way */
+  const float VMAX = 12, ACC = 1.3f;
+  switch (TR.st) {
+    case TR_WAIT:
+      TR.wait -= dt;
+      if (TR.wait <= 0) { TR.st = TR_RUN; TR.v = VMAX; TR.stopped = false; TR.bell_t = 0; }
+      break;
+    case TR_RUN: {
+      float to_stop = (STOP_X - TR.x) * TR.dir;
+      float v = VMAX;
+      if (!TR.stopped && to_stop > 0) v = fminf(VMAX, sqrtf(2 * ACC * to_stop) + .3f);
+      else v = fminf(VMAX, TR.v + ACC * dt);
+      TR.v = v;
+      TR.x += TR.dir * v * dt;
+      if (!TR.stopped && (STOP_X - TR.x) * TR.dir <= 0) { TR.x = STOP_X; TR.st = TR_DWELL; TR.wait = 14; TR.v = 0; TR.stopped = true; bell(TR.x, MAIN_CENTER); }
+      /* the bell coming into the station, and near whoever is watching */
+      TR.bell_t -= dt;
+      float near = fabsf(TR.x - focus.x);
+      if (TR.bell_t <= 0 && ((!TR.stopped && to_stop > 0 && to_stop < 70) || (near < 45 && fabsf(focus.z - MAIN_CENTER) < 30))) { bell(TR.x, MAIN_CENTER); TR.bell_t = 5; }
+      if ((TR.dir > 0 && TR.x > CITY_X1 + 70) || (TR.dir < 0 && TR.x < CITY_X0 - 70)) { TR.dir = -TR.dir; TR.st = TR_WAIT; TR.wait = 22; }
+      break;
+    }
+    case TR_DWELL:
+      TR.wait -= dt;
+      if (TR.wait <= 0) { TR.st = TR_RUN; TR.v = 0; bell(TR.x, MAIN_CENTER); TR.bell_t = 6; }
+      break;
+  }
+  TR.g->visible = TR.st != TR_WAIT && hypotf(TR.x - focus.x, MAIN_CENTER - focus.z) < 420;
+  t3_object_set_position(TR.g, TR.x, -.08f, MAIN_CENTER + TR.dir * (2.2f + train_off(TR.x)));
+  t3_object_set_rotation(TR.g, 0, TR.dir > 0 ? 0 : DS_PI, 0);
+  /* cars: steady along the through lanes, braking for someone in the road ahead, round again at the ends */
+  for (int i = 0; i < NCAR; i++) {
+    float lane = CAR[i].dir > 0 ? LANE_E : LANE_W, ahead = (focus.x - CAR[i].x) * CAR[i].dir;
+    /* someone (the camera, the player) on this half of the road, or at its curb: wait well short of them */
+    bool half = fabsf(focus.z - lane) < 5.f, onto = half && fabsf(ahead) < 6;   /* a cut put the camera on it */
+    bool block = half && ahead >= 6 && ahead < 24;
+    for (int k = 0; k < NCAR; k++) if (k != i && CAR[k].dir == CAR[i].dir) { float d = (CAR[k].x - CAR[i].x) * CAR[i].dir; if (d > 0 && d < 9) block = true; }
+    float target = block ? 0 : CAR[i].vmax;
+    CAR[i].v = target < CAR[i].v ? fmaxf(target, CAR[i].v - 7 * dt) : fminf(target, CAR[i].v + 2.5f * dt);
+    CAR[i].x += CAR[i].dir * CAR[i].v * dt;
+    if (CAR[i].dir > 0 && CAR[i].x > CITY_X1 + 50) CAR[i].x = CITY_X0 - 50;
+    if (CAR[i].dir < 0 && CAR[i].x < CITY_X0 - 50) CAR[i].x = CITY_X1 + 50;
+    CAR[i].g->visible = traffic && !onto && hypotf(CAR[i].x - focus.x, lane - focus.z) < 260;
+    t3_object_set_position(CAR[i].g, CAR[i].x, -.15f, lane);
+    t3_object_set_rotation(CAR[i].g, 0, CAR[i].dir > 0 ? 0 : DS_PI, 0);
+  }
+}
+void city_traffic(bool on) { traffic = on; }
+bool city_train_bell(v3 *at) { if (!bell_q) return false; bell_q--; if (at) *at = bell_at; return true; }
 
 void city_init(t3_object *root) {
   croot = root;
@@ -734,6 +869,7 @@ void city_init(t3_object *root) {
   }
   cmat[MC_LAMP] = t3_mesh_basic_material_new(0xffffff); cmat[MC_LAMP]->vertex_colors = true;
   cmat[MC_WIN] = t3_mesh_basic_material_new(0xffffff); cmat[MC_WIN]->vertex_colors = true;
+  cmat[MC_PROP] = cmat[MC_FPROP] = cmat[MC_PLAIN];
   { t3_material *m = t3_mesh_basic_material_new(0xffffff); m->vertex_colors = true; m->transparent = true; m->blending = 2; m->depth_write = false; m->opacity = 1; cmat[MC_POOL] = m; }
 
   build_ground();
@@ -741,7 +877,9 @@ void city_init(t3_object *root) {
   build_lots();
   build_props();
   build_pools();
+  M_winglow = M_winglow_fwd = glow(1, .82f, .55f);
   build_train();
+  build_cars();
   finish_meshes();
   bins_build();
   city_set_time(0, (t3_color){1, 1, 1});
@@ -762,33 +900,40 @@ void city_set_time(float night, t3_color tint) {
 }
 
 static int draws_now, tris_now;
-void city_update(float dt, v3 focus, bool deep) {
+void city_update(float dt, v3 focus, float cap) {
   draws_now = tris_now = 0;
   for (int i = 0; i < nchunks; i++) {
     chunk_t *c = &chunks[i];
     float d = hypotf(c->x - focus.x, c->z - focus.z) - c->r;
-    float reach = deep ? fminf(c->reach, 70) : c->reach;
+    float reach = fminf(c->reach, cap);
     bool on = d < reach;
+    if (c->mc == MC_FPROP) on = on && d >= PROP_NEAR;
     if ((c->mc == MC_WIN || c->mc == MC_POOL) && city_night < .02f) on = false;
     ((t3_object *)c->mesh)->visible = on;
     if (on) { draws_now++; tris_now += c->tris; }
   }
-  /* the train: now and then along the near track, then back along the far */
-  if (train) {
-    t3_object *t = (t3_object *)train;
-    if (train_wait > 0) { train_wait -= dt; t->visible = false; }
-    else {
-      float tx = train_x + train_dir * 11 * dt;
-      train_x = tx;
-      t->visible = hypotf(train_x - focus.x, MAIN_CENTER - focus.z) < 420;
-      float off = fabsf(tx - 352) < 54 ? 2 : fabsf(tx - 352) < 74 ? 2 * (74 - fabsf(tx - 352)) / 20 : 0;
-      t3_object_set_position(t, tx, -.08f, MAIN_CENTER + train_dir * (2.2f + off));
-      if ((train_dir > 0 && tx > CITY_X1 + 80) || (train_dir < 0 && tx < CITY_X0 - 80)) { train_dir = -train_dir; train_wait = 70; }
-    }
-    train_speed = 11;
+  movers_update(dt, focus);
+  /* neon after dark hums: a slow breath, and now and then one tube stutters */
+  static float nt; nt += dt;
+  if (city_night > .05f) {
+    float nb = ds_lerp(.75f, 3.2f, city_night) * (1 + .05f * sinf(nt * 2.1f) + (fmodf(nt, 7.3f) < .12f ? -.25f : 0));
+    cmat[MC_NEON]->color = (t3_color){nb, nb, nb}; cmat[MC_NEON]->version++;
   }
 }
 int city_stats(int *tris) { if (tris) *tris = tris_now; return draws_now; }
+#ifdef KH_TEST_WORLD
+void city_debug_dump(v3 eye, v3 fwd) {
+  static const char *NM[MC_COUNT] = {"plain", "brick", "asphalt", "paver", "concrete", "sign", "neon", "lamp", "win", "pool", "prop", "fprop"};
+  int d[MC_COUNT] = {0}, t[MC_COUNT] = {0};
+  for (int i = 0; i < nchunks; i++) if (((t3_object *)chunks[i].mesh)->visible) {
+    chunk_t *c = &chunks[i]; t3_geometry *g = c->mesh->geometry; v3 cc = v3_(g->bounding_sphere.center.x, g->bounding_sphere.center.y, g->bounding_sphere.center.z), dv = v3_sub(cc, eye);
+    float l = v3_len(dv); if (l > c->r && v3_dot(dv, fwd) / l < cosf(.9f) - c->r / l) continue;
+    d[c->mc]++; t[c->mc] += c->tris; }
+  char b[512]; int o = 0;
+  for (int i = 0; i < MC_COUNT; i++) o += snprintf(b + o, sizeof b - o, "%s %d/%dk ", NM[i], d[i], t[i] / 1000);
+  ds_log("   city: %s", b);
+}
+#endif
 
 /* ── queries ── */
 static float city_ground(float x, float z) {
@@ -860,11 +1005,12 @@ void city_push(v3 *p, float r, float h, v3 *n, bool *hit) {
       *hit = true;
     }
   }
-  /* the train */
-  if (train && ((t3_object *)train)->visible) {
-    t3_object *t = (t3_object *)train;
-    float cx = t->position.x, cz = t->position.z;
-    if (fabsf(p->x - cx) < 14.5f + r && fabsf(p->z - cz) < 1.4f + r) { float s = p->z > cz ? 1 : -1; p->z = cz + s * (1.4f + r); *n = v3_(0, 0, s); *hit = true; }
+  /* the train and the cars */
+  for (int i = -1; i < NCAR; i++) {
+    t3_object *t = i < 0 ? TR.g : CAR[i].g;
+    if (!t || !t->visible) continue;
+    float cx = t->position.x, cz = t->position.z, hx = i < 0 ? 14.5f : 2.3f, hz = i < 0 ? 1.4f : .95f;
+    if (fabsf(p->x - cx) < hx + r && fabsf(p->z - cz) < hz + r) { float s = p->z > cz ? 1 : -1; p->z = cz + s * (hz + r); *n = v3_(0, 0, s); *hit = true; }
   }
 }
 static bool ray_box(v3 o, v3 d, const col_box *c, float *t, v3 *n) {

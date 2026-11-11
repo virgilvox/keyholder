@@ -25,8 +25,10 @@ struct actor {
   actor_model model;
   float scale, floor_y;
   t3_object *root, *gltf_scene;
-  t3_gltf *gltf;
+  t3_lod *lod;
   t3_mesh *face, *body, *outline, *shadow;
+  t3_material *m_body, *m_face;
+  t3_texture *tex;                    /* the body atlas in this actor's palette (shared through PALC) */
   ck_mixer mixer;
   ck_action *cur;
   int cur_clip;
@@ -49,7 +51,22 @@ struct actor {
 };
 
 static ck_rig *RIG;
-static uint8_t *PRISTINE[AM_COUNT];   /* each model's body atlas before any palette: actor_repalette starts over from it */
+/* each model parsed once (actor_preload); actors are clones that share its geometry and face atlas */
+typedef struct {
+  t3_gltf *gltf;
+  uint8_t *pristine; int tw, th;      /* the body atlas before any palette */
+  t3_texture *face_tex;
+  char *spr;                          /* the spring bone text */
+} model_tpl;
+static model_tpl TPL[AM_COUNT];
+/* body atlases by palette: actors in the same clothes share one texture (and one upload) */
+#define PALC_N 48
+static struct { actor_model m; actor_palette p; t3_texture *T; } PALC[PALC_N];
+static float LOD_BIAS = 1;
+static const t3_camera *LOD_CAM;
+#define LOD_NEAR 5.f     /* full body, face morphs and the outline hull inside this */
+#define LOD_FAR 10.f     /* the far body with a hull inside this, without beyond */
+#define LOD_FOV 50.f     /* the distances hold at this field of view; a longer lens keeps detail further */
 
 /* ---- small quaternion helpers on {x, y, z, w} ---- */
 static void qmul(float *o, const float *a, const float *b) {
@@ -99,6 +116,7 @@ static void hsv_turn(uint8_t *px, const actor_swatch *s) {
 }
 static void apply_palette(t3_texture *T, actor_model model, const actor_palette *pal) {
   if (!T || !T->pixels || !pal) return;
+  if ((int)model >= (int)(sizeof CAST_META / sizeof CAST_META[0])) return;
   const cast_meta *M = &CAST_META[model];
   const actor_swatch *sw[4] = { &pal->hair, &pal->top, &pal->bottom, &pal->shoes };
   for (int i = 0; i < M->nrect; i++) {
@@ -111,36 +129,123 @@ static void apply_palette(t3_texture *T, actor_model model, const actor_palette 
   T->version++;
 }
 
-/* ---- materials: cel lambert off the atlas, dark flat hull ---- */
-static void setup_mesh(t3_object *o, void *ctx) {
-  actor_t *a = ctx;
-  if (o->type != T3_MESH && o->type != T3_SKINNED_MESH) return;
-  o->frustum_culled = false; o->cast_shadow = false; o->receive_shadow = false;
+/* ---- models: parsed once, cloned per actor ---- */
+static t3_texture *find_map(t3_object *root, const char *mesh) {
+  t3_object *o = t3_object_get_by_name(root, mesh);
+  if (!o || (o->type != T3_MESH && o->type != T3_SKINNED_MESH)) return NULL;
   t3_mesh *m = (t3_mesh *)o;
-  t3_material *src = m->material_count ? m->materials[0] : NULL;
-  if (!strcmp(o->name, "outline")) {
-    t3_material *M = t3_mesh_basic_material_new(0x14101a);
-    M->fog = true;
-    if (m->materials[0]) t3_release(m->materials[0]);
-    m->materials[0] = M;
-    a->outline = m;
-    return;
+  return m->material_count && m->materials[0] ? m->materials[0]->map : NULL;
+}
+static void atlas_setup(t3_texture *T) {
+  T->color_space = T3_SRGB_COLOR_SPACE; T->flip_y = false; T->wrap_s = T->wrap_t = T3_CLAMP_TO_EDGE;
+  T->generate_mipmaps = true; T->min_filter = T3_LINEAR_MIPMAP_LINEAR; T->mag_filter = T3_LINEAR;
+  T->version++;
+}
+bool actor_preload(actor_model model) {
+  if ((unsigned)model >= AM_COUNT) return false;
+  model_tpl *P = &TPL[model];
+  if (P->gltf) return true;
+  if (!RIG) RIG = rig_load("rig.bin");
+  size_t n; uint8_t *b = ds_asset(CAST_META[model].glb, &n);
+  if (b) { P->gltf = t3_gltf_parse(b, n, NULL, NULL); free(b); }
+  if (!P->gltf) { ds_log("actor: cannot parse %s", CAST_META[model].glb); return false; }
+  t3_texture *B = find_map(P->gltf->scene, "body");
+  if (B && B->pixels) {
+    P->tw = B->width; P->th = B->height;
+    P->pristine = malloc((size_t)B->width * B->height * 4);
+    memcpy(P->pristine, B->pixels, (size_t)B->width * B->height * 4);
+    /* the template never draws: let its copy of the body atlas go (actors get theirs from body_tex) */
+    static const char *USE[2] = {"body", "far"};
+    for (int i = 0; i < 2; i++) { t3_object *o = t3_object_get_by_name(P->gltf->scene, USE[i]); if (o && ((t3_mesh *)o)->materials[0]) t3_material_set_map(((t3_mesh *)o)->materials[0], NULL); }
   }
+  P->face_tex = find_map(P->gltf->scene, "face");
+  if (P->face_tex) { t3_retain(P->face_tex); atlas_setup(P->face_tex); }
+  P->spr = (char *)ds_asset(CAST_META[model].spr, &n);
+  return true;
+}
+void actor_preload_all(void) { for (int m = 0; m < AM_COUNT; m++) actor_preload((actor_model)m); }
+
+/* the body atlas in a palette: shared by every actor of this model in the same palette */
+static t3_texture *body_tex(actor_model model, const actor_palette *pal) {
+  model_tpl *P = &TPL[model];
+  if (!P->pristine) return NULL;
+  if (!pal) pal = &ACTOR_PAL_NONE;
+  int slot = -1;
+  for (int i = 0; i < PALC_N; i++) {
+    if (PALC[i].T && PALC[i].m == model && !memcmp(&PALC[i].p, pal, sizeof *pal)) { t3_retain(PALC[i].T); return PALC[i].T; }
+    if (slot < 0 && (!PALC[i].T || PALC[i].T->_refs <= 1)) slot = i;   /* empty, or no actor uses it any more */
+  }
+  t3_texture *T = t3_texture_new(P->tw, P->th, P->pristine);
+  apply_palette(T, model, pal);
+  atlas_setup(T);
+  if (slot >= 0) {
+    if (PALC[slot].T) t3_release(PALC[slot].T);
+    PALC[slot].m = model; PALC[slot].p = *pal; PALC[slot].T = T; t3_retain(T);
+  }
+  return T;   /* the caller's reference */
+}
+
+/* a copy of the template's node tree: bones are new objects, meshes share geometry */
+#define MAX_NODES 320
+typedef struct { t3_object *src[MAX_NODES], *dst[MAX_NODES]; int n; } node_map;
+static t3_object *clone_node(t3_object *src, node_map *M) {
+  t3_object *o;
+  if (src->type == T3_SKINNED_MESH) {
+    t3_mesh *sm = (t3_mesh *)src;
+    t3_skinned_mesh *k = t3_skinned_mesh_new(sm->geometry, sm->materials[0]);
+    o = &k->mesh.base;
+    if (sm->morph_influence_count) t3_mesh_update_morph_targets(&k->mesh);
+  } else if (src->type == T3_BONE) o = t3_bone_new();
+  else o = t3_group_new();
+  o->name = src->name;   /* the template's strings: it lives for the game */
+  o->position = src->position; o->quaternion = src->quaternion; o->rotation = src->rotation; o->scale = src->scale;
+  if (M->n < MAX_NODES) { M->src[M->n] = src; M->dst[M->n] = o; M->n++; }
+  for (int i = 0; i < src->child_count; i++) { t3_object *c = clone_node(src->children[i], M); t3_object_add(o, c); t3_release(c); }
+  return o;
+}
+static t3_object *mapped(node_map *M, t3_object *src) { for (int i = 0; i < M->n; i++) if (M->src[i] == src) return M->dst[i]; return NULL; }
+static void bind_clones(node_map *M) {
+  for (int i = 0; i < M->n; i++) {
+    if (M->src[i]->type != T3_SKINNED_MESH) continue;
+    t3_skinned_mesh *s = (t3_skinned_mesh *)M->src[i], *d = (t3_skinned_mesh *)M->dst[i];
+    if (!s->skeleton) continue;
+    int n = s->skeleton->bone_count;
+    t3_object **bones = malloc(sizeof *bones * (size_t)(n ? n : 1));
+    for (int j = 0; j < n; j++) bones[j] = mapped(M, s->skeleton->bones[j]);
+    t3_skeleton *sk = t3_skeleton_new(bones, n, s->skeleton->bone_inverses);
+    t3_skinned_mesh_bind(d, sk, &s->bind_matrix);
+    t3_release(sk); free(bones);
+  }
+}
+
+/* materials: cel lambert off the atlases (one each for body and face, so a flash is one colour change), dark flat hull */
+static t3_material *outline_mat(void) {
+  static t3_material *M;
+  if (!M) { M = t3_mesh_basic_material_new(0x14101a); M->fog = true; }
+  return M;
+}
+static t3_material *cel_mat(t3_texture *T) {
   t3_material *M = t3_mesh_lambert_material_new(0xffffff);
-  t3_texture *T = src ? src->map : NULL;
-  if (T) {
-    T->color_space = T3_SRGB_COLOR_SPACE;
-    T->generate_mipmaps = true; T->min_filter = T3_LINEAR_MIPMAP_LINEAR; T->mag_filter = T3_LINEAR;
-    T->version++;
-    t3_material_set_map(M, T);
-  }
-  M->alpha_test = 0.45f;
-  M->side = T3_DOUBLE_SIDE;
-  M->fog = true;
-  if (src) t3_release(src);
+  if (T) t3_material_set_map(M, T);
+  M->alpha_test = 0.45f; M->side = T3_DOUBLE_SIDE; M->fog = true;
+  return M;
+}
+static void set_mat(t3_object *o, t3_material *M) {
+  if (!o || (o->type != T3_MESH && o->type != T3_SKINNED_MESH)) return;
+  t3_mesh *m = (t3_mesh *)o;
+  o->frustum_culled = false; o->cast_shadow = false; o->receive_shadow = false;
+  t3_retain(M);
+  if (m->materials[0]) t3_release(m->materials[0]);
   m->materials[0] = M;
-  if (!strcmp(o->name, "face")) { a->face = m; t3_mesh_update_morph_targets(m); }
-  else a->body = m;
+}
+/* a second instance of a mesh (same geometry, same skeleton) for another LOD level */
+static t3_object *twin(t3_object *src) {
+  if (!src) return NULL;
+  t3_skinned_mesh *s = (t3_skinned_mesh *)src;
+  t3_skinned_mesh *k = t3_skinned_mesh_new(s->mesh.geometry, s->mesh.materials[0]);
+  k->mesh.base.name = src->name; k->mesh.base.frustum_culled = false;
+  t3_skinned_mesh_bind(k, s->skeleton, &s->bind_matrix);
+  return &k->mesh.base;
 }
 
 /* ---- springs ---- */
@@ -158,7 +263,9 @@ static void add_chain(actor_t *a, t3_object *bone, t3_object *parent, float stif
   for (int i = 0; i < bone->child_count; i++) add_chain(a, bone->children[i], bone, stiff, grav, drag, radius);
 }
 static void load_springs(actor_t *a) {
-  size_t n; char *t = (char *)ds_asset(CAST_META[a->model].spr, &n);
+  const char *src = TPL[a->model].spr;
+  if (!src) return;
+  char *t = strdup(src);
   if (!t) return;
   char *save = NULL;
   for (char *line = strtok_r(t, "\n", &save); line; line = strtok_r(NULL, "\n", &save)) {
@@ -246,24 +353,45 @@ static void spring_step(actor_t *a, float dt) {
 
 actor_t *actor_new(actor_model model, const actor_palette *pal, float scale, t3_scene *scene) {
   actor_t *a = calloc(1, sizeof *a);
+  if ((unsigned)model >= AM_COUNT) model = AM_B;
   a->model = model; a->scale = scale > 0 ? scale : 1; a->cur_clip = -1; a->blink_t = ds_rr(1, 4);
-  if (!RIG) RIG = rig_load("rig.bin");
   a->root = t3_object_new();
-  size_t n; uint8_t *b = ds_asset(CAST_META[model].glb, &n);
-  if (b) { a->gltf = t3_gltf_parse(b, n, NULL, NULL); free(b); }
-  if (!a->gltf) { ds_log("actor: cannot parse %s", CAST_META[model].glb); t3_object_add(&scene->base, a->root); return a; }
-  a->gltf_scene = a->gltf->scene;
+  if (!actor_preload(model)) { t3_object_add(&scene->base, a->root); return a; }
+  model_tpl *P = &TPL[model];
+  node_map *M = calloc(1, sizeof *M);
+  a->gltf_scene = clone_node(P->gltf->scene, M);
+  bind_clones(M);
+  free(M);
   t3_object_add(a->root, a->gltf_scene);
-  t3_object_traverse(a->gltf_scene, setup_mesh, a);
-  if (a->body && a->body->materials[0]) {
-    t3_texture *T = a->body->materials[0]->map;
-    if (T && T->pixels && !PRISTINE[model]) {
-      size_t sz = (size_t)T->width * T->height * 4;
-      PRISTINE[model] = malloc(sz);
-      memcpy(PRISTINE[model], T->pixels, sz);
-    }
-    apply_palette(T, model, pal);
+  /* the levels: near (body, face, hull), mid (far body, its hull), far (far body alone); the renderer picks by camera distance */
+  a->tex = body_tex(model, pal);
+  a->m_body = cel_mat(a->tex); a->m_face = cel_mat(P->face_tex);
+  static const char *MESH[6] = {"body", "face", "outline", "far", "farface", "faroutline"};
+  t3_object *mo[6] = {0};
+  for (int i = 0; i < 6; i++) {
+    t3_object *o = t3_object_get_by_name(a->gltf_scene, MESH[i]);
+    if (!o || o->type != T3_SKINNED_MESH) continue;
+    t3_retain(o); t3_object_remove(o->parent, o);
+    set_mat(o, i == 2 || i == 5 ? outline_mat() : i == 1 || i == 4 ? a->m_face : a->m_body);
+    mo[i] = o;
   }
+  a->body = (t3_mesh *)mo[0]; a->face = (t3_mesh *)mo[1]; a->outline = (t3_mesh *)mo[2];
+  if (a->face) t3_mesh_update_morph_targets(a->face);
+  a->lod = t3_lod_new();
+  t3_object *lv[3] = { t3_group_new(), t3_group_new(), t3_group_new() };
+  for (int i = 0; i < 3; i++) if (mo[i]) t3_object_add(lv[0], mo[i]);
+  if (mo[3]) {   /* an old bake without the far meshes keeps the near level everywhere */
+    for (int i = 3; i < 6; i++) if (mo[i]) t3_object_add(lv[1], mo[i]);
+    t3_object *f = twin(mo[3]), *ff = twin(mo[4]);
+    if (f) { t3_object_add(lv[2], f); t3_release(f); }
+    if (ff) { t3_object_add(lv[2], ff); t3_release(ff); }
+  }
+  t3_lod_add_level(a->lod, lv[0], 0);
+  if (mo[3]) { t3_lod_add_level(a->lod, lv[1], LOD_NEAR); t3_lod_add_level(a->lod, lv[2], LOD_FAR); }
+  for (int i = 0; i < 3; i++) t3_release(lv[i]);
+  for (int i = 0; i < 6; i++) if (mo[i]) t3_release(mo[i]);
+  t3_object_add(a->root, a->lod);
+  t3_release(a->lod);
   if (RIG) { mixer_init(&a->mixer, RIG, a->gltf_scene); a->mixer.hips_scale = CAST_META[model].hips_h; }
   a->b_neck = t3_object_get_by_name(a->gltf_scene, "neck");
   a->b_head = t3_object_get_by_name(a->gltf_scene, "head");
@@ -279,24 +407,24 @@ actor_t *actor_new(actor_model model, const actor_palette *pal, float scale, t3_
   if (a->b_lhand) t3_object_add(a->b_lhand, a->s_lhand);
   load_springs(a);
   /* the blob shadow */
-  {
+  static t3_texture *ST; static t3_material *SM; static t3_geometry *SG;
+  if (!SM) {
     enum { N = 32 };
     uint8_t *px = malloc(N * N * 4);
     for (int y = 0; y < N; y++) for (int x = 0; x < N; x++) {
       float dx = (x + .5f) / N * 2 - 1, dy = (y + .5f) / N * 2 - 1, d = sqrtf(dx*dx + dy*dy);
       uint8_t *p = px + (y * N + x) * 4; p[0] = 8; p[1] = 6; p[2] = 14; p[3] = (uint8_t)(ds_clamp(1 - d, 0, 1) * 150);
     }
-    t3_texture *T = t3_texture_new(N, N, px); free(px);
-    t3_material *M = t3_mesh_basic_material_new(0xffffff);
-    t3_material_set_map(M, T); M->transparent = true; M->depth_write = false; M->fog = false;
-    t3_geometry *G = t3_plane_geometry_new(1.1f, 1.1f, 1, 1);
-    a->shadow = t3_mesh_new(G, M);
-    t3_object_set_rotation(&a->shadow->base, -DS_PI / 2, 0, 0);
-    t3_object_set_position(&a->shadow->base, 0, .02f, 0);
-    a->shadow->base.render_order = 1;
-    t3_object_add(&scene->base, &a->shadow->base);
-    t3_release(T); t3_release(M); t3_release(G);
+    ST = t3_texture_new(N, N, px); free(px);
+    SM = t3_mesh_basic_material_new(0xffffff);
+    t3_material_set_map(SM, ST); SM->transparent = true; SM->depth_write = false; SM->fog = false;
+    SG = t3_plane_geometry_new(1.1f, 1.1f, 1, 1);
   }
+  a->shadow = t3_mesh_new(SG, SM);
+  t3_object_set_rotation(&a->shadow->base, -DS_PI / 2, 0, 0);
+  t3_object_set_position(&a->shadow->base, 0, .02f, 0);
+  a->shadow->base.render_order = 1;
+  t3_object_add(&scene->base, &a->shadow->base);
   t3_object_add(&scene->base, a->root);
   actor_play(a, "Idle_Loop", 1, true, 0);
   actor_place(a, v3_(0, 0, 0), 0);
@@ -375,12 +503,21 @@ static void apply_look(actor_t *a, float dt) {
 }
 
 void actor_repalette(actor_t *a, const actor_palette *pal) {
-  t3_texture *T = a->body && a->body->materials[0] ? a->body->materials[0]->map : NULL;
-  if (!T || !T->pixels || !PRISTINE[a->model]) return;
-  memcpy(T->pixels, PRISTINE[a->model], (size_t)T->width * T->height * 4);
-  apply_palette(T, a->model, pal);
-  T->version++;
+  if (!a->m_body) return;
+  t3_texture *T = body_tex(a->model, pal);
+  if (!T) return;
+  t3_material_set_map(a->m_body, T);
+  if (a->tex) t3_release(a->tex);
+  a->tex = T;
 }
+void actor_lod_bias(float bias) { LOD_BIAS = bias > 0 ? bias : 1; }
+void actor_lod_camera(const t3_camera *cam) { LOD_CAM = cam; }
+static float lod_scale(void) {
+  float k = LOD_BIAS;
+  if (LOD_CAM && LOD_CAM->fov > 1) k *= tanf(LOD_FOV * DS_PI / 360.f) / tanf(LOD_CAM->fov * DS_PI / 360.f);
+  return k;
+}
+int actor_lod_level(const actor_t *a) { return a->lod ? a->lod->current_level : 0; }
 void actor_hands_up(actor_t *a, float amount) { a->hands_t = amount; }
 static void apply_hands(actor_t *a, float dt) {
   a->hands_w = ds_damp(a->hands_w, a->hands_t, 5, dt);
@@ -397,7 +534,8 @@ static void apply_hands(actor_t *a, float dt) {
 }
 
 void actor_update(actor_t *a, float dt) {
-  if (!a->gltf || !a->root->visible) return;
+  if (!a->gltf_scene || !a->root->visible) return;
+  if (a->lod && a->lod->level_count == 3) { float k = lod_scale(); a->lod->levels[1].distance = LOD_NEAR * k; a->lod->levels[2].distance = LOD_FAR * k; }
   mixer_update(&a->mixer, dt);
   if (a->mixer.bound) {}
   apply_hands(a, dt);
@@ -422,7 +560,9 @@ void actor_update(actor_t *a, float dt) {
     }
   }
   t3_object_update_world_matrix(a->root, true, true);
+  /* no hair physics on the far body (the last render's level): the springs start over when it comes near */
   if (a->spring_reset) { spring_seed(a); a->spring_reset = false; }
+  else if (actor_lod_level(a) >= 2) a->spring_reset = true;
   else if (dt > 0) spring_step(a, dt);
   t3_object_update_world_matrix(a->root, true, true);
 }
@@ -437,6 +577,6 @@ v3 actor_bone_pos(actor_t *a, const char *bone) {
 }
 v3 actor_head_pos(actor_t *a) { float p[3] = {a->pos.x, a->pos.y + 1.4f, a->pos.z}; if (a->b_head) wpos(a->b_head, p); return v3_(p[0], p[1], p[2]); }
 void actor_flash(actor_t *a, float r, float g, float b) {
-  t3_mesh *m[2] = { a->face, a->body };
-  for (int i = 0; i < 2; i++) if (m[i] && m[i]->materials[0]) m[i]->materials[0]->color = (t3_color){ r, g, b };
+  t3_material *m[2] = { a->m_face, a->m_body };
+  for (int i = 0; i < 2; i++) if (m[i]) m[i]->color = (t3_color){ r, g, b };
 }

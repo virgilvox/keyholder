@@ -8,3 +8,4 @@ compile_flags.txt
 _ref/
 tools/node_modules/
 source/wav/
+source/vrm-cc0/*.vrm

@@ -25,6 +25,16 @@ typedef enum {
   SFX_JUMP, SFX_LAND, SFX_STEP,
   SFX_PICKUP, SFX_WEAPON, SFX_ALARM,
   SFX_UI, SFX_UI_OK,
+  /* v1.1 combat */
+  SFX_SMASH,        /* the title card's smash cut: a hard hit and a ring */
+  SFX_TELL,         /* a boss about to do something big: a low swell and a sting */
+  SFX_TRAIN,        /* the light rail coming: its bell, then the horn */
+  SFX_HISS,         /* gas or steam escaping */
+  SFX_SLAM,         /* a door slammed, a stop button struck: a big flat thud and a rattle */
+  SFX_ASSIST,       /* an ally called in */
+  SFX_STYLE,        /* style points: a bright tick that climbs with the rank (gain sets the pitch) */
+  SFX_QTE,          /* the finisher's prompt: a held breath */
+  SFX_TRAIN_BELL,   /* the light rail's double ding, placed with sfx_at */
   SFX_COUNT
 } sfx_t;
 

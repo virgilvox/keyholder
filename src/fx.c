@@ -54,7 +54,10 @@ static t3_material *add_material(t3_texture *t) {
   return m;
 }
 
+static t3_scene *FXS;
+
 void fx_init(t3_scene *sc) {
+  FXS = sc;
   if (glow.p) return;
   glow = pool_make(sc, t3_plane_geometry_new(1, 1, 1, 1), add_material(tex_make(0)), 512);
   ring = pool_make(sc, t3_plane_geometry_new(2, 2, 1, 1), add_material(tex_make(1)), 48);
@@ -217,4 +220,108 @@ void fx_update(float dt, const t3_camera *cam) {
   const float *m = cam->base.matrix_world.e;
   cam_r = v3_(m[0], m[1], m[2]); cam_u = v3_(m[4], m[5], m[6]); cam_p = v3_(m[12], m[13], m[14]);
   run_pool(&glow, dt); run_pool(&ring, dt); run_pool(&smoke, dt);
+}
+
+void fx_smoke(v3 at, float size, uint32_t color, int count, float rise) {
+  for (int i = 0; i < count; i++) {
+    float a = ds_rr(0, 6.28f);
+    v3 v = v3_(cosf(a) * ds_rr(.2f, 1.f) * size, ds_rr(.2f, 1.f) * rise, sinf(a) * ds_rr(.2f, 1.f) * size);
+    part_t *q = emit(&smoke, K_SMOKE, v3_add(at, v3_(ds_rr(-.3f, .3f) * size, 0, ds_rr(-.3f, .3f) * size)), v, ds_rr(.9f, 1.8f), size * .5f, size * ds_rr(1.4f, 2.2f), color);
+    q->drag = 1.2f; q->rot = ds_rr(0, 6);
+  }
+}
+
+/* ---- props ---- */
+typedef struct { float *pos, *nor, *col; int n, cap; } pmb;
+static pmb PB[3]; static int cur_layer;
+static t3_material *PMAT[3];
+void fxp_begin(void) { for (int i = 0; i < 3; i++) PB[i].n = 0; cur_layer = FXP_BODY; }
+void fxp_layer(int l) { cur_layer = l < 0 ? 0 : l > 2 ? 2 : l; }
+static void ptri(v3 a, v3 b, v3 c, uint32_t ca, uint32_t cb, uint32_t cc) {
+  pmb *m = &PB[cur_layer];
+  if (m->n + 3 > m->cap) {
+    m->cap = m->cap ? m->cap * 2 : 384;
+    m->pos = realloc(m->pos, sizeof(float) * 3 * m->cap); m->nor = realloc(m->nor, sizeof(float) * 3 * m->cap); m->col = realloc(m->col, sizeof(float) * 3 * m->cap);
+  }
+  v3 nn = v3_norm(v3_cross(v3_sub(b, a), v3_sub(c, a)));
+  v3 P[3] = {a, b, c}; uint32_t C[3] = {ca, cb, cc};
+  for (int i = 0; i < 3; i++) {
+    int k = m->n++; t3_color cc_ = t3_color_hex(C[i]);
+    m->pos[k*3] = P[i].x; m->pos[k*3+1] = P[i].y; m->pos[k*3+2] = P[i].z;
+    m->nor[k*3] = nn.x; m->nor[k*3+1] = nn.y; m->nor[k*3+2] = nn.z;
+    m->col[k*3] = cc_.r; m->col[k*3+1] = cc_.g; m->col[k*3+2] = cc_.b;
+  }
+}
+void fxp_quad(v3 a, v3 b, v3 c, v3 d, uint32_t col) { ptri(a, b, c, col, col, col); ptri(a, c, d, col, col, col); }
+void fxp_box(v3 c, v3 s, uint32_t col) {
+  float x0 = c.x - s.x/2, x1 = c.x + s.x/2, y0 = c.y - s.y/2, y1 = c.y + s.y/2, z0 = c.z - s.z/2, z1 = c.z + s.z/2;
+  fxp_quad(v3_(x0,y0,z1), v3_(x1,y0,z1), v3_(x1,y1,z1), v3_(x0,y1,z1), col);
+  fxp_quad(v3_(x1,y0,z0), v3_(x0,y0,z0), v3_(x0,y1,z0), v3_(x1,y1,z0), col);
+  fxp_quad(v3_(x1,y0,z1), v3_(x1,y0,z0), v3_(x1,y1,z0), v3_(x1,y1,z1), col);
+  fxp_quad(v3_(x0,y0,z0), v3_(x0,y0,z1), v3_(x0,y1,z1), v3_(x0,y1,z0), col);
+  fxp_quad(v3_(x0,y1,z1), v3_(x1,y1,z1), v3_(x1,y1,z0), v3_(x0,y1,z0), col);
+  fxp_quad(v3_(x0,y0,z0), v3_(x1,y0,z0), v3_(x1,y0,z1), v3_(x0,y0,z1), col);
+}
+void fxp_cyl(v3 b, float h, float r0, float r1, int sides, uint32_t col) {
+  for (int k = 0; k < sides; k++) {
+    float a0 = k * 6.28318f / sides, a1 = (k + 1) * 6.28318f / sides;
+    v3 p00 = v3_(b.x + cosf(a0) * r0, b.y, b.z + sinf(a0) * r0), p01 = v3_(b.x + cosf(a1) * r0, b.y, b.z + sinf(a1) * r0);
+    v3 p10 = v3_(b.x + cosf(a0) * r1, b.y + h, b.z + sinf(a0) * r1), p11 = v3_(b.x + cosf(a1) * r1, b.y + h, b.z + sinf(a1) * r1);
+    ptri(p00, p11, p10, col, col, col); ptri(p00, p01, p11, col, col, col);
+    ptri(v3_(b.x, b.y + h, b.z), p10, p11, col, col, col);
+  }
+}
+void fxp_disc(v3 c, float r, int sides, uint32_t in, uint32_t out) {
+  for (int k = 0; k < sides; k++) {
+    float a0 = k * 6.28318f / sides, a1 = (k + 1) * 6.28318f / sides;
+    ptri(c, v3_(c.x + cosf(a1) * r, c.y, c.z + sinf(a1) * r), v3_(c.x + cosf(a0) * r, c.y, c.z + sinf(a0) * r), in, out, out);
+  }
+}
+void fxp_bar(v3 a, v3 b, float w, uint32_t col) {
+  v3 d = v3_sub(b, a); float l = v3_len(d); if (l < 1e-4f) return;
+  d = v3_scale(d, 1 / l);
+  v3 hint = fabsf(d.y) > .9f ? v3_(1, 0, 0) : v3_(0, 1, 0);
+  v3 x = v3_scale(v3_norm(v3_cross(d, hint)), w * .5f), y = v3_scale(v3_norm(v3_cross(x, d)), w * .5f);
+  v3 c[4] = { v3_add(x, y), v3_sub(x, y), v3_scale(v3_add(x, y), -1), v3_sub(y, x) };
+  for (int i = 0; i < 4; i++) { int j = (i + 1) & 3; fxp_quad(v3_add(a, c[i]), v3_add(a, c[j]), v3_add(b, c[j]), v3_add(b, c[i]), col); }
+}
+void fxp_ring(v3 c, v3 ax, float R, float r, int segs, uint32_t col) {
+  ax = v3_norm(ax);
+  v3 hint = fabsf(ax.y) > .9f ? v3_(1, 0, 0) : v3_(0, 1, 0);
+  v3 u = v3_norm(v3_cross(ax, hint)), w = v3_cross(ax, u);
+  for (int i = 0; i < segs; i++) {
+    float a0 = i * 6.28318f / segs, a1 = (i + 1) * 6.28318f / segs;
+    v3 p0 = v3_add(c, v3_add(v3_scale(u, cosf(a0) * R), v3_scale(w, sinf(a0) * R)));
+    v3 p1 = v3_add(c, v3_add(v3_scale(u, cosf(a1) * R), v3_scale(w, sinf(a1) * R)));
+    fxp_bar(p0, p1, r * 2, col);
+  }
+}
+t3_object *fxp_end(void) {
+  if (!PMAT[0]) {
+    PMAT[0] = t3_mesh_lambert_material_new(0xffffff);
+    PMAT[0]->vertex_colors = true; PMAT[0]->fog = true; PMAT[0]->side = T3_DOUBLE_SIDE; PMAT[0]->version++;
+    PMAT[1] = t3_mesh_basic_material_new(0xffffff);
+    PMAT[1]->vertex_colors = true; PMAT[1]->fog = false; PMAT[1]->side = T3_DOUBLE_SIDE; PMAT[1]->tone_mapped = false; PMAT[1]->version++;
+    PMAT[2] = t3_mesh_basic_material_new(0xffffff);
+    PMAT[2]->vertex_colors = true; PMAT[2]->fog = false; PMAT[2]->side = T3_DOUBLE_SIDE; PMAT[2]->tone_mapped = false;
+    PMAT[2]->transparent = true; PMAT[2]->blending = T3_ADDITIVE_BLENDING; PMAT[2]->depth_write = false; PMAT[2]->version++;
+  }
+  t3_object *g = t3_group_new();
+  for (int i = 0; i < 3; i++) {
+    pmb *m = &PB[i];
+    if (!m->n) continue;
+    t3_geometry *geo = t3_geometry_new();
+    t3_attribute *p = t3_attribute_new(T3_FLOAT32, m->pos, m->n, 3), *n = t3_attribute_new(T3_FLOAT32, m->nor, m->n, 3), *c = t3_attribute_new(T3_FLOAT32, m->col, m->n, 3);
+    t3_geometry_set_attribute(geo, T3_ATTR_POSITION, p); t3_release(p);
+    t3_geometry_set_attribute(geo, T3_ATTR_NORMAL, n); t3_release(n);
+    t3_geometry_set_attribute(geo, T3_ATTR_COLOR, c); t3_release(c);
+    t3_mesh *me = t3_mesh_new(geo, PMAT[i]); t3_release(geo);
+    ((t3_object *)me)->frustum_culled = false;
+    if (i == 2) ((t3_object *)me)->render_order = 3;
+    t3_object_add(g, me); t3_release(me);
+    m->n = 0;
+  }
+  t3_object_add(&FXS->base, g);
+  t3_release(g);
+  return g;
 }

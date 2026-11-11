@@ -22,4 +22,19 @@ void fx_glow(v3 at, float size, uint32_t color);
 void fx_glint(v3 at, float size, uint32_t color);      /* a four point star: a blade about to swing */
 void fx_beam(v3 from, v3 to, uint32_t color, float width);
 void fx_ring_flat(v3 at, float radius, uint32_t color);/* flat on the ground */
+void fx_smoke(v3 at, float size, uint32_t color, int count, float rise);   /* coloured puffs: gas, frost, steam */
+
+/* props: small vertex coloured meshes, PS2 style. Build between fxp_begin and fxp_end in the prop's own
+ * frame (y up, origin on the floor); fxp_end adds a group to the scene, at most three draw calls
+ * (lit body, unlit glow, additive halo). Remove it with t3_object_remove(&scene->base, obj). */
+enum { FXP_BODY, FXP_GLOW, FXP_HALO };
+void fxp_begin(void);
+void fxp_layer(int layer);
+void fxp_box(v3 c, v3 size, uint32_t color);
+void fxp_cyl(v3 base, float h, float r0, float r1, int sides, uint32_t color);
+void fxp_quad(v3 a, v3 b, v3 c, v3 d, uint32_t color);
+void fxp_disc(v3 c, float r, int sides, uint32_t inner, uint32_t outer);     /* flat, facing up */
+void fxp_bar(v3 a, v3 b, float w, uint32_t color);                            /* a square rod from a to b */
+void fxp_ring(v3 c, v3 axis, float R, float r, int segs, uint32_t color);    /* a torus about axis: a wheel */
+t3_object *fxp_end(void);
 #endif

@@ -1,4 +1,4 @@
-/* game.c: the title, the day, the pause menu and the ending. */
+/* game.c: the title, the day, the pause menu, the ending and the Battle Zone. */
 #if !defined(KH_TEST_WORLD) && !defined(KH_TEST_FIGHT)
 #include "game.h"
 #include "actor.h"
@@ -11,19 +11,20 @@
 #include "hud_vn.h"
 #include "world.h"
 #include "hud_int.h"
+#include "battle.h"
 #include <string.h>
 
 static t3_scene *scene; static t3_camera *cam;
-static enum { G_TITLE, G_PLAY, G_PAUSE, G_END } mode;
+static enum { G_TITLE, G_PLAY, G_PAUSE, G_END, G_BATTLE } mode;
 static float mode_t;
-static int who, pause_sel; static bool music_on = true;
+static int who, pause_sel, title_row; static bool music_on = true;
 static actor_t *T_A[3];
 static const char *const NAMES[3] = {"VEE", "DEX", "RUTH"};
 static const char *const BLURB[3] = {"First to look up. Runs the printers.", "Electronics bench. Tells you how it broke.", "Laser corner. Has actually read the manual."};
 static const actor_model TITLE_M[3] = {AM_C, AM_D, AM_B};
 
 static void title_enter(void) {
-  mode = G_TITLE; mode_t = 0;
+  mode = G_TITLE; mode_t = 0; title_row = 0;
   story_stop();
   world_set_stage(STAGE_TOWN); world_set_time(16.6f);
   music_mood(MOOD_TITLE);
@@ -46,6 +47,8 @@ void game_init(void) {
   player_init(cam);
   fight_init(scene, cam);
   story_init(scene, cam);
+  actor_preload_all();   /* every body parsed now, so nobody stalls a frame when they walk in */
+  battle_init(scene, cam);
   title_enter();
 }
 void game_frame(float dt) {
@@ -53,7 +56,9 @@ void game_frame(float dt) {
   mode_t += dt;
   switch (mode) {
     case G_TITLE: {
-      if (in->nav_x) { int n = who + in->nav_x; if (n >= 0 && n < 3) { who = n; sfx(SFX_UI, 0, 1); } }
+      if (in->nav_x && title_row == 0) { int n = who + in->nav_x; if (n >= 0 && n < 3) { who = n; sfx(SFX_UI, 0, 1); } }
+      /* down to the Battle Zone's entry, up to the keyholders */
+      if (in->nav_y) { int n = title_row + in->nav_y; if (n >= 0 && n < 2) { title_row = n; sfx(SFX_UI, 0, 1); } }
       for (int i = 0; i < 3; i++) {
         actor_expr_set(T_A[i], EX_JOY, i == who ? .7f : 0);
         actor_play(T_A[i], i == who ? "Sword_Idle" : "Idle_Loop", 1, true, .3f);
@@ -67,7 +72,16 @@ void game_frame(float dt) {
       t3_object_look_at(cam, c.x + (who - 1) * .25f, c.y + 1.15f, c.z);
       if (cam->fov != 38) { cam->fov = 38; t3_camera_update_projection_matrix(cam); }
       world_update(dt, v3_(c.x, c.y + 1, c.z + 4));
-      const bool cont = story_has_save() && (input_key_down(0x06) || in->heavy);   /* C or Y */
+      const bool cont = title_row == 0 && story_has_save() && (input_key_down(0x06) || in->heavy);   /* C or Y */
+      if (in->ok && title_row == 1) {
+        if (battle_available()) {
+          sfx(SFX_UI_OK, 0, 1);
+          title_leave();
+          battle_set_fighters(T_A, who); battle_enter();
+          mode = G_BATTLE; mode_t = 0;
+        } else sfx(SFX_CLASH, 0, .5f);
+        break;
+      }
       if (in->ok || cont) {
         sfx(SFX_UI_OK, 0, 1);
         title_leave();
@@ -91,6 +105,9 @@ void game_frame(float dt) {
         else { fight_end(); title_enter(); }
       }
       break;
+    case G_BATTLE:
+      if (!battle_update(dt, in)) title_enter();
+      break;
     case G_END:
       world_update(dt, v3_(0, 1, 5));
       if (mode_t > 6 && in->ok) title_enter();
@@ -104,7 +121,8 @@ void game_draw(void) {
   return;   /* clean frames for the web page's backdrop */
 #endif
   switch (mode) {
-    case G_TITLE: hud_title_draw(mode_t, 0, who, story_has_save(), NAMES, BLURB); break;
+    case G_TITLE: hud_title_draw(mode_t, title_row, who, story_has_save(), NAMES, BLURB); hud_battle_title(mode_t, title_row == 1); break;
+    case G_BATTLE: battle_draw(); break;
     case G_PLAY:
       if (story_state() == SR_FIGHT && !STORY_UI.retry) fight_draw_hud();
       hud_vn_draw();

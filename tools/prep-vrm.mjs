@@ -1,15 +1,20 @@
-// Bakes the VRoid sample avatars (source/vrm/*.vrm, VRM 0.x) into what the cart loads:
+// Bakes the VRoid sample avatars (CAST below: source/vrm, source/vrm-cc0; VRM 0.x) into what the cart loads:
 //
 //   assets/models/<id>.glb    one node tree (bones named by humanoid slot), canonical facing
-//                             (+Z, y up), identity rests, three skinned meshes:
+//                             (+Z, y up), identity rests, six skinned meshes on one skin padded to
+//                             SKIN_JOINTS (one shader program set for the whole cast):
 //                             "face"    the head's parts with its own atlas and the expression morphs
 //                             "body"    everything else, simplified to PS2 budget, its own atlas
-//                             "outline" inverted hull of body and face skin, no material of its own
+//                             "outline" inverted hull of body and face skin (and any glasses), no material
+//                             "far", "farface", "faroutline": the light level of detail (about 5k triangles),
+//                             same atlases, no morphs
+//   options per body: girth (a heavier trunk), paint { age, grey, stubble }, glasses
+//   assets/models/cast-meta.json  each body's last bake, so one body can be baked alone
 //   assets/models/<id>.spr    the spring bone chains and colliders, as text
 //   assets/anim/rig.bin       the mocap clips (CKAN, anim.c), hips in units of hip height
 //   src/gen/cast_meta.h       each model's hip height, standing height and joint sockets
 //
-//   node tools/prep-vrm.mjs
+//   node tools/prep-vrm.mjs [char_x ...]
 //
 // The motion in source/anim is Quaternius's CC0 Universal Animation Library, retargeted by
 // DOLLY's tools/retarget.mjs onto the VRM humanoid in the same canonical frame.
@@ -20,8 +25,29 @@ import sharp from 'sharp';
 import { MeshoptSimplifier } from 'meshoptimizer';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const CAST = ['yyc_B', 'yyc_C', 'yyc_D', 'shino_light', 'fumiriya'];
-const SHORT = { yyc_B: 'char_b', yyc_C: 'char_c', yyc_D: 'char_d', shino_light: 'char_s', fumiriya: 'char_f' };
+// the bodies, in actor_model order (actor.h); src is under source/
+const CAST = [
+  { src: 'vrm/yyc_B.vrm', id: 'char_b' }, { src: 'vrm/yyc_C.vrm', id: 'char_c' }, { src: 'vrm/yyc_D.vrm', id: 'char_d' },
+  { src: 'vrm/shino_light.vrm', id: 'char_s' }, { src: 'vrm/fumiriya.vrm', id: 'char_f' },
+  // v1.1: the VRoid Project CC0 samples (source/vrm-cc0/SOURCES.txt), some as bake time variants
+  { src: 'vrm-cc0/HairSample_Male.vrm', id: 'char_h' },
+  { src: 'vrm-cc0/Base_Male.vrm', id: 'char_m' },
+  { src: 'vrm-cc0/Base_Male.vrm', id: 'char_o', paint: { age: 1, grey: 1 }, glasses: true },
+  { src: 'vrm-cc0/Base_Male.vrm', id: 'char_p', girth: .16, paint: { stubble: .5, age: .35 } },
+  { src: 'vrm-cc0/HairSample_Male.vrm', id: 'char_u', girth: .5, paint: { stubble: .7, stubbleColor: [40, 34, 40] } },
+  { src: 'vrm-cc0/AvatarSample_D.vrm', id: 'char_k' },
+  { src: 'vrm-cc0/AvatarSample_E.vrm', id: 'char_e' },
+  { src: 'vrm-cc0/AvatarSample_F.vrm', id: 'char_v' },
+  { src: 'vrm-cc0/AvatarSample_G.vrm', id: 'char_g' },
+  { src: 'vrm-cc0/Base_Female.vrm', id: 'char_w' },
+  { src: 'vrm-cc0/Base_Female.vrm', id: 'char_r', paint: { age: .8, grey: .8 }, glasses: { m: .004 } },
+];
+const FAR_TRIS = 4200;
+// every skin is padded to this many joints: the renderer bakes the bone count into the program, so one
+// count means one set of programs for the whole cast (no program link when a new body walks on)
+const SKIN_JOINTS = 192;
+// the face's vertex count is baked into the morph program too: every face is padded to this many
+const FACE_VERTS = 3456;      // the far body (body and face together), no hull
 const BODY_KEEP = 0.5;      // share of body triangles kept by the simplifier
 const OUTLINE = 0.0052;     // hull push in metres
 // the expression morphs, in the order actor.c reads them
@@ -91,7 +117,47 @@ function compact(M) {
 }
 
 // one atlas: shelf-pack the materials' textures at a common scale, remap the uvs
-async function atlas(M, materials, size, name, J, view) {
+// paint on the face skin texture (VRoid faces share one layout: eyes at y .53, nose .64, mouth .75):
+// age lines under the eyes, at the nose and on the brow, and stubble round the mouth and jaw
+function paintFace(raw, w, h, o) {
+  const blend = (x, y, rgb, a) => { x |= 0; y |= 0; if (x < 0 || y < 0 || x >= w || y >= h || a <= 0) return; const p = (y * w + x) * 4; for (let k = 0; k < 3; k++) raw[p + k] = raw[p + k] * (1 - a) + rgb[k] * a; };
+  const tone = (x, y, f, a) => { x |= 0; y |= 0; if (x < 0 || y < 0 || x >= w || y >= h) return; const p = (y * w + x) * 4; blend(x, y, [raw[p] * f, raw[p + 1] * f * .96, raw[p + 2] * f * .94], a); };
+  // a soft stroke along a quadratic curve, in texture fractions
+  const stroke = (p0, p1, p2, width, f, a) => {
+    for (let t = 0; t <= 1; t += 1 / (w * .6)) {
+      const x = ((1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * p1[0] + t * t * p2[0]) * w, y = ((1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * p1[1] + t * t * p2[1]) * h;
+      const taper = Math.sin(Math.PI * t), r = width * w;
+      for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { const d = Math.hypot(dx, dy) / r; if (d <= 1) tone(x + dx, y + dy, f, a * taper * (1 - d) * .5); }
+    }
+  };
+  if (o.age) {
+    const a = o.age;
+    for (const s of [1, -1]) {
+      const X = (x) => .5 + s * (x - .5);
+      stroke([X(.27), .585], [X(.34), .625], [X(.42), .59], .004, .72, a);          // under the eye
+      stroke([X(.26), .615], [X(.335), .655], [X(.41), .62], .003, .8, a * .7);
+      stroke([X(.445), .675], [X(.405), .73], [X(.415), .79], .005, .7, a);         // nose to mouth
+      stroke([X(.235), .5], [X(.215), .53], [X(.235), .565], .003, .78, a * .8);     // crow's feet
+    }
+    stroke([.38, .405], [.5, .39], [.62, .405], .003, .82, a * .7);                  // brow
+    stroke([.4, .435], [.5, .422], [.6, .435], .003, .82, a * .55);
+  }
+  if (o.stubble) {
+    // a speckle in the hair colour over the lip, chin and jaw, thinning at the edges
+    const col = o.stubbleColor || [70, 52, 44];
+    let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    for (let y = (h * .69) | 0; y < h * .97; y++) for (let x = (w * .1) | 0; x < w * .9; x++) {
+      const u = x / w - .5, v = y / h;
+      const jaw = Math.hypot(u / .36, (v - .74) / .2);                  // the lower face
+      const mouth = Math.hypot(u / .085, (v - .752) / .016);            // keep the lips clear
+      if (jaw > 1 || mouth < 1) continue;
+      const edge = Math.min(1, (1 - jaw) * 4) * Math.min(1, (mouth - 1) * 3) * (v < .72 ? Math.max(0, 1 - Math.abs(u) / .12) : 1);
+      if (rnd() < .55) blend(x, y, col, o.stubble * edge * (.5 + .5 * rnd()));
+    }
+  }
+}
+
+async function atlas(M, materials, size, name, J, view, paint) {
   const used = [...new Set(M.mat)];
   const items = [];
   for (const m of used) {
@@ -106,6 +172,12 @@ async function atlas(M, materials, size, name, J, view) {
       raw = r.data; w = r.info.width; h = r.info.height;
     }
     for (let p = 0; p < raw.length; p += 4) for (let k = 0; k < 3; k++) raw[p + k] = Math.min(255, raw[p + k] * fac[k]);
+    if (paint && /Face_00/.test(mat.name)) paintFace(raw, w, h, paint);
+    // grey hair (and brows): the luminance lifted toward a silver, a trace of the old hue left
+    if (paint?.grey && /hair|FaceBrow/i.test(mat.name)) for (let p = 0; p < raw.length; p += 4) {
+      const L = .3 * raw[p] + .59 * raw[p + 1] + .11 * raw[p + 2], g = 70 + L * .75 * paint.grey + (1 - paint.grey) * L * .2;
+      for (let k = 0; k < 3; k++) raw[p + k] = Math.min(255, g * (k === 2 ? 1.03 : 1) * .85 + raw[p + k] * .15);
+    }
     items.push({ m, raw, w, h, name: mat.name });
   }
   const PAD = 3;
@@ -134,6 +206,14 @@ async function atlas(M, materials, size, name, J, view) {
     }
     rects[p.it.m] = p;
   }
+  remapLike(M, rects, size);
+  // a 256 colour PNG: cel shaded art survives it, and it is a third of the size (stb_image reads it)
+  const png = await sharp(out, { raw: { width: size, height: size, channels: 4 } }).png({ compressionLevel: 9, palette: true, colours: 256, dither: 0.6, effort: 10 }).toBuffer();
+  console.log(`  atlas ${name} ${size}: ${used.length} mats scale ${scale.toFixed(2)} ${(png.length / 1024) | 0} KB`);
+  return { png, size, place: rects, rects: Object.values(rects).map((p) => ({ name: p.it.name, x: p.x, y: p.y, w: p.w, h: p.h })) };
+}
+// move a mesh's uvs into the atlas rects of its materials
+function remapLike(M, rects, size) {
   // a vertex can be shared by triangles of one material only (prims never share)
   const seen = new Uint8Array(M.nv);
   for (let t = 0; t < M.idx.length / 3; t++) {
@@ -147,9 +227,6 @@ async function atlas(M, materials, size, name, J, view) {
       M.uv[v * 2] = (p.x + u * p.w) / size; M.uv[v * 2 + 1] = (p.y + w * p.h) / size;
     }
   }
-  const png = await sharp(out, { raw: { width: size, height: size, channels: 4 } }).png({ compressionLevel: 9, palette: false }).toBuffer();
-  console.log(`  atlas ${name}: ${used.length} mats scale ${scale.toFixed(2)} ${(png.length / 1024) | 0} KB`);
-  return { png, rects: Object.values(rects).map((p) => ({ name: p.it.name, x: p.x, y: p.y, w: p.w, h: p.h })) };
 }
 
 class GlbOut {
@@ -161,8 +238,68 @@ class GlbOut {
 }
 
 const metas = [];
-async function bake(file) {
-  const { J, acc, view } = readGlb(join(ROOT, 'source/vrm', file + '.vrm'));
+// simplify material by material so a jacket cannot eat a shoe; keep is the share of triangles kept
+function simplifyByMat(S, keep, err, label) {
+  const kept = [], matKept = [];
+  for (const m of new Set(S.mat)) {
+    const ids = []; for (let t = 0; t < S.mat.length; t++) if (S.mat[t] === m) ids.push(S.idx[t * 3], S.idx[t * 3 + 1], S.idx[t * 3 + 2]);
+    let out = Uint32Array.from(ids);
+    if (ids.length > 360 && keep < 1) {
+      // a private vertex list per material: the simplifier's error is relative to what it is given
+      const map = new Map(), lp = [];
+      const li = Uint32Array.from(ids, (v) => { if (!map.has(v)) { map.set(v, map.size); lp.push(S.pos[v * 3], S.pos[v * 3 + 1], S.pos[v * 3 + 2]); } return map.get(v); });
+      const back = [...map.keys()];
+      const [sm] = MeshoptSimplifier.simplify(li, Float32Array.from(lp), 3, Math.max(120, Math.floor(ids.length * keep / 3)) * 3, err, []);
+      if (label) console.log('   ', label, String(m).padStart(3), ids.length / 3, '->', sm.length / 3);
+      if (sm.length) out = Uint32Array.from(sm, (v) => back[v]);
+    }
+    kept.push(...out); for (let t = 0; t < out.length / 3; t++) matKept.push(m);
+  }
+  return compact({ ...S, idx: Uint32Array.from(kept), mat: Int32Array.from(matKept) });
+}
+// an inverted hull: the meshes' triangles (all, or those the filter keeps) pushed out along the normals and flipped
+function makeHull(parts, push) {
+  let nv = 0; for (const [S] of parts) nv += S.nv;
+  const hp = new Float32Array(nv * 3), hn = new Float32Array(nv * 3), hj = new Uint16Array(nv * 4), hw = new Float32Array(nv * 4), idx = [];
+  let o = 0;
+  for (const [S, keepTri] of parts) {
+    for (let i = 0; i < S.nv; i++) { for (let k = 0; k < 3; k++) { hp[(o + i) * 3 + k] = S.pos[i * 3 + k] + S.nor[i * 3 + k] * push; hn[(o + i) * 3 + k] = S.nor[i * 3 + k]; } for (let k = 0; k < 4; k++) { hj[(o + i) * 4 + k] = S.jnt[i * 4 + k]; hw[(o + i) * 4 + k] = S.wgt[i * 4 + k]; } }
+    for (let t = 0; t < S.idx.length / 3; t++) if (!keepTri || keepTri(S.mat[t])) idx.push(S.idx[t * 3] + o, S.idx[t * 3 + 2] + o, S.idx[t * 3 + 1] + o);
+    o += S.nv;
+  }
+  return compact({ nv, pos: hp, nor: hn, uv: new Float32Array(nv * 2), jnt: hj, wgt: hw, idx: Uint32Array.from(idx), mat: new Int32Array(idx.length / 3), morph: [] });
+}
+
+// glasses as inked lines: two rounded frames, a bridge and the arms, in the outline's dark flat colour,
+// both sides, on the head joint. eyes are the eye bones (canonical frame), face the face mesh
+function glassesMesh(face, isWhite, head, o = {}) {
+  const pos = [], idx = [], ring = 32, th = o.t || .0026, m = o.m || .006;
+  // each lens round its eye white, from the face mesh itself (the eye bones are the eyeballs' pivots, deep and close)
+  const box = [[1e9, 1e9, -1e9, -1e9], [1e9, 1e9, -1e9, -1e9]];
+  for (let t = 0; t < face.idx.length / 3; t++) if (isWhite(face.mat[t])) for (let c = 0; c < 3; c++) {
+    const v = face.idx[t * 3 + c], x = face.pos[v * 3], y = face.pos[v * 3 + 1], B = box[x < 0 ? 0 : 1];
+    B[0] = Math.min(B[0], x); B[1] = Math.min(B[1], y); B[2] = Math.max(B[2], x); B[3] = Math.max(B[3], y);
+  }
+  const lens = box.map((B) => ({ cx: (B[0] + B[2]) / 2, cy: (B[1] + B[3]) / 2 + .002, hw: (B[2] - B[0]) / 2 + m, hh: (B[3] - B[1]) / 2 + m * .8 }));
+  // the lens plane: just in front of the skin inside the frames
+  let zs = -1e9;
+  for (let i = 0; i < face.nv; i++) for (const L of lens) if (Math.abs(face.pos[i * 3] - L.cx) < L.hw && Math.abs(face.pos[i * 3 + 1] - L.cy) < L.hh) zs = Math.max(zs, face.pos[i * 3 + 2]);
+  const z = zs + (o.gap || .006);
+  const quad = (a, b, c, d) => { const n = pos.length / 3; pos.push(...a, ...b, ...c, ...d); idx.push(n, n + 1, n + 2, n, n + 2, n + 3, n, n + 2, n + 1, n, n + 3, n + 2); };
+  const rr = (L, t, grow) => { const a = t * Math.PI * 2, c = Math.cos(a), si = Math.sin(a), q = 2 / 5; return [L.cx + Math.sign(c) * Math.abs(c) ** q * (L.hw + grow), L.cy + Math.sign(si) * Math.abs(si) ** q * (L.hh + grow), z]; };
+  for (const L of lens) for (let k = 0; k < ring; k++) quad(rr(L, k / ring, 0), rr(L, (k + 1) / ring, 0), rr(L, (k + 1) / ring, th), rr(L, k / ring, th));
+  const [l, r] = lens[0].cx < lens[1].cx ? lens : [lens[1], lens[0]], y = (l.cy + r.cy) / 2 + l.hh * .35;
+  quad([l.cx + l.hw, y, z], [r.cx - r.hw, y, z], [r.cx - r.hw, y + th, z], [l.cx + l.hw, y + th, z]);   // bridge
+  for (const [L, s] of [[l, -1], [r, 1]]) { const x = L.cx + s * (L.hw + th), yy = L.cy + L.hh * .4; quad([x, yy, z], [x + s * .008, yy, z - .085], [x + s * .008, yy + th, z - .085], [x, yy + th, z]); }   // arms to the ears
+  console.log(`  glasses: lenses ${lens.map((L) => `${L.cx.toFixed(3)},${L.cy.toFixed(3)} ${(L.hw * 2).toFixed(3)}x${(L.hh * 2).toFixed(3)}`).join(' ')} at z ${z.toFixed(3)}`);
+  const nv = pos.length / 3, jnt = new Uint16Array(nv * 4), wgt = new Float32Array(nv * 4);
+  for (let i = 0; i < nv; i++) { jnt[i * 4] = head; wgt[i * 4] = 1; }
+  return { nv, pos: Float32Array.from(pos), nor: new Float32Array(nv * 3), uv: new Float32Array(nv * 2), jnt, wgt, idx: Uint32Array.from(idx), mat: new Int32Array(idx.length / 3), morph: [] };
+}
+
+async function bake(entry) {
+  const file = entry.src.replace(/^.*\//, '').replace(/\.vrm$/, '');
+  const { J, acc, view } = readGlb(join(ROOT, 'source', entry.src));
   const V = J.extensions.VRM;
   // bones by humanoid slot; other joints (hair, skirt, bust) keep a sanitized name
   const human = {}; for (const b of V.humanoid.humanBones) human[b.node] = b.bone;
@@ -172,8 +309,8 @@ async function bake(file) {
   // world position of every node (VRoid rests are translation only: checked below)
   const parent = {}; J.nodes.forEach((n, i) => (n.children || []).forEach((c) => (parent[c] = i)));
   const world = (i) => { let x = 0, y = 0, z = 0; for (let n = i; n !== undefined; n = parent[n]) { const t = J.nodes[n].translation || [0, 0, 0], r = J.nodes[n].rotation || [0, 0, 0, 1]; if (Math.abs(r[0]) + Math.abs(r[1]) + Math.abs(r[2]) > 1e-4) throw new Error('rotated rest: ' + J.nodes[n].name); x += t[0]; y += t[1]; z += t[2]; } return [x, y, z]; };
-  // skins are per mesh: unify to the first skin's joints
-  const joints = J.skins[0].joints;
+  // skins are per mesh: unify to one joint list (the first skin's, then any others')
+  const joints = [...new Set(J.skins.flatMap((s) => s.joints))];
   const jointIndex = new Map(joints.map((j, i) => [j, i]));
   // binds for the fixed expression list
   const groups = V.blendShapeMaster.blendShapeGroups;
@@ -181,10 +318,15 @@ async function bake(file) {
   // every primitive
   const facePrims = [], bodyPrims = [], meshNodes = J.nodes.filter((n) => n.mesh !== undefined);
   for (const node of meshNodes) {
-    const skin = J.skins[node.skin];
-    const remap = skin.joints.map((j) => { if (!jointIndex.has(j)) throw new Error('joint outside skin 0'); return jointIndex.get(j); });
+    const ni = J.nodes.indexOf(node);
+    // an unskinned mesh (a hat on the head bone): rigid on its nearest joint, moved to world space
+    let rigid = -1, off = [0, 0, 0];
+    if (node.skin === undefined) { let p = ni; while (p !== undefined && !jointIndex.has(p)) p = parent[p]; if (p === undefined) { console.log('  skip unskinned mesh', node.name); continue; } rigid = jointIndex.get(p); off = world(ni); }
+    const remap = node.skin === undefined ? [rigid] : J.skins[node.skin].joints.map((j) => jointIndex.get(j));
     J.meshes[node.mesh].primitives.forEach((p) => {
-      const at = p.attributes, pos = acc(at.POSITION), nor = acc(at.NORMAL), uv = acc(at.TEXCOORD_0), jn = acc(at.JOINTS_0), wg = acc(at.WEIGHTS_0);
+      const at = p.attributes, pos = acc(at.POSITION), nor = acc(at.NORMAL), uv = acc(at.TEXCOORD_0);
+      const nv0 = pos.length / 3, jn = at.JOINTS_0 !== undefined ? acc(at.JOINTS_0) : new Uint16Array(nv0 * 4), wg = at.WEIGHTS_0 !== undefined ? acc(at.WEIGHTS_0) : Float32Array.from({ length: nv0 * 4 }, (_, i) => (i % 4 ? 0 : 1));
+      if (rigid >= 0) for (let i = 0; i < pos.length; i += 3) { pos[i] += off[0]; pos[i + 1] += off[1]; pos[i + 2] += off[2]; }
       const idx = Uint32Array.from(acc(p.indices));
       const jnt = new Uint16Array(jn.length); for (let i = 0; i < jn.length; i++) jnt[i] = remap[jn[i]];
       // canonical facing: VRM 0 faces -Z, turn 180 about y
@@ -206,24 +348,22 @@ async function bake(file) {
     });
   }
   const faceSrc = gather(facePrims), bodySrc = gather(bodyPrims);
-  // simplify the body material by material so a jacket cannot eat a shoe
-  await MeshoptSimplifier.ready;
-  const kept = []; const matKept = [];
-  for (const m of new Set(bodySrc.mat)) {
-    const ids = []; for (let t = 0; t < bodySrc.mat.length; t++) if (bodySrc.mat[t] === m) ids.push(bodySrc.idx[t * 3], bodySrc.idx[t * 3 + 1], bodySrc.idx[t * 3 + 2]);
-    let out = Uint32Array.from(ids);
-    if (ids.length > 360) {
-      // a private vertex list per material: the simplifier's error is relative to what it is given
-      const map = new Map(), lp = [];
-      const li = Uint32Array.from(ids, (v) => { if (!map.has(v)) { map.set(v, map.size); lp.push(bodySrc.pos[v * 3], bodySrc.pos[v * 3 + 1], bodySrc.pos[v * 3 + 2]); } return map.get(v); });
-      const back = [...map.keys()];
-      const [sm] = MeshoptSimplifier.simplify(li, Float32Array.from(lp), 3, Math.floor(ids.length * BODY_KEEP / 3) * 3, 0.05, []);
-      console.log('   ', J.materials[m].name.slice(0, 20), ids.length / 3, '->', sm.length / 3, 'nan', lp.some((x) => !isFinite(x)));
-      if (sm.length) out = Uint32Array.from(sm, (v) => back[v]);
+  // a heavier build: the trunk's vertices pushed out from the spine, the belly most
+  if (entry.girth) {
+    const wOf = { hips: .7, spine: 1, chest: 1, upperChest: .6, leftUpperLeg: .35, rightUpperLeg: .35, neck: .25 };
+    const jw = new Float32Array(joints.length); joints.forEach((j, i) => { jw[i] = wOf[human[j]] || 0; });
+    const sp = world(+Object.entries(human).find(([, v]) => v === 'spine')[0]), zc = -sp[2], yc = sp[1];
+    for (let i = 0; i < bodySrc.nv; i++) {
+      let w = 0; for (let k = 0; k < 4; k++) w += bodySrc.wgt[i * 4 + k] * jw[bodySrc.jnt[i * 4 + k]];
+      if (w <= 0) continue;
+      const y = bodySrc.pos[i * 3 + 1], dz = bodySrc.pos[i * 3 + 2] - zc;
+      const belly = dz > 0 ? 1 + 1.2 * Math.max(0, 1 - Math.abs(y - yc + .02) / .16) : 1;
+      bodySrc.pos[i * 3] *= 1 + entry.girth * w;
+      bodySrc.pos[i * 3 + 2] = zc + dz * (1 + entry.girth * w * belly);
     }
-    kept.push(...out); for (let t = 0; t < out.length / 3; t++) matKept.push(m);
   }
-  const body = compact({ ...bodySrc, idx: Uint32Array.from(kept), mat: Int32Array.from(matKept) });
+  await MeshoptSimplifier.ready;
+  const body = simplifyByMat(bodySrc, entry.keep || BODY_KEEP, 0.05);
   const face = compact(faceSrc);
   console.log(`${file}: body ${bodySrc.idx.length / 3} -> ${body.idx.length / 3} tris, ${body.nv} verts; face ${face.idx.length / 3} tris, ${face.nv} verts, joints ${joints.length}`);
 
@@ -232,23 +372,49 @@ async function bake(file) {
   const hw = world(+headNode); const hc = [-hw[0], hw[1] + 0.06, -hw[2]];
   for (let i = 0; i < face.nv; i++) { const d = [face.pos[i * 3] - hc[0], face.pos[i * 3 + 1] - hc[1], face.pos[i * 3 + 2] - hc[2]]; const l = Math.hypot(...d) || 1; for (let k = 0; k < 3; k++) face.nor[i * 3 + k] = d[k] / l; }
 
-  const faceAt = await atlas(face, J.materials, 1024, 'face', J, view);
-  const bodyAt = await atlas(body, J.materials, 1024, 'body', J, view);
+  // the far body: the same atlases, the face without its mouth, eye extras or morphs
+  const mname = (m) => J.materials[m].name;
+  const farFaceSrc = compact({ ...face, ...(() => { const idx = [], mat = []; for (let t = 0; t < face.mat.length; t++) if (!/FaceMouth|EyeExtra|EyeHighlight/i.test(mname(face.mat[t]))) { idx.push(face.idx[t * 3], face.idx[t * 3 + 1], face.idx[t * 3 + 2]); mat.push(face.mat[t]); } return { idx: Uint32Array.from(idx), mat: Int32Array.from(mat) }; })() });
+  const bodyT = body.idx.length / 3, ffT = farFaceSrc.idx.length / 3, farKeep = Math.min(1, FAR_TRIS / (bodyT + ffT));
+  const far = simplifyByMat(body, farKeep, 0.25), farFace = simplifyByMat(farFaceSrc, Math.max(farKeep, .45), 0.25);
 
-  // the hull: body and the face's skin (no eyes, lashes or mouth), pushed out and flipped
-  const faceSkin = [...new Set(face.mat)].filter((m) => /Face_00/.test(J.materials[m].name));
-  const hullFace = []; for (let t = 0; t < face.mat.length; t++) if (faceSkin.includes(face.mat[t])) hullFace.push(face.idx[t * 3] + body.nv, face.idx[t * 3 + 2] + body.nv, face.idx[t * 3 + 1] + body.nv);
-  const hn = body.nv + face.nv, hp = new Float32Array(hn * 3), hnor = new Float32Array(hn * 3), hj = new Uint16Array(hn * 4), hw2 = new Float32Array(hn * 4), push = (S, o) => { for (let i = 0; i < S.nv; i++) { for (let k = 0; k < 3; k++) { hp[(o + i) * 3 + k] = S.pos[i * 3 + k] + S.nor[i * 3 + k] * OUTLINE; hnor[(o + i) * 3 + k] = S.nor[i * 3 + k]; } for (let k = 0; k < 4; k++) { hj[(o + i) * 4 + k] = S.jnt[i * 4 + k]; hw2[(o + i) * 4 + k] = S.wgt[i * 4 + k]; } } };
-  push(body, 0); push(face, body.nv);
-  const hullIdx = []; for (let t = 0; t < body.idx.length; t += 3) hullIdx.push(body.idx[t], body.idx[t + 2], body.idx[t + 1]); hullIdx.push(...hullFace);
-  const hull = compact({ nv: hn, pos: hp, nor: hnor, uv: new Float32Array(hn * 2), jnt: hj, wgt: hw2, idx: Uint32Array.from(hullIdx), mat: new Int32Array(hullIdx.length / 3), morph: [] });
+  const faceAt = await atlas(face, J.materials, entry.faceAtlas || 1024, 'face', J, view, entry.paint);
+  // the far face shares the face atlas: same materials, so the same placement
+  remapLike(farFace, faceAt.place, faceAt.size);
+  const bodyAt = await atlas(body, J.materials, entry.bodyAtlas || 1024, 'body', J, view, entry.paint);
+  remapLike(far, bodyAt.place, bodyAt.size);
+
+  // the hulls: body and the face's skin (no eyes, lashes or mouth), pushed out and flipped
+  const isSkin = (m) => /Face_00/.test(mname(m)) || (/face/i.test(mname(m)) && /skin/i.test(mname(m)));
+  const extra = [];
+  if (entry.glasses) {
+    const head = +Object.entries(human).find(([, v]) => v === 'head')[0];
+    extra.push([glassesMesh(face, (m) => /EyeWhite/.test(mname(m)), jointIndex.get(head), entry.glasses === true ? {} : entry.glasses)]);
+  }
+  // the glasses ride in the hull meshes (zero normals: no push), both near and mid
+  const hull = makeHull([[body], [face, isSkin], ...extra], OUTLINE);
+  const farHull = makeHull([[far], [farFace, isSkin], ...extra], OUTLINE * 1.5);
 
   // write
   const G = new GlbOut(), O = G.J;
+  // quantized attributes (the loader dequantizes): normals in bytes, uvs in shorts, joints and weights in bytes
+  const qNormal = (nor) => { const nv = nor.length / 3, b = new Int8Array(nv * 4); for (let i = 0; i < nv; i++) { const l = Math.hypot(nor[i * 3], nor[i * 3 + 1], nor[i * 3 + 2]) || 1; for (let k = 0; k < 3; k++) b[i * 4 + k] = Math.round(nor[i * 3 + k] / l * 127); } const v = G.blob(b); O.bufferViews[v].byteStride = 4; O.accessors.push({ bufferView: v, componentType: 5120, normalized: true, count: nv, type: 'VEC3' }); return O.accessors.length - 1; };
+  const qWeights = (w) => { const b = new Uint8Array(w.length); for (let i = 0; i < w.length; i += 4) { let s = 0, big = i; for (let k = 0; k < 4; k++) { b[i + k] = Math.round(w[i + k] * 255); s += b[i + k]; if (w[i + k] > w[big]) big = i + k; } b[big] += 255 - s; } return G.acc(b, 'VEC4', 5121, false, true); };
+  const qJoints = (j) => (SKIN_JOINTS < 256 ? G.acc(Uint8Array.from(j), 'VEC4', 5121) : G.acc(j, 'VEC4', 5123));
+  const qUv = (uv) => G.acc(Uint16Array.from(uv, (x) => Math.round(Math.min(1, Math.max(0, x)) * 65535)), 'VEC2', 5123, false, true);
+  const pad = (S, n) => {
+    if (S.nv > n) throw new Error(`${file}: face has ${S.nv} vertices, more than FACE_VERTS`);
+    const grow = (a, k) => { const o = new a.constructor(n * k); o.set(a); return o; };
+    const P = { ...S, nv: n, pos: grow(S.pos, 3), nor: grow(S.nor, 3), uv: grow(S.uv, 2), jnt: grow(S.jnt, 4), wgt: grow(S.wgt, 4), morph: S.morph.map((d) => grow(d, 3)) };
+    for (let i = S.nv; i < n; i++) { P.wgt[i * 4] = 1; P.nor[i * 3 + 1] = 1; P.pos.set(S.pos.subarray(0, 3), i * 3); }   /* unused, parked on vertex 0 */
+    return P;
+  };
   const add = (src, n, tex) => {
-    const attrs = { POSITION: G.acc(src.pos, 'VEC3', 5126, true), NORMAL: G.acc(src.nor, 'VEC3', 5126), JOINTS_0: G.acc(src.jnt, 'VEC4', 5123), WEIGHTS_0: G.acc(src.wgt, 'VEC4', 5126) };
+    if (n === 'face') src = pad(src, FACE_VERTS);
+    const attrs = { POSITION: G.acc(src.pos, 'VEC3', 5126, true), JOINTS_0: qJoints(src.jnt), WEIGHTS_0: qWeights(src.wgt) };
+    if (tex !== null) attrs.NORMAL = qNormal(src.nor);   /* the hull is unlit */
     let material;
-    if (tex !== null) { attrs.TEXCOORD_0 = G.acc(src.uv, 'VEC2', 5126); O.materials.push({ name: n, alphaMode: 'MASK', alphaCutoff: 0.45, pbrMetallicRoughness: { baseColorTexture: { index: tex }, metallicFactor: 0, roughnessFactor: 1 } }); material = O.materials.length - 1; }
+    if (tex !== null) { attrs.TEXCOORD_0 = qUv(src.uv); O.materials.push({ name: n, alphaMode: 'MASK', alphaCutoff: 0.45, pbrMetallicRoughness: { baseColorTexture: { index: tex }, metallicFactor: 0, roughnessFactor: 1 } }); material = O.materials.length - 1; }
     else { O.materials.push({ name: n, pbrMetallicRoughness: { baseColorFactor: [0.08, 0.06, 0.08, 1], metallicFactor: 0, roughnessFactor: 1 } }); material = O.materials.length - 1; }
     const prim = { attributes: attrs, indices: src.nv < 65535 ? G.acc(Uint16Array.from(src.idx), 'SCALAR', 5123) : G.acc(Uint32Array.from(src.idx), 'SCALAR', 5125), material };
     if (n === 'face') prim.targets = EXPR.map((_, e) => ({ POSITION: G.acc(src.morph[e], 'VEC3', 5126, true) }));
@@ -256,18 +422,21 @@ async function bake(file) {
     O.nodes.push({ name: n, mesh: O.meshes.length - 1, skin: 0 });
     return O.nodes.length - 1;
   };
-  const meshIds = [add(body, 'body', G.tex(bodyAt.png)), add(face, 'face', G.tex(faceAt.png)), add(hull, 'outline', null)];
+  const bodyTex = G.tex(bodyAt.png), faceTex = G.tex(faceAt.png);
+  const meshIds = [add(body, 'body', bodyTex), add(face, 'face', faceTex), add(hull, 'outline', null), add(far, 'far', bodyTex), add(farFace, 'farface', faceTex), add(farHull, 'faroutline', null)];
   // the skeleton as the source's hierarchy, translations flipped, rotations identity
   const newId = new Map();
   const walk = (i) => { const n = J.nodes[i]; const t = n.translation || [0, 0, 0]; const rec = { name: nameOf(i), translation: [-t[0], t[1], -t[2]] }; O.nodes.push(rec); const id = O.nodes.length - 1; newId.set(i, id); const ch = (n.children || []).filter((c) => J.nodes[c].mesh === undefined).map(walk); if (ch.length) rec.children = ch; return id; };
   const rootSrc = J.scenes[0].nodes.find((i) => J.nodes[i].name === 'Root');
   const skelRoot = walk(rootSrc);
   // inverse bind: pure translation, from the rest positions
-  const ibm = new Float32Array(joints.length * 16);
-  joints.forEach((j, i) => { const w = world(j); const m = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, w[0], -w[1], w[2], 1]; ibm.set(m, i * 16); });
-  O.skins.push({ joints: joints.map((j) => newId.get(j)), inverseBindMatrices: G.acc(ibm, 'MAT4', 5126), skeleton: skelRoot });
+  if (joints.length > SKIN_JOINTS) throw new Error(`${file}: ${joints.length} joints, more than SKIN_JOINTS`);
+  const ibm = new Float32Array(SKIN_JOINTS * 16);
+  for (let i = 0; i < SKIN_JOINTS; i++) { const w = world(joints[Math.min(i, joints.length - 1)]); ibm.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, w[0], -w[1], w[2], 1], i * 16); }
+  const padded = Array.from({ length: SKIN_JOINTS }, (_, i) => newId.get(joints[Math.min(i, joints.length - 1)]));
+  O.skins.push({ joints: padded, inverseBindMatrices: G.acc(ibm, 'MAT4', 5126), skeleton: skelRoot });
   O.scenes[0].nodes = [...meshIds, skelRoot];
-  const id = SHORT[file];
+  const id = entry.id;
   G.write(join(ROOT, 'assets/models', id + '.glb'));
 
   // spring bones
@@ -284,7 +453,9 @@ async function bake(file) {
   // sizes for the runtime
   const pick = (b) => world(+Object.entries(human).find(([, v]) => v === b)[0]);
   const hipsH = pick('hips')[1] - Math.min(pick('leftFoot')[1], pick('rightFoot')[1]);
-  metas.push({ id, file, hipsH, height: pick('head')[1] + 0.12, tris: body.idx.length / 3 + face.idx.length / 3, hull: hull.idx.length / 3, rects: bodyAt.rects });
+  const tris = { near: body.idx.length / 3 + face.idx.length / 3, hull: hull.idx.length / 3, far: far.idx.length / 3 + farFace.idx.length / 3, farHull: farHull.idx.length / 3 };
+  console.log(`  ${id}: near ${tris.near} + hull ${tris.hull}, far ${tris.far} + hull ${tris.farHull}`);
+  metas.push({ id, file, hipsH, height: pick('head')[1] + 0.12, tris, rects: bodyAt.rects });
 }
 
 function rig() {
@@ -326,10 +497,17 @@ mkdirSync(join(ROOT, 'assets/anim'), { recursive: true });
 mkdirSync(join(ROOT, 'src/gen'), { recursive: true });
 rig();
 if (process.argv[2] === 'rig') process.exit(0);
-for (const f of process.argv[2] ? [process.argv[2]] : CAST) await bake(f);
-const kind = (n) => /hair/i.test(n) ? 0 : /tops/i.test(n) ? 1 : /bottoms/i.test(n) ? 2 : /shoes/i.test(n) ? 3 : /access/i.test(n) ? 1 : -1;
+// node tools/prep-vrm.mjs char_x char_y: bake only those; the others keep their last meta (assets/models/cast-meta.json)
+const only = process.argv.slice(2);
+for (const e of CAST) if (!only.length || only.includes(e.id)) await bake(e);
+const metaPath = join(ROOT, 'assets/models/cast-meta.json');
+let old = {}; try { old = JSON.parse(readFileSync(metaPath)); } catch { /* first bake */ }
+for (const m of metas) old[m.id] = m;
+writeFileSync(metaPath, JSON.stringify(old));
+const all = CAST.map((e) => old[e.id]);
+if (all.some((m) => !m)) throw new Error('bake every body once: ' + CAST.filter((e) => !old[e.id]).map((e) => e.id).join(' '));
+const kind = (n) => /hair/i.test(n) ? 0 : /tops|onepi|onepice|outer|jacket/i.test(n) ? 1 : /bottoms/i.test(n) ? 2 : /shoes/i.test(n) ? 3 : /access/i.test(n) ? 1 : -1;
 let h = '/* made by tools/prep-vrm.mjs */\n#ifndef CAST_META_H\n#define CAST_META_H\ntypedef struct { int kind, x, y, w, h; } cast_rect;   /* kind: 0 hair, 1 top, 2 bottom, 3 shoes */\ntypedef struct { const char *glb, *spr; float hips_h, height; int nrect; cast_rect rect[24]; } cast_meta;\nstatic const cast_meta CAST_META[] = {\n';
-for (const m of metas) { const r = m.rects.filter((x) => kind(x.name) >= 0); h += `  { "${m.id}.glb", "${m.id}.spr", ${m.hipsH.toFixed(4)}f, ${m.height.toFixed(4)}f, ${r.length}, { ${r.map((x) => `{${kind(x.name)},${x.x},${x.y},${x.w},${x.h}}`).join(', ')} } },  /* ${m.file}: ${m.tris} tris + hull ${m.hull} */\n`; }
+for (const m of all) { const r = m.rects.filter((x) => kind(x.name) >= 0).slice(0, 24); h += `  { "${m.id}.glb", "${m.id}.spr", ${m.hipsH.toFixed(4)}f, ${m.height.toFixed(4)}f, ${r.length}, { ${r.map((x) => `{${kind(x.name)},${x.x},${x.y},${x.w},${x.h}}`).join(', ')} } },  /* ${m.file}: ${m.tris.near} tris + hull ${m.tris.hull}, far ${m.tris.far} */\n`; }
 h += '};\n#endif\n';
 writeFileSync(join(ROOT, 'src/gen/cast_meta.h'), h);
-writeFileSync(join(ROOT, 'assets/models/atlas-rects.json'), JSON.stringify(Object.fromEntries(metas.map((m) => [m.id, m.rects])), null, 0));

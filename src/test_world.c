@@ -7,10 +7,13 @@
 #include "city.h"
 #include "actor.h"
 #include <stdio.h>
+#include <string.h>
 #include "gen/city_data.h"
 static t3_scene *scene; static t3_camera *cam; static actor_t *A, *B2;
-typedef struct { const char *name; float t; world_stage st; v3 eye, at; } shot_t;
-#define S(n, t, st, ex, ey, ez, ax, ay, az) {n, t, st, {ex, ey, ez}, {ax, ay, az}}
+typedef struct { const char *name; float t; world_stage st; v3 eye, at; int phase; float fov; } shot_t;
+#define S(n, t, st, ex, ey, ez, ax, ay, az) {n, t, st, {ex, ey, ez}, {ax, ay, az}, 0, 55}
+#define S2(n, t, st, ex, ey, ez, ax, ay, az) {n, t, st, {ex, ey, ez}, {ax, ay, az}, 1, 55}
+#define ST(n, t, ex, ey, ez, ax, ay, az, fov) {n, t, STAGE_TOWN, {ex, ey, ez}, {ax, ay, az}, 0, fov}
 static const shot_t SHOTS[] = {
   /* 0 */  S("door_east_10", 10, STAGE_TOWN, -2, 1.6f, 5.5f, 60, 3, 9),
   /* 1 */  S("door_west_10", 10, STAGE_TOWN, 3, 1.6f, 5.5f, -60, 3, 7),
@@ -25,10 +28,10 @@ static const shot_t SHOTS[] = {
   /* 10 */ S("station_18", 18.3f, STAGE_TOWN, 300, 1.8f, 19.5f, 400, 3, 19.5f),
   /* 11 */ S("lab_inside_10", 10, STAGE_TOWN, 3, 1.5f, -12, 3, 1.3f, -28),
   /* 12 */ S("lab_inside_street_21", 21, STAGE_TOWN, 1, 1.5f, -9, 0, 1.3f, 8),
-  /* 13 */ S("arena_bench", 18, STAGE_ARENA_BENCH, 0, 3, 16, 0, 1, 0),
-  /* 14 */ S("arena_laser", 18, STAGE_ARENA_LASER, 0, 3, 16, 0, 1, 0),
-  /* 15 */ S("arena_fridge", 18, STAGE_ARENA_FRIDGE, 0, 3, 16, 0, 1, 0),
-  /* 16 */ S("arena_shop", 18, STAGE_ARENA_SHOP, 0, 3, 16, 0, 1, 0),
+  /* 13 */ S("arena_bench", 18, STAGE_ARENA_BENCH, 0, 2.6f, 11, 0, 1.2f, -5),
+  /* 14 */ S("arena_laser", 18, STAGE_ARENA_LASER, 0, 2.6f, 11, 0, 1.2f, -5),
+  /* 15 */ S("arena_fridge", 18, STAGE_ARENA_FRIDGE, 0, 2.6f, 11, 0, 1.2f, -5),
+  /* 16 */ S("arena_shop", 18, STAGE_ARENA_SHOP, 0, 2.6f, 11, 0, 1.2f, -5),
   /* 17 */ S("arena_unfold", 18, STAGE_ARENA_UNFOLD, 0, 8, 34, 0, 2, 0),
   /* 18 */ S("block_200_10", 10, STAGE_TOWN, -260, 1.6f, 16, -260, 3.5f, 0),
   /* 19 */ S("main_west_far_17", 17.6f, STAGE_TOWN, -140, 1.7f, 12, 40, 4, 12),
@@ -46,6 +49,24 @@ static const shot_t SHOTS[] = {
   /* 31 */ S("west_end_10", 10, STAGE_TOWN, -335, 2, 16, -200, 5, 16),
   /* 32 */ S("high_city_16", 16, STAGE_TOWN, -60, 42, 90, 80, 0, -30),
   /* 33 */ S("train_12", 12, STAGE_TOWN, -335, 1.8f, 12.5f, -250, 2, 21),
+  /* 34 */ S2("arena_bench_2", 18, STAGE_ARENA_BENCH, 0, 2.6f, 11, 0, 1.2f, -5),
+  /* 35 */ S2("arena_laser_2", 18, STAGE_ARENA_LASER, 0, 2.6f, 11, 0, 1.2f, -5),
+  /* 36 */ S2("arena_fridge_2", 18, STAGE_ARENA_FRIDGE, 0, 2.6f, 11, 0, 1.2f, -5),
+  /* 37 */ S2("arena_shop_2", 18, STAGE_ARENA_SHOP, 0, 2.6f, 11, 0, 1.2f, -5),
+  /* 38 */ S2("arena_unfold_2", 18, STAGE_ARENA_UNFOLD, 0, 8, 34, 0, 2, 0),
+  /* 39 */ ST("title_1636", 16.6f, 0, 1.2f, 13.9f, 0, 1.15f, 7.7f, 38),
+  /* 40 */ ST("street_9", 9, 20, 1.7f, 12, -80, 4, 14, 55),
+  /* 41 */ ST("street_13", 13, 20, 1.7f, 12, -80, 4, 14, 55),
+  /* 42 */ ST("street_1830", 18.5f, 20, 1.7f, 12, -80, 4, 14, 55),
+  /* 43 */ ST("street_2230", 22.5f, 20, 1.7f, 12, -80, 4, 14, 55),
+  /* 44 */ ST("street_east_2230", 22.5f, -20, 1.7f, 27, 80, 4, 25, 55),
+  /* 45 */ ST("lab_front_22", 22, 0, 1.6f, 14, 0, 2.6f, 0, 55),
+  /* 46 */ ST("lab_inside_22", 22, 3, 1.5f, -12, 3, 1.3f, -28, 55),
+  /* 47 */ ST("sky_up_13", 13, 0, 1.7f, 14, 0, 30, -20, 55),
+  /* 48 */ ST("sky_up_1830", 18.5f, 0, 1.7f, 14, -40, 20, -20, 55),
+  /* 49 */ ST("sky_up_2230", 22.5f, 0, 1.7f, 14, 0, 30, -20, 55),
+  /* 50 */ ST("title_1636_wide", 16.6f, 0, 1.7f, 16, 0, 6, 0, 55),
+  /* 51 */ ST("station_stop_13", 13, 330, 1.7f, 12.5f, 360, 2, 19.5f, 55),
 };
 #define NSHOT (int)(sizeof SHOTS / sizeof SHOTS[0])
 static int frame; static int cur = -1;
@@ -119,8 +140,12 @@ void game_frame(float dt) {
     cur = s;
     world_set_stage(SHOTS[s].st);
     world_set_time(SHOTS[s].t);
+    if (SHOTS[s].phase) { world_arena_phase(1); world_update(2.f, SHOTS[s].eye); }
+    if (!strcmp(SHOTS[s].name, "station_stop_13")) { int bells = 0; v3 bp; for (int k = 0; k < 212; k++) { world_update(.25f, v3_(0, 0, -100)); while (world_train_bell(&bp)) { bells++; ds_log("  bell at %.0f %.0f after %.1f s", bp.x, bp.z, k * .25f); } } }
+    if (cam->fov != SHOTS[s].fov) { cam->fov = SHOTS[s].fov; t3_camera_update_projection_matrix(cam); }
     int d, t; world_update(.016f, SHOTS[s].eye); world_debug_counts(&d, &t);
     ds_log("shot %d %s: chunks %d tris %d", s, SHOTS[s].name, d, t);
+    if (SHOTS[s].st == STAGE_TOWN) { void city_debug_dump(v3, v3); city_debug_dump(SHOTS[s].eye, v3_norm(v3_sub(SHOTS[s].at, SHOTS[s].eye))); int ct; int cd = city_stats(&ct); ds_log("   lab: %d draws %d tris", d - cd, t - ct); }
   }
   const shot_t *h = &SHOTS[s];
   t3_object_set_position(cam, h->eye.x, h->eye.y, h->eye.z);

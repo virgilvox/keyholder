@@ -1,6 +1,7 @@
 // Bakes the HSL-108 model into the game's lab, at 1 unit = 1 metre in world coordinates:
 //
 //   assets/models/lab.glb   vertex coloured chunks: one opaque chunk per 4 m band along the room,
+//                           and its far twin (lab_bNN_far: no small parts, no lettering, coarser),
 //                           lab_glow (emissive parts), lab_glass_*, the front door's two leaves
 //                           (door_a, door_b, each with door_*_glass), and the shell the model
 //                           does not have: ceiling, roof, parapets and the street front's upper wall
@@ -33,6 +34,7 @@ const band = (px) => `lab_b${String(Math.max(0, Math.floor(px / BAND))).padStart
 const isPrinter = (n) => /centauri/i.test(n);
 const dropPart = (p) => p.name === 'LED cube LEDs' || p.name === 'Hacker backdrop peg holes' || p.name === 'Caution tape stripes';
 const DOOR_PARTS = /^Entry door /;
+const LETTERING = /text|letter|label|decal|vinyl|digit|plate|title|notice|sign\b/i;
 // the rear exit leaves stand part way across their doorways: swing them flat against the hall wall
 const swings = {
   'Rear corridor exit open leaf': { hinge: [40.41, 5.93], to: -Math.PI },        // along plan z = 5.93
@@ -84,16 +86,27 @@ for (const p of parts) {
   else if (p.alpha < 1) target = ch(cx < 7 ? 'lab_glass_front' : 'lab_glass_in', 'glass');
   else if (p.emissive) { target = ch(cx < 14 ? 'lab_glow_f' : 'lab_glow_b', 'glow'); rgb = p.emissive.map((v, i) => Math.min(1, Math.max(v, p.color[i]))); }
   else if (p.name === 'Blackout curtain') target = ch('lab_soft', 'opaque');      // a person walks through a curtain: no collision
+  else if (p.name === 'Ground slab') target = ch('lab_slab', 'opaque');          // the floor under every band, near or far
   else target = ch(band(cx), 'opaque');
   target.add(pos, idx, rgb, xf);
+  // the far twin of a band: what reads from across the room
+  // the storefront's big lettering stays: it reads from across the street
+  const storefront = (target.name === 'lab_b00' || target.name === 'lab_b01') && maxExt >= 0.9;
+  if (target.name.startsWith('lab_b') && maxExt >= 0.3 && (storefront || !LETTERING.test(p.name))) {
+    let fp = pos, fi = idx;
+    if (fi.length / 3 > 40 && maxExt < 3) { const s = simplify({ pos, idx, box: p.box }, 0.2, 0.025); if (s.idx.length >= 3 && s.idx.length < fi.length) { fp = s.pos; fi = s.idx; } }
+    ch(`${target.name}_far`, 'opaque').add(fp, fi, rgb, xf);
+  }
   keptT += idx.length / 3;
 }
 
 // printers: a dark cabinet with a lighter door, no CAD
 for (const b of printers.values()) {
   const w = worldBox(b), c = ch(band((b[0] + b[3]) / 2), 'opaque');
-  c.box(...w, srgb(0x2e3034));
-  c.box(w[0] + 0.03, w[1] + (w[4] - w[1]) * 0.25, w[2] + 0.04, w[3] - 0.03, w[4] - 0.05, w[2] - 0.005, srgb(0x96a0aa));
+  for (const k of [c, ch(`${c.name}_far`, 'opaque')]) {
+    k.box(...w, srgb(0x2e3034));
+    k.box(w[0] + 0.03, w[1] + (w[4] - w[1]) * 0.25, w[2] + 0.04, w[3] - 0.03, w[4] - 0.05, w[2] - 0.005, srgb(0x96a0aa));
+  }
 }
 
 // the shell the model leaves out. Ceiling over the hall, a higher one over the attic end, the

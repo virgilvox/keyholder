@@ -11,6 +11,7 @@
 #include "cv.h"
 #include "input.h"
 #include "game.h"
+#include "actor.h"
 #include "audio.h"
 #include "present.h"
 #include <stdarg.h>
@@ -161,6 +162,7 @@ void wc_init(void) {
 
 /* the scene at the low size, then the PS1 pass up into the frame target the HUD draws on */
 void render_scene(t3_scene *scene, t3_camera *cam) {
+  actor_lod_camera(cam);   /* the lens widens or narrows the detail distances */
   t3_renderer_set_framebuffer(DS_R, low_fbo);
   t3_renderer_render(DS_R, scene, cam);
   t3_renderer_reset_bindings(DS_R);

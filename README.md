@@ -19,6 +19,7 @@ A PS2-style action visual novel for the HeatSync Labs game station (wasmcart, Ba
 | Jump | A | Space |
 | Special (meter full) | RB | U |
 | Lock on | LB, R3 | Tab |
+| Call a friend (Trust high) | D-pad up | R |
 | Weapon | d-pad left, right | 1 to 5, Q |
 | Skip scene | hold START | hold Enter |
 | Pause | START | Esc, P |

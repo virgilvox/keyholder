@@ -1,0 +1,19 @@
+VRoid Project sample avatars released under CC0 (copyright waived). Downloaded 2026-11-10 from the
+OpenGameArt collection "VRoid Studio CC0 models" (https://opengameart.org/content/vroid-studio-cc0-models),
+which mirrors pixiv's VRoid help article on the sample models' conditions of use
+(https://vroid.pixiv.help/hc/en-us/articles/4402614652569). Each file's own VRM meta allows
+modification and redistribution (hub.vroid.com licence link: redistribution=allow, modification=allow,
+credit=unnecessary; Base_Male, Base_Female and HairSample_Male also declare licenseName CC0).
+
+File                   Archive on OpenGameArt                                         Embedded title
+AvatarSample_D.vrm     https://opengameart.org/sites/default/files/avatarsample_d_0.zip   Sendagaya Shibu
+AvatarSample_E.vrm     https://opengameart.org/sites/default/files/avatarsample_e.zip     Bibi
+AvatarSample_F.vrm     https://opengameart.org/sites/default/files/avatarsample_f.zip     Vita
+AvatarSample_G.vrm     https://opengameart.org/sites/default/files/avatarsample_g.zip     Victoria Rubin
+Base_Female.vrm        https://opengameart.org/sites/default/files/base_female.zip        Base_Female
+Base_Male.vrm          https://opengameart.org/sites/default/files/base_male.zip          Base_Male
+HairSample_Male.vrm    https://opengameart.org/sites/default/files/hairsample_male.zip    HairSample_Male
+
+The copies here were shrunk by tools/slim-vrm.mjs (images over 1024 px scaled down and stored as WebP;
+meshes, skins, morphs and the VRM extension unchanged). tools/prep-vrm.mjs bakes them into
+assets/models/char_{h,m,o,p,u,k,e,v,g,w,r}.glb.

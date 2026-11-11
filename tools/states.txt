@@ -20,3 +20,4 @@ lambert+vcol+fog+l1001
 basic+ds
 basic+vcol+fog+ds
 basic+vcol+fog+trans
+lambert+fog+skin+atest+ds+l1001

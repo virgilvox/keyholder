@@ -3,7 +3,10 @@
  * to tune difficulty. Keys held in the first frames choose: Digit1..6 a tier, KeyN a poor
  * bot, KeyG a good bot, KeyX all tiers in a batch with no drawing between them, KeyM start
  * with a full meter, KeyT the tutorial flags, KeyH foes nearly beaten, KeyL the player nearly
- * beaten, KeyP the third person walk instead of a fight. */
+ * beaten, KeyP the third person walk instead of a fight. v1.1: KeyO with Digit1..9, 0 a twist tier (tutorial, timer, retrieve,
+ * score, hold, defend, protect, boss Root, boss Burnout with the finisher, a plain fight), KeyY with KeyX
+ * batches only those, KeyW with Digit1..5 start with that weapon (all owned), KeyC start in phase two (the checkpoint),
+ * KeyZ the Battle Zone flag with every modifier off but turbo. */
 #ifdef KH_TEST_FIGHT
 #include "game.h"
 #include "actor.h"
@@ -61,7 +64,20 @@ static const actor_palette BLU = {{180, 1, 1}, {200, 1, .9f}, {200, .8f, 1}, {0,
 
 /* the tuning table */
 #define FOE(M, P, NAME, W, AI, HP, POW, SP, X, Z) { M, P, 1, NAME, W, AI, HP, POW, SP, X, Z, NULL }
-static fight_def TIER[7];
+#define NT 17
+static fight_def TIER[NT];
+static actor_t *SAM;
+static const fight_bark BARKS[] = {
+  { FB_START, "vee", "Vee", 0xff7a1a, "Okay. Let us do this properly." },
+  { FB_PHASE2, "root", "Root", 0xe8433a, "Back at 140, we did not have a wiki. We had me." },
+  { FB_OBJ_WARN, "dex", "Dex", 0x58c8ff, "The objective! Watch the objective!" },
+  { FB_HAZARD, "dex", "Dex", 0x58c8ff, "Heads up, that is live!" },
+  { FB_PARRY, "root", "Root", 0xe8433a, "Huh. Somebody taught you right." },
+  { FB_PLAYER_LOW, "dex", "Dex", 0x58c8ff, "Breathe. Reset. Go again." },
+  { FB_FOE_LOW, "root", "Root", 0xe8433a, "Six years. That part. Six years." },
+  { FB_ASSIST, "bex", "Bex", 0x60e090, "Labeled. Dated. Go!" },
+  { FB_FINISH, "vee", "Vee", 0xff7a1a, "Lights off. Door locked." },
+};
 static void tiers(void) {
   static const actor_palette *r = &RED, *b = &BLU;
   fight_def base = { "CONFLICT RESOLUTION", "versus the whole mailing list", 0, {{0}}, {0, 0, 0}, 13, 1, 1, 31, WP_ARC, false, false };
@@ -80,32 +96,70 @@ static void tiers(void) {
   TIER[5].count = 1; memcpy(TIER[5].foes, t5, sizeof t5); TIER[5].title = "LEASE TERMINATION"; TIER[5].sub = "versus The Landlord";
   fighter_def t6[] = { FOE(AM_F, *r, "Lazer Lou", WP_STAFF, AI_CASTER, 90, .85f, 1.f, 0, 8), FOE(AM_C, *b, "Dee Burr", WP_TWIN, AI_SKIRMISH, 60, .7f, .95f, 3, 4) };
   TIER[6].count = 2; memcpy(TIER[6].foes, t6, sizeof t6); TIER[6].sub = "versus the laser queue";
+  /* v1.1: the day's fights with their twists, numbers as in day.mjs */
+  for (int i = 7; i < NT; i++) { TIER[i] = base; TIER[i].barks = BARKS; TIER[i].nbarks = sizeof BARKS / sizeof *BARKS; TIER[i].radius = 11; }
+  fighter_def f7[] = { FOE(AM_F, *r, "Ruth", WP_ARC, AI_DUELIST, 55, .45f, .8f, 0, 3) };
+  TIER[7].count = 1; memcpy(TIER[7].foes, f7, sizeof f7); TIER[7].title = "WALK THROUGH ORIENTATION"; TIER[7].sub = "As revised"; TIER[7].twist = FT_TUTORIAL; TIER[7].tutorial = true; TIER[7].radius = 5.5f;
+  fighter_def f8[] = { FOE(AM_F, *r, "Vinyl Vic", WP_STAFF, AI_CASTER, 110, .7f, .95f, 0, 6) };
+  TIER[8].count = 1; memcpy(TIER[8].foes, f8, sizeof f8); TIER[8].title = "CONFLICT RESOLUTION"; TIER[8].sub = "Polyvinyl chloride is not on the list"; TIER[8].twist = FT_TIMER; TIER[8].twist_a = 60; TIER[8].obj_pos = v3_(-6, 0, 3); TIER[8].obj_label = "STOP THE CUT";
+  fighter_def f9[] = { FOE(AM_C, *b, "Rennick", WP_TWIN, AI_SKIRMISH, 70, .75f, 1.05f, -2.5f, 5), FOE(AM_F, *r, "Dobbs", WP_MAUL, AI_BRUISER, 110, .85f, .85f, 2.5f, 5) };
+  TIER[9].count = 2; memcpy(TIER[9].foes, f9, sizeof f9); TIER[9].title = "THEFT OF PROPERTY"; TIER[9].sub = "HSL or member owned"; TIER[9].twist = FT_RETRIEVE;
+  fighter_def f10[] = { FOE(AM_C, *b, "The Champ", WP_TWIN, AI_DUELIST, 120, .9f, 1.2f, 0, 5) };
+  TIER[10].count = 1; memcpy(TIER[10].foes, f10, sizeof f10); TIER[10].title = "FREE PLAY"; TIER[10].sub = "Insert coin"; TIER[10].twist = FT_SCORE; TIER[10].radius = 8;
+  fighter_def f11[] = { FOE(AM_B, *r, "Bex", WP_SPEAR, AI_DUELIST, 160, 1.f, 1.f, 0, 6) };
+  TIER[11].count = 1; memcpy(TIER[11].foes, f11, sizeof f11); TIER[11].title = "THE FRIDGE"; TIER[11].sub = "Everything in it has a home"; TIER[11].twist = FT_HOLD; TIER[11].twist_a = 1; TIER[11].obj_pos = v3_(0, 0, 10);
+  fighter_def f12[] = { FOE(AM_F, *r, "Cal", WP_MAUL, AI_BRUISER, 180, 1.f, .9f, 0, 6), FOE(AM_C, *b, "Crew", WP_SPEAR, AI_SKIRMISH, 70, .75f, 1.f, -4, 5), FOE(AM_C, *r, "Crew", WP_ARC, AI_SKIRMISH, 70, .75f, 1.f, 4, 5) };
+  TIER[12].count = 3; memcpy(TIER[12].foes, f12, sizeof f12); TIER[12].title = "THE BACK LOT"; TIER[12].sub = "Three of them, one of you"; TIER[12].twist = FT_DEFEND; TIER[12].twist_a = 70; TIER[12].radius = 12; TIER[12].obj_pos = v3_(0, 0, 8);
+  fighter_def f13[] = { FOE(AM_D, *r, "Brant Holloway", WP_ARC, AI_BOSS, 300, 1.f, 1.05f, 0, 7), FOE(AM_B, *b, "Intern", WP_STAFF, AI_CASTER, 40, .45f, .95f, -6, 3), FOE(AM_C, *r, "Intern", WP_TWIN, AI_SKIRMISH, 40, .45f, .95f, 6, 3) };
+  TIER[13].count = 3; memcpy(TIER[13].foes, f13, sizeof f13); TIER[13].title = "A BRIEF WORD FROM OUR SPONSOR"; TIER[13].sub = "Brant Holloway, growth"; TIER[13].twist = FT_PROTECT;
+  fighter_def f14[] = { FOE(AM_F, *r, "Root", WP_MAUL, AI_BOSS, 320, 1.1f, 1.f, 0, 7) };
+  TIER[14].count = 1; memcpy(TIER[14].foes, f14, sizeof f14); TIER[14].title = "ACCESS DENIED"; TIER[14].sub = "Root, member since the old building"; TIER[14].twist = FT_BOSS; TIER[14].phase2_at = .5f;
+  fighter_def f15[] = { FOE(AM_D, ACTOR_PAL_NONE, "Burnout", WP_SPEAR, AI_BOSS, 380, 1.1f, 1.1f, 0, 8) };
+  TIER[15].count = 1; memcpy(TIER[15].foes, f15, sizeof f15); TIER[15].title = "LOCK UP"; TIER[15].sub = "Everyone else went home"; TIER[15].twist = FT_BOSS; TIER[15].phase2_at = .5f; TIER[15].finisher_qte = true; TIER[15].radius = 12;
+  fighter_def f16[] = { FOE(AM_C, *b, "Haunter", WP_SPEAR, AI_SKIRMISH, 80, .5f, 1.05f, 0, 3) };
+  TIER[16].count = 1; memcpy(TIER[16].foes, f16, sizeof f16); TIER[16].title = "PROP CHECK"; TIER[16].sub = "Foam, mostly"; TIER[16].radius = 5.5f;
+  fighter_def ally = FOE(AM_B, *b, "Bex", WP_SPEAR, AI_DUELIST, 100, 1.f, 1.f, 0, 0);
+  for (int i = 12; i <= 15; i++) { TIER[i].assist[0] = ally; TIER[i].nassist = 1; }
 }
 
 /* ---- the bot ---- */
 static int bot_kind;   /* 0 none, 1 poor, 2 good */
 static intent_t BI;
 static float bot_mash, bot_jog, bot_think; static int bot_seen[4]; static int bot_plan_kind; static float bot_plan_t; static bool bot_guard_prev;
-static void bot_reset(void) { bot_mash = bot_jog = bot_think = 0; memset(bot_seen, 0, sizeof bot_seen); bot_plan_kind = 0; bot_plan_t = 0; bot_guard_prev = false; }
+static bool bot_cares;   /* a poor bot may or may not mind the objective, decided per fight */
+static void bot_reset(void) { bot_mash = bot_jog = bot_think = 0; memset(bot_seen, 0, sizeof bot_seen); bot_plan_kind = 0; bot_plan_t = 0; bot_guard_prev = false; bot_cares = ds_rand() < .5f; }
+static bool dead(const fighter_t *o) { return o->st == F_KO || o->st == F_KNEEL; }
 static void bot_step(float dt) {
   memset(&BI, 0, sizeof BI); BI.weapon_pick = -1;
   fighter_t *P = &FG.P;
+  const twist_t *TW = &FG.tw;
+  bool good = bot_kind == 2, minds = good || bot_cares;
+  /* the finisher's prompt */
+  if (FG.fin_t > .45f && (good || ds_rand() < .03f)) { BI.heavy = true; return; }
   if (FG.phase != PH_FIGHT) return;
-  int t = FG.lock;
-  if (t < 0) { float best = 1e9f; for (int i = 0; i < FG.nfoe; i++) { fighter_t *o = &FG.foe[i]; if (o->st == F_KO || o->st == F_KNEEL) continue; float d = v3_len(v3_sub(o->pos, P->pos)); if (d < best) { best = d; t = i; } } }
+  int t = -1;
+  { float best = 1e9f; for (int i = 0; i < FG.nfoe; i++) { fighter_t *o = &FG.foe[i]; if (dead(o)) continue; float d = v3_len(v3_sub(o->pos, P->pos)) - (minds && o->goal && o->aggro <= 0 ? 4 : 0); if (d < best) { best = d; t = i; } } }
+  if (FG.lock >= 0 && !(minds && t >= 0 && FG.foe[t].goal)) t = FG.lock;
   if (t < 0) return;
   fighter_t *T = &FG.foe[t];
-  /* the threat: a foe swinging or about to, close enough */
+  /* where to stand: the foe, unless the twist says otherwise */
+  v3 goal = T->pos; float reach = 1.7f; bool swing_obj = false;
+  if (minds) {
+    if (TW->kind == FT_TIMER && !TW->obj_done) { goal = TW->obj; reach = 1.4f; swing_obj = true; }
+    if (TW->kind == FT_HOLD && TW->meter > (good ? .45f : .7f)) { goal = TW->obj; reach = 2.4f; swing_obj = true; }
+    if (TW->kind == FT_RETRIEVE && TW->carrier == -1) { goal = TW->obj; reach = .3f; }
+    if (TW->kind == FT_RETRIEVE && TW->carrier >= 0) { t = TW->carrier; T = &FG.foe[t]; goal = T->pos; }
+  }
   float react = bot_kind == 1 ? .42f : .2f;
   float act_p = bot_kind == 1 ? .1f : .72f, parry_share = bot_kind == 1 ? .1f : .4f;
+  if (TW->kind == FT_TUTORIAL) { act_p = good ? .9f : .5f; parry_share = TW->step == TUT_PARRY ? .9f : TW->step == TUT_GUARD ? 1 : .3f; }
   fighter_t *threat = NULL;
   for (int i = 0; i < FG.nfoe; i++) {
     fighter_t *o = &FG.foe[i];
-    if (o->st == F_ATTACK && v3_len(v3_sub(o->pos, P->pos)) < 5.5f) {
+    if (o->st == F_ATTACK && v3_len(v3_sub(o->pos, P->pos)) < 5.5f && !(o->goal && o->aggro <= 0)) {
       if (!o->released && o->tele > 0) {
         if (bot_seen[i] != o->mv + 1) {
           bot_seen[i] = o->mv + 1;
-          /* decide once per telegraph, after a human reaction */
           float r = ds_rand();
           bot_plan_kind = r < act_p ? (ds_rand() < parry_share ? 2 : 1) : 0;
           bot_plan_t = o->tele + .06f;
@@ -115,48 +169,65 @@ static void bot_step(float dt) {
       }
     } else if (o->st != F_ATTACK) bot_seen[i] = 0;
   }
-  if (bot_plan_t > 0) bot_plan_t -= dt;
-  /* aim: the stick is camera relative, so move in camera space */
+  bot_plan_t -= dt;
   v3 f = v3_norm(v3_(FG.cam_look.x - FG.cam_pos.x, 0, FG.cam_look.z - FG.cam_pos.z));
   v3 r = v3_(f.z, 0, -f.x);
-  v3 to = v3_sub(T->pos, P->pos); to.y = 0;
+  v3 to = v3_sub(goal, P->pos); to.y = 0;
   float dist = v3_len(to);
   v3 dir = dist > .01f ? v3_scale(to, 1 / dist) : f;
-  float reach = 1.7f;
   v3 go = v3_(0, 0, 0);
   if (dist > reach) go = dir;
-  /* the good bot does not stand between two foes */
+  /* the tutorial's first lesson: walk */
+  if (TW->kind == FT_TUTORIAL && TW->step == TUT_MOVE) go = v3_(sinf(FG.clock), 0, cosf(FG.clock));
+  /* the good bot steps off the light rail when the bell goes */
+  if (good && TW->kind == FT_RETRIEVE && TW->train_st >= 1) {
+    float tz = FG.def.center.z + 3.5f;
+    if (fabsf(P->pos.z - tz) < 2.4f) go = v3_(0, 0, P->pos.z < tz ? -1 : 1);
+  }
   BI.my = v3_dot(go, f); BI.mx = -v3_dot(go, r);
-  /* the planned defence, timed to the release */
   if (bot_plan_kind && threat) {
-    if (bot_plan_kind == 1 && threat->tele < .1f) { BI.dodge = true; v3 s = v3_(dir.z, 0, -dir.x); BI.my = v3_dot(s, f); BI.mx = -v3_dot(s, r); bot_plan_kind = 0; }
+    if (bot_plan_kind == 1 && threat->tele < .1f) { BI.dodge = true; v3 s2 = v3_(dir.z, 0, -dir.x); BI.my = v3_dot(s2, f); BI.mx = -v3_dot(s2, r); bot_plan_kind = 0; }
     if (bot_plan_kind == 2 && threat->tele < .08f) { BI.guard = true; BI.guard_pressed = !bot_guard_prev; }
   }
   if (bot_plan_kind == 2 && bot_plan_t > -.25f && !threat && bot_guard_prev) BI.guard = true;
   if (bot_plan_kind == 2 && bot_plan_t <= -.25f) bot_plan_kind = 0;
   bot_guard_prev = BI.guard;
-  /* a caster's windup or a boss's leap: roll when it comes due */
-  if (bot_kind == 2) for (int i = 0; i < FG.nfoe; i++) {
+  if (good) for (int i = 0; i < FG.nfoe; i++) {
     fighter_t *o = &FG.foe[i];
-    if (o->st == F_CHARGE && o->charge >= o->stun - .12f && ds_rand() < .35f) { BI.dodge = true; v3 s = v3_(dir.z, 0, -dir.x); BI.my = v3_dot(s, f); BI.mx = -v3_dot(s, r); }
+    if (o->st == F_CHARGE && o->charge >= o->stun - .12f && ds_rand() < .35f) { BI.dodge = true; v3 s2 = v3_(dir.z, 0, -dir.x); BI.my = v3_dot(s2, f); BI.mx = -v3_dot(s2, r); }
     if (o->st == F_LEAP && o->t > .95f && P->st != F_ROLL) { BI.dodge = true; v3 a = v3_norm(v3_sub(P->pos, o->leap_to)); a.y = 0; BI.my = v3_dot(a, f); BI.mx = -v3_dot(a, r); }
   }
+  /* hazards: the good bot jumps the sweep and rolls out of the marks */
+  if (good) {
+    if (TW->sweep_on > .5f) {
+      v3 d = v3_(sinf(TW->sweep), 0, cosf(TW->sweep)), rel = v3_sub(P->pos, FG.def.center); rel.y = 0;
+      float ang = atan2f(rel.x, rel.z), diff = ds_wrap_pi(ang - TW->sweep); (void)d;
+      if (diff > 0 && diff < .2f + .12f / fmaxf(v3_len(rel), 1) && P->st == F_FREE) BI.jump = true;
+    }
+    if (TW->nstrike > 0 && TW->strike_t < .5f && P->st != F_ROLL)
+      for (int k = 0; k < TW->nstrike; k++) if (v3_len(v3_sub(P->pos, TW->strike[k])) < 1.7f) { v3 a = v3_norm(v3_sub(P->pos, TW->strike[k])); a.y = 0; if (v3_len(a) < .1f) a = r; BI.dodge = true; BI.my = v3_dot(a, f); BI.mx = -v3_dot(a, r); }
+  }
+  /* call the ally */
+  if (FG.def.nassist > 0 && !FG.ally_on && FG.ally_cd <= 0 && (good ? ds_rand() < .02f : ds_rand() < .002f)) BI.assist = true;
   if (BI.guard) return;
-  if (bot_kind == 2 && bot_plan_kind && threat) return;   /* the good bot does not swing into a blow it means to meet */
-  /* attack: a mash for the poor bot, combos and heavies for the good one */
+  if (good && bot_plan_kind && threat) return;
   bot_mash -= dt;
-  bool in_range = dist < reach + .6f;
-  /* the good bot keeps its swings short of a blow it can see coming */
-  if (bot_kind == 2) for (int i = 0; i < FG.nfoe; i++) { fighter_t *o = &FG.foe[i]; if (o->st == F_ATTACK && !o->released && o->tele < .55f && v3_len(v3_sub(o->pos, P->pos)) < 4.5f) in_range = false; }
+  bool in_range = dist < reach + .6f || (!swing_obj && v3_len(v3_sub(T->pos, P->pos)) < 2.3f);
+  if (good) for (int i = 0; i < FG.nfoe; i++) { fighter_t *o = &FG.foe[i]; if (o->st == F_ATTACK && !o->released && o->tele < .55f && v3_len(v3_sub(o->pos, P->pos)) < 4.5f) in_range = false; }
+  if (TW->kind == FT_RETRIEVE && TW->carrier == -1 && minds) in_range = false;
+  if (TW->kind == FT_TUTORIAL && TW->step >= TUT_DODGE && TW->step <= TUT_PARRY) in_range = false;   /* a pupil waits for the swing */
   if (bot_mash <= 0 && in_range) {
-    if (bot_kind == 1) { bot_mash = ds_rr(.25f, .6f); if (ds_rand() < .12f) BI.heavy = true; else BI.light = true; }
-    else { bot_mash = ds_rr(.14f, .26f); if (ds_rand() < .16f) BI.heavy = true; else BI.light = true; }
+    float hv = TW->kind == FT_TUTORIAL && TW->step == TUT_HEAVY ? .9f : bot_kind == 1 ? .12f : TW->kind == FT_SCORE ? .3f : .16f;
+    if (bot_kind == 1) { bot_mash = ds_rr(.25f, .6f); if (ds_rand() < hv) BI.heavy = true; else BI.light = true; }
+    else { bot_mash = ds_rr(.14f, .26f); if (ds_rand() < hv) BI.heavy = true; else BI.light = true; }
+    if (good && TW->kind == FT_SCORE && ds_rand() < .05f) BI.weapon_step = 1;
   }
   if (FG.meter >= 100 && ds_rand() < (bot_kind == 1 ? .01f : .05f)) BI.special = true;
+  if (TW->kind == FT_TUTORIAL && TW->step == TUT_DODGE && ds_rand() < .02f) BI.dodge = true;
 }
 
 /* ---- the frame ---- */
-static int frame, tier = 0, batch_tier, batch_bot, batch_rep; static bool batch, started, meter_full, tutorial, foes_weak, bot_weak; static float fight_time;
+static int frame, tier = 0, batch_tier, batch_bot, batch_rep, batch_end = 7, start_wp = -1; static bool batch, started, meter_full, tutorial, foes_weak, bot_weak, checkpoint, zone; static float fight_time;
 static actor_t *story; static int rounds;
 static t3_mesh *mk_box(float w, float h, float d, uint32_t c, float x, float y, float z) {
   t3_material *m = t3_mesh_lambert_material_new(c); m->fog = true; m->version++;
@@ -189,6 +260,13 @@ static void begin(int t) {
     if (rounds == 1) { D.foes[1].pal = RED; D.count = 2; D.foes[1].model = AM_C; D.foes[1].name = "Dee Burr"; D.foes[1].hp = 40; D.foes[1].power = 1; D.foes[1].speed = 1; D.foes[1].ai = AI_SKIRMISH; D.foes[1].weapon = WP_TWIN; D.foes[1].place_x = 3; D.foes[1].place_z = 4; D.foes[1].actor = NULL; }
   }
   if (tutorial) D.tutorial = true;
+  if (start_wp >= 0) { D.weapons = 31; D.start_weapon = start_wp; }
+  if (checkpoint) D.start_phase = 1;
+  if (zone) { D.battle_zone = true; D.mods = MOD_TURBO; }
+  if (D.twist == FT_PROTECT) {
+    if (!SAM) SAM = actor_new(AM_C, &BLU, 1, scene);
+    D.protect_actor = SAM;
+  } else if (SAM) actor_visible(SAM, false);
   fight_start(&D, PL);
   if (meter_full) FG.meter = 100;
   if (foes_weak) for (int i = 0; i < FG.nfoe; i++) FG.foe[i].hp = FG.foe[i].ghost = 8;
@@ -209,11 +287,12 @@ static void sim_step(float dt) {
   if (batch) {
     bool over = s != FIGHT_RUNNING || fight_time > 400;
     if (over) {
-      ds_log("[bot] tier=%d bot=%s result=%s time=%.1f dmg=%.1f hp=%.0f meter=%.0f", batch_tier, batch_bot == 1 ? "poor" : "good", s == FIGHT_WON ? "WON" : s == FIGHT_LOST ? "LOST" : "TIMEOUT", FG.phase == PH_FIGHT ? fight_time : fight_time - FG.phase_t, FG.damage_taken, FG.P.hp, FG.meter);
+      fight_result R; fight_result_get(&R);
+      ds_log("[bot] tier=%d bot=%s result=%s time=%.1f dmg=%.1f hp=%.0f meter=%.0f score=%d rank=%c line=%s fin=%d", batch_tier, batch_bot == 1 ? "poor" : "good", s == FIGHT_WON ? "WON" : s == FIGHT_LOST ? "LOST" : "TIMEOUT", FG.phase == PH_FIGHT ? fight_time : fight_time - FG.phase_t, FG.damage_taken, FG.P.hp, FG.meter, R.score, R.rank, FG.tw.fail ? FG.tw.fail : "-", R.finisher);
       fight_end();
       batch_rep++;
       if (batch_rep >= 10) { batch_rep = 0; batch_bot++; if (batch_bot > 2) { batch_bot = 1; batch_tier++; } }
-      if (batch_tier >= 7) { batch = false; started = false; bot_kind = 0; ds_log("[bot] done"); return; }
+      if (batch_tier >= batch_end) { batch = false; started = false; bot_kind = 0; ds_log("[bot] done"); __builtin_trap(); }
       bot_kind = batch_bot;
       begin(batch_tier);
     }
@@ -222,10 +301,15 @@ static void sim_step(float dt) {
 void game_frame(float dt) {
   frame++;
   if (frame <= 3) {
-    for (int i = 0; i < 7; i++) if (input_key_down(0x1e + i)) tier = i;
+    bool ko = input_key_down(0x04 + 'O' - 'A'), kw = input_key_down(0x04 + 'W' - 'A');
+    for (int i = 0; i < 10; i++) if (input_key_down(0x1e + i)) { if (kw) { if (i < 5) start_wp = i; } else if (ko) tier = 7 + i; else if (i < 7) tier = i; }
     if (input_key_down(0x04 + 'N' - 'A')) bot_kind = 1;
     if (input_key_down(0x04 + 'G' - 'A')) bot_kind = 2;
     if (input_key_down(0x04 + 'X' - 'A')) batch = true;
+    if (input_key_down(0x04 + 'Y' - 'A')) { batch_end = NT; if (tier < 7) tier = 7; }
+    if (input_key_down(0x04 + 'C' - 'A')) checkpoint = true;
+    if (input_key_down(0x04 + 'U' - 'A')) batch_end = -1;   /* only the chosen tier */
+    if (input_key_down(0x04 + 'Z' - 'A')) zone = true;
     if (input_key_down(0x04 + 'M' - 'A')) meter_full = true;
     if (input_key_down(0x04 + 'T' - 'A')) tutorial = true;
     if (input_key_down(0x04 + 'P' - 'A')) bot_kind = 3;
@@ -239,7 +323,7 @@ void game_frame(float dt) {
       if (input_key_down(0x04 + 'B' - 'A')) player_teleport(v3_(5.5f, 0, 0), -DS_PI / 2); else player_camera_snap();
       return;
     }
-    if (batch) { batch_tier = tier; batch_bot = 1; bot_kind = 1; begin(batch_tier); }
+    if (batch) { if (batch_end < 0) batch_end = tier + 1; batch_tier = tier; batch_bot = 1; bot_kind = 1; begin(batch_tier); }
     else begin(tier);
   }
   if (frame < 4) return;
@@ -262,6 +346,7 @@ void game_frame(float dt) {
   else if (rounds < 2) sim_step(dt);
   else actor_update(story, dt);
   if (!batch && (frame % 60) == 0) ds_log("f=%d phase=%d P.st=%d clip=%s lock=%d wp=%d foe0=%d", frame, FG.phase, FG.P.st, FG.P.clip ? FG.P.clip : "", FG.lock, FG.P.wp, FG.foe[0].st);
+  if (!batch && FG.tw.kind && (frame % 120) == 0) ds_log("twist=%d meter=%.1f/%.0f obj_hp=%.0f carrier=%d score=%.0f step=%d/%.1f/%.1f style=%.0f", FG.tw.kind, FG.tw.meter, FG.tw.meter_max, FG.tw.obj_hp, FG.tw.carrier, FG.tw.score, FG.tw.step, FG.tw.step_n, FG.tw.step_t, FG.tw.style);
   if (!batch && bot_kind == 0 && FG.phase == PH_FIGHT && (frame % 240) == 0) ds_log("t=%.1f hp=%.0f meter=%.0f combo=%d foe0=%.0f st=%d", fight_time, FG.P.hp, FG.meter, FG.combo, FG.foe[0].hp, FG.foe[0].st);
 }
 void game_draw(void) {

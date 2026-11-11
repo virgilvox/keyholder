@@ -24,8 +24,8 @@ static t3_light *hemi, *sun;
 static world_stage stage = STAGE_TOWN;
 
 /* meshes of the lab, for the band culling */
-typedef struct { t3_mesh *m; float z; int tris; bool always; } lab_mesh;
-static lab_mesh lmesh[32]; static int nlmesh;
+typedef struct { t3_mesh *m; float z, z0, z1; int tris; bool always; int twin; bool far; const char *name; } lab_mesh;  /* twin: the band's far version */
+static lab_mesh lmesh[48]; static int nlmesh;
 static t3_object *door_pivot[2];
 static float door_open, door_target; static bool door_auto = true;
 static t3_material *lab_mat, *lab_glow_mat, *lab_glass_mat;
@@ -94,9 +94,9 @@ static void load_lab(void) {
   tris = malloc((size_t)count * sizeof *tris);
   /* the children of the scene: named chunks. Doors move, so they stay out of the triangles */
   int nc = root->child_count;
-  t3_object *kids[64];
-  for (int i = 0; i < nc && i < 64; i++) kids[i] = root->children[i];
-  for (int i = 0; i < nc && i < 64; i++) {
+  t3_object *kids[80];
+  for (int i = 0; i < nc && i < 80; i++) kids[i] = root->children[i];
+  for (int i = 0; i < nc && i < 80; i++) {
     t3_object *o = kids[i];
     t3_mesh *m = NULL;
     if (o->type == T3_MESH) m = (t3_mesh *)o;
@@ -106,9 +106,22 @@ static void load_lab(void) {
     bool door = !strncmp(name, "door_", 5), glass = strstr(name, "glass") != NULL, gl = strstr(name, "glow") || strstr(name, "lamps");
     { t3_material *nm = glass ? lab_glass_mat : gl ? lab_glow_mat : lab_mat; t3_retain(nm); t3_release(m->materials[0]); m->materials[0] = nm; }
     if (!door) {
-      if (strcmp(name, "lab_soft")) take_tris(m);
-      if (nlmesh < 32) { t3_geometry_compute_bounding_sphere(m->geometry); lmesh[nlmesh++] = (lab_mesh){m, o->position.z, m->geometry->index ? m->geometry->index->count / 3 : 0, !strcmp(name, "lab_shell") || !strcmp(name, "lab_glass_front")}; }
+      bool far = strstr(name, "_far") != NULL;
+      if (strcmp(name, "lab_soft") && !far) take_tris(m);
+      if (nlmesh < 48) {
+        t3_geometry_compute_bounding_sphere(m->geometry);
+        float cz = m->geometry->bounding_sphere.center.z + o->position.z;
+        /* a band's z span: bands are 4 m of plan x, world z = -plan x */
+        int bi = !strncmp(name, "lab_b", 5) ? atoi(name + 5) : -1;
+        float z1 = bi >= 0 ? -bi * 4.f : cz + 2, z0 = bi >= 0 ? z1 - 4 : cz - 2;
+        lmesh[nlmesh++] = (lab_mesh){m, cz, z0, z1, m->geometry->index ? m->geometry->index->count / 3 : 0, !strcmp(name, "lab_shell") || !strcmp(name, "lab_glass_front") || !strcmp(name, "lab_slab"), -1, far, name};
+      }
     }
+  }
+  /* pair each band with its far twin */
+  for (int i = 0; i < nlmesh; i++) if (lmesh[i].far) {
+    const char *fn = lmesh[i].name;
+    for (int k = 0; k < nlmesh; k++) { const char *nn = lmesh[k].name; if (!lmesh[k].far && !strncmp(nn, fn, 7) && strlen(nn) == 7) lmesh[k].twin = i; }
   }
   build_grid();
   t3_object_add(lab_root, root);
@@ -219,6 +232,8 @@ static void build_sky(t3_scene *scene) {
   ((t3_object *)stars)->render_order = -998; ((t3_object *)stars)->frustum_culled = false;
   t3_object_add(&scene->base, stars);
 }
+static t3_color city_glow; /* the downtown's sodium glow on the low sky after dark, added by sky_paint */
+static t3_color sky_mid; static float sky_mid_w;  /* a clear light blue between the horizon and the zenith by day */
 static void sky_paint(t3_color zen, t3_color hor, t3_color glow, v3 sd, float glow_amt, t3_color skyline) {
   float *c = t3_attribute_f32(dome_g->attributes[T3_ATTR_COLOR]);
   for (int i = 0; i < dome_nv; i++) {
@@ -226,9 +241,18 @@ static void sky_paint(t3_color zen, t3_color hor, t3_color glow, v3 sd, float gl
     if (w > 0) { c[i * 3] = skyline.r * w; c[i * 3 + 1] = skyline.g * w; c[i * 3 + 2] = skyline.b * w; continue; }
     float t = powf(ds_clamp(y, 0, 1), .55f);
     float r = ds_lerp(hor.r, zen.r, t), g = ds_lerp(hor.g, zen.g, t), b = ds_lerp(hor.b, zen.b, t);
+    if (sky_mid_w > 0) {
+      /* horizon to light blue to zenith, so a warm horizon never greys the middle of the sky */
+      t3_color m = {ds_lerp((hor.r + zen.r) * .5f, sky_mid.r, sky_mid_w), ds_lerp((hor.g + zen.g) * .5f, sky_mid.g, sky_mid_w), ds_lerp((hor.b + zen.b) * .5f, sky_mid.b, sky_mid_w)};
+      float u = t < .3f ? t / .3f : (t - .3f) / .7f;
+      u = u * u * (3 - 2 * u);
+      if (t < .3f) { r = ds_lerp(hor.r, m.r, u); g = ds_lerp(hor.g, m.g, u); b = ds_lerp(hor.b, m.b, u); }
+      else { r = ds_lerp(m.r, zen.r, u); g = ds_lerp(m.g, zen.g, u); b = ds_lerp(m.b, zen.b, u); }
+    }
     float d = fmaxf(0, x * sd.x + y * sd.y + z * sd.z);
     float gl = (powf(d, 8) * .22f + powf(d, 60) * .55f) * glow_amt;
-    c[i * 3] = r + glow.r * gl; c[i * 3 + 1] = g + glow.g * gl; c[i * 3 + 2] = b + glow.b * gl;
+    float cg = powf(1 - ds_clamp(y * 3.5f, 0, 1), 3);
+    c[i * 3] = r + glow.r * gl + city_glow.r * cg; c[i * 3 + 1] = g + glow.g * gl + city_glow.g * cg; c[i * 3 + 2] = b + glow.b * gl + city_glow.b * cg;
   }
   dome_g->attributes[T3_ATTR_COLOR]->version++;
 }
@@ -237,27 +261,30 @@ static void sky_paint(t3_color zen, t3_color hor, t3_color glow, v3 sd, float gl
 typedef struct { float h; uint32_t zen, hor, fog; uint32_t hsky, hgnd; float hi; uint32_t sc; float si; float fnear, ffar; float night; } tod_key;
 /* intensities are three.js physical: pi is one to one on a white surface facing the light */
 static const tod_key TOD[] = {
-  { 9.0f, 0x2f6fc4, 0xbcd6ea, 0xc4d4e0, 0xdbe8ff, 0x9c8a72, 1.75f, 0xfff0d6, 1.55f, 110, 470, 0},
-  {12.0f, 0x2a68c6, 0xb4d2ee, 0xc0d4e6, 0xe2ecff, 0xa4927a, 1.85f, 0xfff6e8, 1.6f, 110, 480, 0},
-  {15.5f, 0x2d6cc2, 0xc0d6e8, 0xc8d6e0, 0xe4e8f4, 0xa08c74, 1.75f, 0xfff0d8, 1.5f, 110, 470, 0},
-  {17.4f, 0x3a68ac, 0xf3c48c, 0xe8c49a, 0xf0dcc4, 0xa07e60, 1.5f, 0xffc484, 1.65f, 90, 450, 0.03f},
+  { 9.0f, 0x245ec4, 0xbcd8f0, 0xc4d6e4, 0xdbe8ff, 0x9c8a72, 1.75f, 0xfff0d6, 1.55f, 110, 470, 0},
+  {12.0f, 0x1a52c4, 0xaed0f2, 0xbcd2e8, 0xe2ecff, 0xa4927a, 1.85f, 0xfff6e8, 1.6f, 110, 480, 0},
+  {15.5f, 0x1e58c2, 0xbcd8f0, 0xc4d6e4, 0xe4e8f4, 0xa08c74, 1.75f, 0xfff0d8, 1.5f, 110, 470, 0},
+  {16.6f, 0x2458b8, 0xf0d8b0, 0xe4d4bc, 0xf2e2cc, 0xa48464, 1.65f, 0xffd8a0, 1.6f, 100, 460, 0},
+  {17.4f, 0x2c55a6, 0xf8c07c, 0xecc296, 0xf0d8bc, 0xa07a5a, 1.5f, 0xffbc78, 1.65f, 90, 450, 0.03f},
   {18.3f, 0x3c4e94, 0xffa468, 0xe89a6c, 0xd8b4ac, 0x7c5850, 1.3f, 0xffa060, 1.5f, 70, 430, 0.25f},
   {19.0f, 0x232c66, 0xc9607c, 0x8c5a7a, 0x8a84b8, 0x4a3c50, 1.25f, 0xb06060, .35f, 55, 380, 0.7f},
   {20.0f, 0x10163a, 0x3a3060, 0x2c2a50, 0x6a72b4, 0x3a3648, 1.5f, 0x7082c0, .35f, 45, 340, 1},
   {24.0f, 0x070a1c, 0x161a34, 0x12162c, 0x5a64a8, 0x2e2e40, 1.4f, 0x6c7cc0, .35f, 40, 320, 1},
 };
 #define NTOD (int)(sizeof TOD / sizeof TOD[0])
-static float clock_h = 12, in_lab_w = 0;
+static float clock_h = 12, in_lab_w = 0, lab_night;
 static t3_color cl(t3_color a, t3_color b, float t) { t3_color c = {ds_lerp(a.r, b.r, t), ds_lerp(a.g, b.g, t), ds_lerp(a.b, b.b, t)}; return c; }
 static t3_color cs(t3_color a, float s) { t3_color c = {a.r * s, a.g * s, a.b * s}; return c; }
 /* the warm lights inside the lab */
 static const float LAB_H = 1.7f, LAB_D = .55f;
 static v3 sun_at = {0, 1, 0};
 static float dome_stamp = -1; static world_stage dome_stage = STAGE_COUNT;
+static float dome_blend = -1;
 static void apply_lights(void) {
   if (stage != STAGE_TOWN) {
     arena_mood m; arena_mood_of(stage, &m);
-    if (dome_stage != stage) {
+    if (dome_stage != stage || dome_blend != arena_blend()) {
+      dome_blend = arena_blend();
       sky_paint(m.zenith, m.horizon, m.sun, m.sun_dir, .35f, cs(m.fog, .9f));
       dome_stage = stage; dome_stamp = -1;
       sun_m->color = m.sun; sun_m->version++;
@@ -268,7 +295,7 @@ static void apply_lights(void) {
     SC->fog = (t3_fog){T3_FOG_LINEAR, m.fog, m.fog_near, m.fog_far, 0};
     SC->has_background = true; SC->background = m.horizon;
     ((t3_object *)stars)->visible = m.stars > .01f;
-    star_m->color = (t3_color){m.stars, m.stars, m.stars};
+    star_m->color = (t3_color){m.stars, m.stars, m.stars}; star_m->version++;
     sun_at = m.sun_dir;
     ((t3_object *)sundisc)->scale = t3_v3(9, 9, 9);
     return;
@@ -310,6 +337,7 @@ static void apply_lights(void) {
   t3_color cur_avg = {Hs.r * 1.15f + Ds.r * .35f, Hs.g * 1.15f + Ds.g * .35f, Hs.b * 1.15f + Ds.b * .35f};
   t3_color tint = {out_avg.r / cur_avg.r, out_avg.g / cur_avg.g, out_avg.b / cur_avg.b};
   city_set_time(night, tint);
+  lab_night = night;
   /* the lab's lit material holds the warm light when the scene lights are the street's */
   t3_color in_avg = {lab_sky.r * LAB_H * 1.15f + lab_dir.r * LAB_D * .35f, lab_sky.g * LAB_H * 1.15f + lab_dir.g * LAB_D * .35f, lab_sky.b * LAB_H * 1.15f + lab_dir.b * LAB_D * .35f};
   if (lab_mat) { lab_mat->color = (t3_color){in_avg.r / cur_avg.r, in_avg.g / cur_avg.g, in_avg.b / cur_avg.b}; lab_mat->version++; }
@@ -319,7 +347,11 @@ static void apply_lights(void) {
     t3_color skyline = cl(fog, hor, .35f);
     float glow_amt = dayf <= 1 ? ds_clamp(1.35f - sd.y * 1.6f, .12f, 1.2f) : 0;
     t3_color glowc = cl(sc, t3_color_hex(0xffe0b0), .3f);
+    float cgw = ds_clamp((night - .3f) * 1.5f, 0, 1);
+    city_glow = (t3_color){.16f * cgw, .075f * cgw, .03f * cgw};
+    sky_mid = t3_color_hex(0x5e9ce6); sky_mid_w = .8f * (1 - ds_clamp(night * 4, 0, 1));
     sky_paint(zen, hor, glowc, sd, glow_amt, skyline);
+    city_glow = (t3_color){0, 0, 0}; sky_mid_w = 0;
     t3_color sunc = dayf <= 1 ? cs(cl(sc, t3_color_hex(0xffffff), ds_clamp(sd.y * 2, 0, .85f)), 1.6f) : (t3_color){.9f, .92f, 1.05f};
     sun_m->color = sunc; sun_m->version++;
     float sr = dayf <= 1 ? 5.5f + (1 - ds_clamp(sd.y * 3, 0, 1)) * 3.5f : 6.f;
@@ -370,7 +402,7 @@ void world_update(float dt, v3 focus) {
   t3_object_set_position(dome, focus.x, focus.y, focus.z);
   t3_object_set_position(stars, focus.x, focus.y, focus.z);
   t3_object_set_position(sundisc, sun_at.x * (DOME_R - 6) + focus.x, sun_at.y * (DOME_R - 6) + focus.y, sun_at.z * (DOME_R - 6) + focus.z);
-  if (stage != STAGE_TOWN) return;
+  if (stage != STAGE_TOWN) { if (arena_update(dt)) apply_lights(); return; }
   /* the door */
   if (door_auto) door_target = (hypotf(focus.x, focus.z + LAB_DOOR_X) < 3.2f) ? 1.f : 0.f;
   door_open = ds_damp(door_open, door_target, 7, dt);
@@ -378,20 +410,38 @@ void world_update(float dt, v3 focus) {
     t3_object_set_rotation(door_pivot[0], 0, -door_open * 1.55f, 0);
     t3_object_set_rotation(door_pivot[1], 0, door_open * 1.55f, 0);
   }
+  /* the lab's screens and LEDs: brighter against the dark, and a little alive */
+  if (lab_glow_mat) {
+    static float gt; gt += dt;
+    float k = (1 + .35f * lab_night) * (1 + .04f * sinf(gt * 3.1f) * sinf(gt * .7f));
+    lab_glow_mat->color = (t3_color){k, k, k}; lab_glow_mat->version++;
+  }
   /* lights: blend to the lab's inside */
   bool in = world_in_lab(focus);
   float nw = ds_damp(in_lab_w, in ? 1.f : 0.f, 5, dt);
   if (fabsf(nw - in_lab_w) > .001f) { in_lab_w = nw; apply_lights(); } else if (in_lab_w != (in ? 1.f : 0.f)) { in_lab_w = in ? 1.f : 0.f; apply_lights(); }
   /* far from the lab it does not draw, deep inside the city does not */
   float dl = hypotf(ds_clamp(focus.x, LAB_X0, LAB_X1) - focus.x, ds_clamp(focus.z, -40.5f, 0) - focus.z);
+  /* inside, a band more than LAB_NEAR away along the hall draws its far twin. Outside, only from in front of
+   * the glass: the first bands near, the next ones far */
+  const float LAB_NEAR = 6.5f;
+  bool facing = focus.z > -1.f && fabsf(focus.x - (LAB_X0 + LAB_X1) * .5f) < 70;
   for (int i = 0; i < nlmesh; i++) {
-    /* from outside only the front bands can be seen, through the glass; the shell always */
-    bool front = lmesh[i].z > -14.f || lmesh[i].always;
-    ((t3_object *)lmesh[i].m)->visible = in ? true : (lmesh[i].always ? dl < 260 : (front && dl < 60));
+    lab_mesh *L = &lmesh[i];
+    if (L->far) continue;
+    bool on, near = true;
+    float dz = focus.z > L->z1 ? focus.z - L->z1 : focus.z < L->z0 ? L->z0 - focus.z : 0;
+    if (L->always) on = dl < 260;
+    else if (in) { on = true; near = dz < LAB_NEAR; }
+    else if (!facing) on = false;
+    else { on = L->z > -16.f && dl < 60; near = L->z > -8.f && dl < 11 && fabsf(focus.x - (LAB_X0 + LAB_X1) * .5f) < 9; }
+    if (L->twin < 0) { ((t3_object *)L->m)->visible = on; continue; }
+    ((t3_object *)L->m)->visible = on && near;
+    ((t3_object *)lmesh[L->twin].m)->visible = on && !near;
   }
   if (door_pivot[0]) { door_pivot[0]->visible = dl < 120; door_pivot[1]->visible = dl < 120; }
-  bool deep = in && focus.z < -14;
-  city_update(dt, focus, deep);
+  /* from inside the lab only the storefront looks out: the street within a block or so */
+  city_update(dt, focus, !in ? 1e9f : focus.z < -14 ? 70.f : 150.f);
 }
 void world_debug_counts(int *draws, int *tri) { int t = 0; int d = city_stats(&t); if (stage == STAGE_TOWN) for (int i = 0; i < nlmesh; i++) if (((t3_object *)lmesh[i].m)->visible) { d++; t += lmesh[i].tris; } if (draws) *draws = d; if (tri) *tri = t; }
 
@@ -601,3 +651,6 @@ float world_lab_yaw(float plan_deg) {
 bool world_place(const char *name, v3 *pos, float *yaw) { return city_place(name, pos, yaw); }
 void world_door(float open) { door_auto = false; door_target = ds_clamp(open, 0, 1); }
 void world_door_auto(bool on) { door_auto = on; }
+void world_arena_phase(int phase) { arena_set_phase(phase); }
+void world_traffic(bool on) { city_traffic(on); }
+bool world_train_bell(v3 *at) { return stage == STAGE_TOWN && city_train_bell(at); }

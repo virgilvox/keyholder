@@ -56,4 +56,10 @@ void world_debug_counts(int *draws, int *tris);
 /* v1.1: an arena's second look for a boss's phase two (0 normal, 1 transformed: the laser corner fogs green,
  * the fridge frosts over, the shop goes back to the old building, the unfolded lab breaks apart). */
 void world_arena_phase(int phase);
+/* v1.1: the light rail rings its bell (coming into Center and Main, leaving it, passing near the focus).
+ * Poll once a frame: true once per ring, with where it rang. Audio has no bell yet. */
+bool world_train_bell(v3 *at);
+/* v1.1: cars in Main's through lanes (on by default). They wait short of the focus when it is on their half of
+ * the road; a shot that frames people across the street can turn them off */
+void world_traffic(bool on);
 #endif
