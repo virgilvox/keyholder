@@ -542,6 +542,16 @@ static int chapter_beat(void) {
   for (int i = 0; i < SCRIPT_COUNT; i++) if ((SCRIPT[i].op == OP_CHAPTER || SCRIPT[i].op == OP_NIGHT) && title_hash(SCRIPT[i].s) == save_chap) return i;
   return -1;
 }
+/* v2.3: what the title's "continue?" box shows: who, the hour, and the chapter or night the save resumes at */
+bool story_save_info(int *who, float *hr, const char **where) {
+  if (!story_has_save()) return false;
+  const save_t *s = (const save_t *)DS_SAVE.data;
+  *who = s->me == W_DEX ? 1 : s->me == W_RUTH ? 2 : 0;
+  *hr = s->hour; *where = NULL;
+  if (s->ver == SAVE_V3 && s->chap)
+    for (int i = 0; i < SCRIPT_COUNT; i++) if ((SCRIPT[i].op == OP_CHAPTER || SCRIPT[i].op == OP_NIGHT) && title_hash(SCRIPT[i].s) == s->chap) { *where = SCRIPT[i].s; break; }
+  return true;
+}
 bool story_can_save(void) { return block == B_ROAM && roam && !story_scene_busy() && world_get_stage() == STAGE_TOWN && save_chap && chapter_beat() >= 0 && !replay; }
 bool story_save_here(void) {
   if (!story_can_save()) return false;

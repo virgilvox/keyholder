@@ -18,7 +18,7 @@
 static t3_scene *scene; static t3_camera *cam;
 static enum { G_TITLE, G_PLAY, G_PAUSE, G_END, G_BATTLE, G_ATTIC } mode;
 static float mode_t;
-static int who, pause_sel, title_row, night_sel = 1; static bool music_on = true;
+static int who, pause_sel, title_row, night_sel = 1, ask_sel = -1; static float ask_t; static bool music_on = true;
 static int pause_saved;   /* the pause menu: 1 once this pause saved */
 static int pause_from;    /* the mode the pause returns to: G_PLAY, or G_ATTIC */
 static actor_t *T_A[3];
@@ -27,7 +27,7 @@ static const char *const BLURB[3] = {"First to look up. Runs the printers.", "El
 static const actor_model TITLE_M[3] = {AM_C, AM_D, AM_B};
 
 static void title_enter(void) {
-  mode = G_TITLE; mode_t = 0; title_row = 0;
+  mode = G_TITLE; mode_t = 0; title_row = 0; ask_sel = -1;
   story_stop();
   world_set_stage(STAGE_TOWN); world_set_time(16.6f);
   music_mood(MOOD_TITLE);
@@ -60,12 +60,13 @@ void game_frame(float dt) {
   mode_t += dt;
   switch (mode) {
     case G_TITLE: {
-      if (in->nav_x && title_row == 0) { int n = who + in->nav_x; if (n >= 0 && n < 3) { who = n; sfx(SFX_UI, 0, 1); } }
+      const bool asking = ask_sel >= 0;
+      if (!asking && in->nav_x && title_row == 0) { int n = who + in->nav_x; if (n >= 0 && n < 3) { who = n; sfx(SFX_UI, 0, 1); } }
       /* down to the Battle Zone's entry, up to the keyholders */
       /* v1.3: and further down, the night select once a night has been reached */
       int nights = story_nights_open();
-      if (in->nav_y) { int n = title_row + in->nav_y; if (n >= 0 && n < (nights ? 3 : 2)) { title_row = n; sfx(SFX_UI, 0, 1); } }
-      if (title_row == 2 && nights) {
+      if (!asking && in->nav_y) { int n = title_row + in->nav_y; if (n >= 0 && n < (nights ? 3 : 2)) { title_row = n; sfx(SFX_UI, 0, 1); } }
+      if (!asking && title_row == 2 && nights) {
         if (!(nights & (1 << (night_sel - 1)))) for (int k = 1; k <= story_night_count(); k++) if (nights & (1 << (k - 1))) { night_sel = k; break; }
         if (in->nav_x) for (int k = night_sel + in->nav_x; k >= 1 && k <= story_night_count(); k += in->nav_x) if (nights & (1 << (k - 1))) { night_sel = k; sfx(SFX_UI, 0, 1); break; }
         if (in->ok) { sfx(SFX_UI_OK, 0, 1); title_leave(); story_start_night(night_sel); mode = G_PLAY; mode_t = 0; break; }
@@ -83,10 +84,21 @@ void game_frame(float dt) {
       t3_object_look_at(cam, c.x + (who - 1) * .25f, c.y + 1.15f, c.z);
       if (cam->fov != 38) { cam->fov = 38; t3_camera_update_projection_matrix(cam); }
       world_update(dt, v3_(c.x, c.y + 1, c.z + 4));
-      /* v2.1: with a save, ENTER (A) continues it, so a habit press never starts over; N (X) starts a new day */
-      const bool has = story_has_save();
-      const bool cont = title_row == 0 && has && (in->ok || input_key_down(0x06) || in->heavy);   /* or C, Y */
-      const bool fresh = title_row == 0 && (has ? (input_key_down(0x11) || (in->used_pad && in->light)) : in->ok);
+      /* v2.3: with a save, starting asks first: continue it (the default) or start a new day */
+      if (ask_sel >= 0) {
+        ask_t += dt;
+        if (in->nav_y || in->nav_x) { int n = ask_sel + (in->nav_y ? in->nav_y : in->nav_x); if (n >= 0 && n < 2 && n != ask_sel) { ask_sel = n; sfx(SFX_UI, 0, 1); } }
+        if (in->back || in->pause) { ask_sel = -1; sfx(SFX_UI, 0, .6f); }
+        else if (in->ok) {
+          sfx(SFX_UI_OK, 0, 1);
+          title_leave();
+          if (ask_sel == 0) story_continue(); else story_new_game(who);
+          ask_sel = -1; mode = G_PLAY; mode_t = 0;
+        }
+        break;
+      }
+      if (in->ok && title_row == 0 && story_has_save()) { ask_sel = 0; ask_t = 0; sfx(SFX_UI, 0, 1); break; }
+      const bool fresh = title_row == 0 && in->ok;
       if (in->ok && title_row == 1) {
         if (battle_available()) {
           sfx(SFX_UI_OK, 0, 1);
@@ -96,10 +108,10 @@ void game_frame(float dt) {
         } else sfx(SFX_CLASH, 0, .5f);
         break;
       }
-      if (fresh || cont) {
+      if (fresh) {
         sfx(SFX_UI_OK, 0, 1);
         title_leave();
-        if (cont) story_continue(); else story_new_game(who);
+        story_new_game(who);
         mode = G_PLAY; mode_t = 0;
       }
       break;
@@ -149,7 +161,9 @@ void game_draw(void) {
 #endif
   switch (mode) {
     case G_TITLE: hud_title_draw(mode_t, title_row, who, story_has_save(), NAMES, BLURB); hud_battle_title(mode_t, title_row == 1);
-      hud_nights_title(mode_t, title_row == 2, night_sel, story_nights_open(), story_night_count(), story_night_title(night_sel)); break;
+      hud_nights_title(mode_t, title_row == 2, night_sel, story_nights_open(), story_night_count(), story_night_title(night_sel));
+      if (ask_sel >= 0) { int w = 0; float h = 9; const char *at = NULL; story_save_info(&w, &h, &at); hud_title_ask(ask_t, ask_sel, NAMES[w], h, at, NAMES[who]); }
+      break;
     case G_BATTLE: battle_draw(); break;
     case G_ATTIC: attic_draw(); break;
     case G_PLAY:

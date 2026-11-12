@@ -509,11 +509,46 @@ void hud_title_draw(float t, int row, int who, bool has_save, const char *const 
   char m[120];
   if (row == 2) snprintf(m, sizeof m, "%s  pick a night     %s  play it     %s  back", in->used_pad ? "LEFT RIGHT" : "ARROWS", in->used_pad ? "A" : "ENTER", in->used_pad ? "UP" : "UP ARROW");
   else if (row == 1) snprintf(m, sizeof m, "%s  enter the Battle Zone     %s  back to the day", in->used_pad ? "A" : "ENTER", in->used_pad ? "UP" : "UP ARROW");
-  else if (has_save) snprintf(m, sizeof m, "%s  continue     %s  start a new day", in->used_pad ? "A" : "ENTER", in->used_pad ? "X" : "N");
+  else if (has_save) snprintf(m, sizeof m, "%s  play", in->used_pad ? "A" : "ENTER");
   else snprintf(m, sizeof m, "%s  start the day", in->used_pad ? "A" : "ENTER");
   c = layer_begin(&L_menu, 800, 40, hash_str(m, 1));
   if (c) { p_text(c, F_DISPLAY, 19, 1, CV_CENTER, m, 400, 28, PAPER, 1); layer_end(&L_menu, c); }
   hg_tex(&L_menu, 240, 642, .6f + .4f * sinf(t * 3));
+  hg_end();
+}
+
+/* v2.3: with a save, starting asks first. Continue (the default) or a new day as the picked keyholder */
+void hud_title_ask(float t, int sel, const char *save_name, float hour, const char *where, const char *new_name) {
+  static layer_t L_ask;
+  const intent_t *in = input_get();
+  char info[160], tm[32], r0[64], r1[64], keys[96];
+  fmt_hour(tm, sizeof tm, hour);
+  if (where && *where) snprintf(info, sizeof info, "%s,  %s,  %s", save_name, tm, where);
+  else snprintf(info, sizeof info, "%s,  %s", save_name, tm);
+  snprintf(r0, sizeof r0, "Continue the saved day");
+  snprintf(r1, sizeof r1, "Start a new day as %s", new_name);
+  snprintf(keys, sizeof keys, "%s  choose     %s  back", in->used_pad ? "A" : "ENTER", in->used_pad ? "B" : "ESC");
+  hg_begin();
+  hg_rect(0, 0, DS_W, DS_H, INK, .55f * ez(t * 4));
+  cv *c = layer_begin(&L_ask, 640, 330, hash_str(info, hash_str(r1, 900u + (unsigned)sel * 3 + (in->used_pad ? 1 : 0))));
+  if (c) {
+    cv_fill_hex(c, INK, .94f);
+    cv_begin(c); cv_move(c, 18, 0); cv_line(c, 640, 0); cv_line(c, 622, 330); cv_line(c, 0, 330); cv_close(c); cv_fill(c);
+    cv_fill_hex(c, ORANGE, 1); cv_fill_rect(c, 18, 0, 622, 6);
+    p_text(c, F_DISPLAY, 38, 2, CV_LEFT, "YOU HAVE A SAVED DAY", 40, 64, PAPER, 1);
+    p_text(c, F_TYPE, 19, 0, CV_LEFT, info, 42, 102, ORANGE, 1);
+    const char *rows[2] = { r0, r1 };
+    for (int i = 0; i < 2; i++) {
+      bool s = i == sel;
+      cv_fill_hex(c, s ? ORANGE : 0x24242e, 1); cv_fill_rect(c, 36, 128 + i * 62, 568, 52);
+      p_text(c, F_TYPE, 21, 0, CV_LEFT, rows[i], 56, 162 + i * 62, s ? INK : PAPER, 1);
+    }
+    p_text(c, F_MONO, 15, 2, CV_LEFT, sel ? "THE SAVED DAY IS REPLACED WHEN THE NEW ONE FIRST SAVES" : "PICK UP WHERE YOU LEFT OFF", 40, 276, DIMT, 1);
+    p_text(c, F_DISPLAY, 17, 1, CV_LEFT, keys, 40, 312, PAPER, 1);
+    layer_end(&L_ask, c);
+  }
+  float a = ez(t * 4);
+  hg_tex(&L_ask, 320, 190 + (1 - a) * 20, a);
   hg_end();
 }
 

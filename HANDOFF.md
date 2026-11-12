@@ -53,6 +53,7 @@ v1.4's attic reused the real HSL-108 attic mesh, which is a 1.3 m crawlspace —
 
 ## v1.3 (2026-11-12)
 
+- **Title with a save (v2.2.2):** ENTER (A) on the keyholders opens a "You have a saved day" box showing the save's keyholder, hour and chapter: Continue (the default) or Start a new day as the picked keyholder; ESC (B) closes it. `hud_title_ask` in hud_vn.c, `story_save_info` in story.c. The old N (X) shortcut is gone.
 - **Nights:** tools/script/night1.mjs to night3.mjs (Open Hack Night, Hack Your Hackerspace, Second Friday) run after the day, with carry-over flags, a NIGHTS row on the title, and do-ocracy lessons in scenes. KH_AUTO plays everything and ends with `[auto] END FINAL KEYHOLDERS`.
 - **Roams:** once required tasks are done the goal is shown and reached in a generous circle (some roams end on a timer). The wayfinder sticks to one labelled target and routes round walls.
 - **Street:** src/street.c, tools/script/street.mjs (24 stranger types, documented in its header), `node tools/script/street_compile.mjs`, then bake. Doors into five interiors (src/interior.c, one table line per room). Moheeb and Luis on the Chupacabra patio (always out since v1.3.3) (Kyutai voices via tools/voices_kyutai.py).

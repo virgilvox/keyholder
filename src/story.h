@@ -63,6 +63,8 @@ extern story_ui_t STORY_UI;
 void story_init(t3_scene *scene, t3_camera *cam);
 void story_new_game(int playable);       /* 0 Vee, 1 Dex, 2 Ruth */
 bool story_has_save(void);
+/* v2.3: the save's keyholder (0 VEE, 1 DEX, 2 RUTH), hour, and chapter or night title (may be NULL) */
+bool story_save_info(int *who, float *hour, const char **where);
 /* v2.1: the pause menu's save: only during a free walk (a roam), where Continue can put you back */
 bool story_can_save(void);
 bool story_save_here(void);
