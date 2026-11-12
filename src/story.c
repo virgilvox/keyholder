@@ -51,6 +51,7 @@ static const sc_beat *roam;
 static v3 roam_pos; static bool roam_has_place; static bool side_done[8]; static int side_near = -1;
 static int roam_follow = -1; static float roam_t, roam_h0, follow_path_t;
 static bool attic_want, attic_warned, attic_done;   /* v1.4: the attic minigame off the back stairs */
+static uint16_t attic_found_m, attic_games_m;        /* v1.5: hub progress (persisted in save_t) */
 /* fight */
 static int fight_flags, fight_id;
 static const sc_beat *fight_beat;
@@ -486,6 +487,10 @@ typedef struct {
   uint32_t chap;
   uint8_t fbits[32];
   carry_t start[NIGHTS_MAX];
+  /* v1.5: the attic hub, global across the day (NOT in carry_t). Appended after start[] so offsetof(bike)
+   * stays 300 and save_v3's memset-from-ver zeroes them on migration. */
+  uint16_t attic_found, attic_games;
+  uint8_t attic_state;      /* bit0 the minigame has been beaten */
 } save_t;
 _Static_assert(sizeof(save_t) <= 520, "the day's save must stay under DS_SAVE.data[520]");
 _Static_assert(FLAG_COUNT <= 256, "flags are saved as 256 bits");
@@ -519,6 +524,7 @@ static void autosave(void) {
   snprintf(s->objective, sizeof s->objective, "%s", obj_buf);
   s->bike = gear_bike_have ? GEAR_BIKE : 0;
   s->chap = save_chap;
+  s->attic_state = attic_done ? 1 : 0; s->attic_found = attic_found_m; s->attic_games = attic_games_m;
   s->ended = pc >= SCRIPT_COUNT || SCRIPT[pc].op == OP_END;
   DS_SAVE.magic = DS_SAVE_MAGIC;
 }
@@ -579,6 +585,7 @@ void story_new_game(int p) {
 #endif
   static const int PL[3] = { W_VEE, W_DEX, W_RUTH };
   memset(&STORY_UI, 0, sizeof STORY_UI); memset(flags, 0, sizeof flags);
+  attic_done = attic_warned = false; attic_found_m = attic_games_m = 0;   /* v1.5: a new day, the attic is wrong again */
   street_reset(false);   /* street: a new day, nobody downtown has met you */
   set_cast(PL[p]);
   for (int i = 0; i < ST_COUNT; i++) STORY_UI.stats[i] = 0;
@@ -606,6 +613,7 @@ void story_continue(void) {
   memset(&STORY_UI, 0, sizeof STORY_UI);
   set_cast(s->me); pc = resume_pc(s); weapons = s->weapons; hour = hour_target = s->hour;
   gear_bike_have = s->bike == GEAR_BIKE;   /* a save from before v1.2 holds no such byte */
+  if (s->ver == SAVE_V3) { attic_done = (s->attic_state & 1) != 0; attic_found_m = s->attic_found; attic_games_m = s->attic_games; }
   memcpy(STORY_UI.stats, s->stats, sizeof s->stats);
   memset(flags, 0, sizeof flags);
   if (s->ver == SAVE_V3) bits_get(s->fbits);
@@ -653,6 +661,9 @@ void story_attic_result(bool rebooted) {
     STORY_UI.toast = story_stat_name(ST_SAFETY); STORY_UI.toast_n = 1; STORY_UI.toast2 = NULL; STORY_UI.toast_t = 2.6f;
   }
 }
+bool story_attic_beaten(void) { return attic_done; }
+void story_attic_masks(uint16_t *found, uint16_t *games) { if (found) *found = attic_found_m; if (games) *games = attic_games_m ? attic_games_m : 1; }
+void story_attic_set_masks(uint16_t found, uint16_t games) { attic_found_m = found; attic_games_m = games; }
 const char *story_player_name(void) { return CAST[me_id].name; }
 
 /* the people a chapter needs, made while its card is up rather than at their first line */
@@ -2091,13 +2102,13 @@ static void roam_frame(float dt, const intent_t *in) {
    * blocks the climb; the minigame warps you up). Only when nothing else is in reach. */
   if (near_task < 0 && side_near < 0 && tcur < 0 && world_get_stage() == STAGE_TOWN) {
     float sd = flat_dist(player_pos(), v3_(0.35f, 0, -31.4f));
-    if (sd < 4.0f && !attic_warned) {
+    if (sd < 4.0f && !attic_warned && !attic_done) {
       attic_warned = true;
       int w = roam_follow >= 0 ? roam_follow : canon(W_M1);
       sub_say(w, "Hey, don't go up there alone. That floor's soft as cake since the leak.");
     }
     if (sd < 2.0f) {
-      U->prompt_use = "GO UPSTAIRS";
+      U->prompt_use = attic_done ? "UP TO THE ATTIC" : "GO UPSTAIRS";
       if (in->interact) { attic_want = true; return; }
     }
   }

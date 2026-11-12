@@ -1,5 +1,5 @@
 /* game.c: the title, the day, the pause menu, the ending and the Battle Zone. */
-#if !defined(KH_TEST_WORLD) && !defined(KH_TEST_FIGHT) && !defined(KH_TEST_ATTIC)
+#if !defined(KH_TEST_WORLD) && !defined(KH_TEST_FIGHT) && !defined(KH_TEST_ATTIC) && !defined(KH_TEST_TERMINAL)
 #include "game.h"
 #include "actor.h"
 #include "audio.h"

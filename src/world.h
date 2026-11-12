@@ -17,6 +17,7 @@ typedef enum {
   STAGE_ARENA_FRIDGE,  /* "The Fridge": the kitchen, grown, tiled and frosted */
   STAGE_ARENA_SHOP,    /* "Machine Shop": lathes and mills as pillars around a steel floor */
   STAGE_ARENA_UNFOLD,  /* "The Whole Lab, Unfolded": every room of the lab around a huge disc, night sky */
+  STAGE_ATTIC,         /* v1.5: the purpose-built attic room (attic.c owns its geometry/collision/mood; not an arena) */
   STAGE_COUNT
 } world_stage;
 

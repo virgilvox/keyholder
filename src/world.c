@@ -5,6 +5,7 @@
 #include "city.h"
 #include "interior.h"
 #include "arena.h"
+#include "attic.h"   /* v1.5: STAGE_ATTIC is routed here, not into arena.c (idx() runs off its 5 tables) */
 #include "gen/lab_areas.h"
 #include <stdlib.h>
 #include <string.h>
@@ -292,7 +293,7 @@ static float dome_stamp = -1; static world_stage dome_stage = STAGE_COUNT;
 static float dome_blend = -1;
 static void apply_lights(void) {
   if (stage != STAGE_TOWN) {
-    arena_mood m; arena_mood_of(stage, &m);
+    arena_mood m; if (stage == STAGE_ATTIC) attic_env_mood(&m); else arena_mood_of(stage, &m);
     if (dome_stage != stage || dome_blend != arena_blend()) {
       dome_blend = arena_blend();
       sky_paint(m.zenith, m.horizon, m.sun, m.sun_dir, .35f, cs(m.fog, .9f));
@@ -396,7 +397,8 @@ void world_init(t3_scene *scene) {
 void world_set_stage(world_stage s) {
   stage = s;
   town->visible = s == STAGE_TOWN;
-  arena_show(s);
+  if (s == STAGE_ATTIC) { arena_show(STAGE_TOWN); attic_env_show(true); }   /* hide the arenas, show the attic room */
+  else { attic_env_show(false); arena_show(s); }
   dome_stage = STAGE_COUNT;
   apply_lights();
 }
@@ -408,6 +410,7 @@ void world_add_prop(t3_object *o) {
 }
 void world_stage_floor(world_stage s, v3 *center, float *radius) {
   if (s == STAGE_TOWN) { city_place("mid_block", center, NULL); if (radius) *radius = 5.5f; return; }
+  if (s == STAGE_ATTIC) { attic_env_floor(center, radius); return; }
   arena_floor(s, center, radius);
 }
 
@@ -431,7 +434,7 @@ void world_update(float dt, v3 focus) {
   t3_object_set_position(dome, focus.x, focus.y, focus.z);
   t3_object_set_position(stars, focus.x, focus.y, focus.z);
   t3_object_set_position(sundisc, sun_at.x * (DOME_R - 6) + focus.x, sun_at.y * (DOME_R - 6) + focus.y, sun_at.z * (DOME_R - 6) + focus.z);
-  if (stage != STAGE_TOWN) { if (arena_update(dt)) apply_lights(); return; }
+  if (stage != STAGE_TOWN) { if (stage == STAGE_ATTIC ? attic_env_update(dt) : arena_update(dt)) apply_lights(); return; }
   /* the door */
   /* the subject, else the lens */
   bool has_subj = subj_t > 0; subj_t -= dt;
@@ -602,6 +605,7 @@ static bool lab_raycast(v3 o, v3 d, float max_dist, float *t_out, v3 *normal) {
 /* ── public queries ── */
 bool world_raycast(v3 o, v3 d, float max_dist, float *t_out, v3 *normal) {
   d = v3_norm(d);
+  if (stage == STAGE_ATTIC) return attic_env_raycast(o, d, max_dist, t_out, normal);
   if (stage != STAGE_TOWN) return arena_raycast(stage, o, d, max_dist, t_out, normal);
   float t1 = 1e30f, t2 = 1e30f; v3 n1 = v3_(0, 1, 0), n2 = n1;
   if (stage == STAGE_TOWN && interior_contains(o)) return interior_raycast(o, d, max_dist, t_out, normal);
@@ -713,7 +717,8 @@ void world_move(v3 *p, v3 *vel, float r, float h, float dt, bool *grounded) {
   for (int k = 0; k < n; k++) {
     p->x += s.x; p->z += s.z; p->y += s.y;
     v3 nn = v3_(0, 1, 0); bool hit = false;
-    if (stage != STAGE_TOWN) arena_push(stage, p, r, h, &nn, &hit);
+    if (stage == STAGE_ATTIC) attic_env_push(p, r, h, &nn, &hit);
+    else if (stage != STAGE_TOWN) arena_push(stage, p, r, h, &nn, &hit);
     else {
       /* in a room behind a facade: its walls and furniture, nothing else */
       if (interior_push(p, r, h, &nn, &hit)) goto moved;

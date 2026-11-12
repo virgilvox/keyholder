@@ -72,6 +72,10 @@ story_run story_state(void);
  * gets the toast and the stat. */
 bool story_take_attic(void);
 void story_attic_result(bool rebooted);
+/* v1.5: the attic hub's persisted progress (saved in save_t's slack, global across the day) */
+bool story_attic_beaten(void);
+void story_attic_masks(uint16_t *found, uint16_t *games);
+void story_attic_set_masks(uint16_t found, uint16_t games);
 const char *story_player_name(void);
 /* the epilogue's text */
 /* v1.3: the nights. The epilogue's screen done, story_resume goes on into the next night (false: the story is
