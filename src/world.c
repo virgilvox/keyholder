@@ -5,7 +5,7 @@
 #include "city.h"
 #include "interior.h"
 #include "arena.h"
-#include "attic.h"   /* v1.5: STAGE_ATTIC is routed here, not into arena.c (idx() runs off its 5 tables) */
+#include "attic_env.h"   /* v1.5: STAGE_ATTIC collision/mood routed here, never into arena.c (idx() runs off its 5 tables) */
 #include "gen/lab_areas.h"
 #include <stdlib.h>
 #include <string.h>

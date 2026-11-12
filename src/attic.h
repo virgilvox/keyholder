@@ -12,20 +12,11 @@
 #include "ds.h"
 #include "input.h"
 #include "three.h"
-#include "arena.h"   /* arena_mood */
 
-/* the mode (game.c G_ATTIC) */
-void attic_init(t3_scene *scene, t3_camera *cam);  /* builds the sign, the hidden attic env and props, once */
+/* the gameplay mode (game.c G_ATTIC). The STAGE_ATTIC room itself lives in attic_env.h/.c. */
+void attic_init(t3_scene *scene, t3_camera *cam);  /* builds the sign, the attic room and props, once */
 void attic_enter(void);                            /* from the stairs: remember where you stood, warp into the stage */
 bool attic_update(float dt, const intent_t *in);   /* false when you come back down */
 void attic_draw(void);                             /* the minigame / hub / memory HUD, after the scene */
 bool attic_won(void);                              /* the last visit rebooted the rack (first time only) */
-
-/* the STAGE_ATTIC environment, called by world.c (never by arena.c: idx() would run off its 5 tables) */
-void attic_env_show(bool on);                      /* build on first use, then show/hide the room */
-void attic_env_floor(v3 *center, float *radius);
-void attic_env_push(v3 *p, float r, float h, v3 *n, bool *hit);
-bool attic_env_raycast(v3 o, v3 d, float max_dist, float *t, v3 *n);
-void attic_env_mood(arena_mood *m);                /* glitched (0) to normal (1), by the reboot */
-bool attic_env_update(float dt);                   /* true when the mood changed (world repaints the lights) */
 #endif
