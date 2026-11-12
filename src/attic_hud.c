@@ -3,6 +3,7 @@
  * found, a toast when a memory ends, and the black of a board giving way. Scenes draw the story's HUD instead. */
 #include "attic_int.h"
 #include "hud_int.h"
+#include "hud_vn.h"   /* the lab's interact prompt */
 #include <stdio.h>
 #include <string.h>
 
@@ -27,9 +28,11 @@ void attic_hud_draw(const attic_hud_t *h) {
     layer_end(&L_tag, c);
   }
   hg_tex(&L_tag, 44, 36, 1);
-  /* the line at the bottom: the prompt in reach, else the objective */
-  const char *s = h->prompt ? h->prompt : h->objective;
-  if (s) {
+  /* the thing in reach: the same centred prompt as the lab's talks and tasks */
+  if (h->prompt) hud_use_prompt(h->prompt, 556);
+  /* the objective along the bottom */
+  const char *s = h->objective;
+  if (s && !h->prompt) {
     cv *b = layer_begin(&L_line, 900, 40, 0xB10u ^ hash_s(s) ^ (pad ? 0x40000u : 0u));
     if (b) { p_plate(b, 0, 0, 900, 40, 10, AT_INK, .82f); g_markup(b, 16, 26, CV_LEFT, F_TYPE, 20, .1f, AT_PAPER, 20, pad, s, true); layer_end(&L_line, b); }
     hg_tex(&L_line, 44, 648, 1);

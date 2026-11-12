@@ -85,7 +85,8 @@ void story_attic_set_masks(uint16_t found, uint16_t games);
  * draws the story HUD as in the day. attic.c puts the player and the attic's stage back after. */
 bool story_scene_play(int scene);
 bool story_scene_busy(void);
-bool story_scene_fight_won(void);   /* the last scene had a fight and it was won */
+bool story_scene_fight_won(void);
+void story_scene_abort(void);       /* the pause menu quits to the title mid scene */   /* the last scene had a fight and it was won */
 /* the attic between scenes: keeps the town's people out of sight up there and eases the flashback grade */
 void story_attic_tick(float dt);
 const char *story_player_name(void);

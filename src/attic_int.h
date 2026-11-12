@@ -26,7 +26,7 @@ enum { HUB_NONE, HUB_MEMORY, HUB_TERMINAL, HUB_LEAVE };
 void hub_begin(void);                                    /* at the stair head */
 int hub_update(float dt, const intent_t *in, int *arg);  /* for HUB_MEMORY, arg is the SC_* scene */
 void hub_return(void);                                   /* back where you stood when the memory started */
-const char *hub_prompt(void);                            /* "EXAMINE THE PARTS SHELF  {USE}" or NULL */
+const char *hub_prompt(void);                            /* "Look at the parts shelf" or NULL (the HUD adds the button) */
 const char *hub_found_title(int scene);                  /* the memory's name, for the toast */
 int hub_found_count(unsigned mask);
 int hub_scene_bit(int scene);                            /* the found mask bit of a memory scene, or -1 */

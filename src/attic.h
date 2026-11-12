@@ -19,4 +19,6 @@ void attic_enter(void);                            /* from the stairs: remember 
 bool attic_update(float dt, const intent_t *in);   /* false when you come back down */
 void attic_draw(void);                             /* the minigame / hub / memory HUD, after the scene */
 bool attic_won(void);                              /* the last visit rebooted the rack (first time only) */
+bool attic_can_leave(void);                        /* the pause menu may offer "climb back down" now */
+void attic_leave_now(void);                        /* walk back down to the lab (attic_update then returns false) */
 #endif

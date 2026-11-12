@@ -11,7 +11,7 @@
 #define INK 0x12121au
 #define PAPER 0xf4eee2u
 #define DIMT 0xa8a49au
-static layer_t L_box, L_name, L_opt[5], L_prompt, L_ch, L_card, L_note, L_obj, L_clock, L_use, L_toast, L_got, L_title, L_menu, L_cards[3], L_retry, L_end, L_mk, L_tasks, L_mgt, L_mgh, L_seq, L_sub, L_trip, L_greet, L_gear[2], L_nights;
+static layer_t L_box, L_name, L_opt[5], L_prompt, L_ch, L_card, L_note, L_obj, L_clock, L_toast, L_got, L_title, L_menu, L_cards[3], L_retry, L_end, L_mk, L_tasks, L_mgt, L_mgh, L_seq, L_sub, L_trip, L_greet, L_gear[2], L_nights;
 
 static float ez(float t) { t = ds_clamp(t, 0, 1); return 1 - (1 - t) * (1 - t) * (1 - t); }
 
@@ -199,18 +199,22 @@ static void draw_roam(const story_ui_t *U) {
     }
     hg_tex(&L_mk, ds_clamp(x, 220, DS_W - 220) - 210, y - 2 + bob, .95f);   /* the label stays on screen at the edges */
   }
-  if (U->prompt_use) {
-    const intent_t *in = input_get();
-    char s[140]; snprintf(s, sizeof s, "{USE}  %s", U->prompt_use);
-    c = layer_begin(&L_use, 620, 58, hash_str(s, 41 + in->used_pad));
-    if (c) {
-      float w = g_markup(c, 0, 37, CV_LEFT, F_DISPLAY, 23, 0, INK, 34, in->used_pad, s, false) + 56, x0 = 310 - w / 2;
-      cv_fill_hex(c, ORANGE, 1); cv_begin(c); cv_move(c, x0 + 14, 2); cv_line(c, x0 + w, 2); cv_line(c, x0 + w - 14, 54); cv_line(c, x0, 54); cv_close(c); cv_fill(c);
-      g_markup(c, 310, 37, CV_CENTER, F_DISPLAY, 23, 0, INK, 34, in->used_pad, s, true);
-      layer_end(&L_use, c);
-    }
-    hg_tex(&L_use, 330, U->mg && U->mg != MG_GREET && U->mg != MG_POINT ? 450 : 556, 1);
+  if (U->prompt_use) hud_use_prompt(U->prompt_use, U->mg && U->mg != MG_GREET && U->mg != MG_POINT ? 450 : 556);
+}
+/* the interact prompt: the use button and what it does, on an orange plate centred low on screen (the lab's
+ * talks and tasks, the attic's shelves). Call inside hg_begin/hg_end. */
+void hud_use_prompt(const char *label, float y) {
+  static layer_t L_use;   /* this prompt only */
+  const intent_t *in = input_get();
+  char s[140]; snprintf(s, sizeof s, "{USE}  %s", label);
+  cv *c = layer_begin(&L_use, 620, 58, hash_str(s, 41 + in->used_pad));
+  if (c) {
+    float w = g_markup(c, 0, 37, CV_LEFT, F_DISPLAY, 23, 0, INK, 34, in->used_pad, s, false) + 56, x0 = 310 - w / 2;
+    cv_fill_hex(c, ORANGE, 1); cv_begin(c); cv_move(c, x0 + 14, 2); cv_line(c, x0 + w, 2); cv_line(c, x0 + w - 14, 54); cv_line(c, x0, 54); cv_close(c); cv_fill(c);
+    g_markup(c, 310, 37, CV_CENTER, F_DISPLAY, 23, 0, INK, 34, in->used_pad, s, true);
+    layer_end(&L_use, c);
   }
+  hg_tex(&L_use, 330, y, 1);
 }
 /* the roam's standing hints, bottom left: the weapon (once one is owned) and the bike (once it is unlocked,
  * outdoors), in the use prompt's style, with this device's glyphs */
@@ -534,15 +538,15 @@ void hud_nights_title(float t, bool sel, int night, int open_mask, int count, co
   hg_end();
 }
 
-void hud_pause_draw(int sel, bool music, int save) {
+void hud_pause_draw(int sel, bool music, int save, const char *leave) {
   hg_begin();
   hg_rect(0, 0, DS_W, DS_H, INK, .72f);
   const intent_t *in = input_get();
-  cv *c = layer_begin(&L_menu, 1000, 560, 500u + (unsigned)sel * 7 + (music ? 1 : 0) + (unsigned)save * 2 + (in->used_pad ? 50 : 0));
+  cv *c = layer_begin(&L_menu, 1000, 560, 500u + (unsigned)sel * 7 + (music ? 1 : 0) + (unsigned)save * 2 + (in->used_pad ? 50 : 0) + (leave ? 300u : 0u));
   if (c) {
     p_text(c, F_DISPLAY, 50, 2, CV_LEFT, "PAUSED", 0, 54, PAPER, 1);
     const char *sv = save == 2 ? "Saved. Continue starts here" : save == 1 ? "Save (only between scenes)" : "Save game";
-    const char *rows[4] = {"Back to the day", sv, music ? "Music on" : "Music off", "Leave (your last save stays)"};
+    const char *rows[4] = {"Back to the day", sv, music ? "Music on" : "Music off", leave ? leave : "Leave (your last save stays)"};
     for (int i = 0; i < 4; i++) {
       bool s = i == sel;
       cv_fill_hex(c, s ? ORANGE : 0x24242e, 1); cv_fill_rect(c, 0, 84 + i * 56, 470, 48);

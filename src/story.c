@@ -542,7 +542,7 @@ static int chapter_beat(void) {
   for (int i = 0; i < SCRIPT_COUNT; i++) if ((SCRIPT[i].op == OP_CHAPTER || SCRIPT[i].op == OP_NIGHT) && title_hash(SCRIPT[i].s) == save_chap) return i;
   return -1;
 }
-bool story_can_save(void) { return block == B_ROAM && roam && !story_scene_busy() && save_chap && chapter_beat() >= 0 && !replay; }
+bool story_can_save(void) { return block == B_ROAM && roam && !story_scene_busy() && world_get_stage() == STAGE_TOWN && save_chap && chapter_beat() >= 0 && !replay; }
 bool story_save_here(void) {
   if (!story_can_save()) return false;
   int c = chapter_beat(), at = (int)(roam - SCRIPT), k = 0;

@@ -37,6 +37,12 @@ static v3 back_pos; static float back_yaw;
 void hub_begin(void) { float yaw; v3 e = attic_env_entry(&yaw); player_teleport(e, yaw); player_camera_snap(); }
 void hub_return(void) { player_teleport(back_pos, back_yaw); player_camera_snap(); }
 const char *hub_prompt(void) { return have_prompt ? prompt : NULL; }
+/* "THE PARTS SHELF" -> "Look at the parts shelf", in the lab prompts' own case */
+static void look_at(const char *label) {
+  int n = snprintf(prompt, sizeof prompt, "Look at ");
+  for (const char *c = label; *c && n < (int)sizeof prompt - 1; c++) prompt[n++] = (*c >= 'A' && *c <= 'Z') ? (char)(*c - 'A' + 'a') : *c;
+  prompt[n] = 0;
+}
 
 int hub_update(float dt, const intent_t *in, int *arg) {
   player_update(dt, in);
@@ -48,17 +54,17 @@ int hub_update(float dt, const intent_t *in, int *arg) {
   float ty, ey; v3 t = attic_env_term(&ty), e = attic_env_entry(&ey);
   float dt_term = hypotf(p.x - t.x, p.z - t.z), dt_stair = hypotf(p.x - e.x, p.z - e.z);
   if (dt_term < 1.0f && dt_term < bd) {
-    snprintf(prompt, sizeof prompt, "USE THE TERMINAL  {USE}"); have_prompt = true;
+    snprintf(prompt, sizeof prompt, "Use the terminal"); have_prompt = true;
     if (in->interact) return HUB_TERMINAL;
   } else if (best >= 0) {
     int m = memory_of_zone(ATTIC_EXAM[best].zone);
-    snprintf(prompt, sizeof prompt, "%s  {USE}", ATTIC_EXAM[best].label); have_prompt = true;
+    look_at(ATTIC_EXAM[best].label); have_prompt = true;
     if (in->interact && m >= 0) {
       back_pos = p; back_yaw = atan2f(ATTIC_EXAM[best].x - p.x, ATTIC_EXAM[best].z - p.z);
       *arg = MEMORIES[m].scene; return HUB_MEMORY;
     }
   } else if (dt_stair < 0.9f) {
-    snprintf(prompt, sizeof prompt, "GO BACK DOWN  {USE}"); have_prompt = true;
+    snprintf(prompt, sizeof prompt, "Go back down"); have_prompt = true;
     if (in->interact) return HUB_LEAVE;
   }
   return HUB_NONE;

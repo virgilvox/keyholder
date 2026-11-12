@@ -20,6 +20,7 @@ static enum { G_TITLE, G_PLAY, G_PAUSE, G_END, G_BATTLE, G_ATTIC } mode;
 static float mode_t;
 static int who, pause_sel, title_row, night_sel = 1; static bool music_on = true;
 static int pause_saved;   /* the pause menu: 1 once this pause saved */
+static int pause_from;    /* the mode the pause returns to: G_PLAY, or G_ATTIC */
 static actor_t *T_A[3];
 static const char *const NAMES[3] = {"VEE", "DEX", "RUTH"};
 static const char *const BLURB[3] = {"First to look up. Runs the printers.", "Electronics bench. Tells you how it broke.", "Laser corner. Has actually read the manual."};
@@ -104,22 +105,24 @@ void game_frame(float dt) {
       break;
     }
     case G_PLAY:
-      if (in->pause) { mode = G_PAUSE; pause_sel = 0; pause_saved = 0; mode_t = 0; sfx(SFX_UI, 0, 1); break; }
+      if (in->pause) { mode = G_PAUSE; pause_from = G_PLAY; pause_sel = 0; pause_saved = 0; mode_t = 0; sfx(SFX_UI, 0, 1); break; }
       story_update(dt, in);
       if (story_take_attic()) { attic_enter(); mode = G_ATTIC; mode_t = 0; break; }
       if (story_state() == SR_EPILOGUE) { mode = G_END; mode_t = 0; }
       break;
     case G_ATTIC:
+      if (in->pause) { mode = G_PAUSE; pause_from = G_ATTIC; pause_sel = 0; pause_saved = 0; mode_t = 0; sfx(SFX_UI, 0, 1); break; }
       if (!attic_update(dt, in)) { story_attic_result(attic_won()); mode = G_PLAY; mode_t = 0; }
       break;
     case G_PAUSE:
-      if (in->pause || in->back) { mode = G_PLAY; break; }
+      if (in->pause || in->back) { mode = pause_from; break; }
       if (in->nav_y) { int n = pause_sel + in->nav_y; if (n >= 0 && n < 4) { pause_sel = n; sfx(SFX_UI, 0, 1); } }
       if (in->ok) {
-        if (pause_sel == 0) { sfx(SFX_UI_OK, 0, 1); mode = G_PLAY; }
+        if (pause_sel == 0) { sfx(SFX_UI_OK, 0, 1); mode = pause_from; }
         else if (pause_sel == 1) { if (story_save_here()) { pause_saved = 1; sfx(SFX_UI_OK, 0, 1); } else sfx(SFX_CLASH, 0, .5f); }
         else if (pause_sel == 2) { sfx(SFX_UI_OK, 0, 1); music_on = !music_on; audio_set_music(music_on); }
-        else { sfx(SFX_UI_OK, 0, 1); fight_end(); title_enter(); }
+        else if (pause_from == G_ATTIC && attic_can_leave()) { sfx(SFX_UI_OK, 0, 1); attic_leave_now(); mode = G_ATTIC; }
+        else { sfx(SFX_UI_OK, 0, 1); fight_end(); story_scene_abort(); title_enter(); }
       }
       break;
     case G_BATTLE:
@@ -153,7 +156,10 @@ void game_draw(void) {
       if (story_state() == SR_FIGHT && !STORY_UI.retry) fight_draw_hud();
       hud_vn_draw();
       break;
-    case G_PAUSE: hud_vn_draw(); hud_pause_draw(pause_sel, music_on, pause_saved ? 2 : story_can_save() ? 0 : 1); break;
+    case G_PAUSE:
+      if (pause_from == G_ATTIC && !story_scene_busy()) attic_draw(); else hud_vn_draw();
+      hud_pause_draw(pause_sel, music_on, pause_saved ? 2 : story_can_save() ? 0 : 1, pause_from == G_ATTIC && attic_can_leave() ? "Climb back down to the lab" : NULL);
+      break;
     case G_END: {
       const char *lines[16]; int n = story_end_lines(lines, 16);
       hud_end_draw(mode_t, story_end_title(), lines, n, STORY_UI.stats);

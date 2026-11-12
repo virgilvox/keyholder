@@ -34,6 +34,9 @@ void attic_init(t3_scene *scene_, t3_camera *cam) {
   term_init();
 }
 bool attic_won(void) { return was_won; }
+/* the pause menu's "climb back down": not in the middle of a scene or the terminal */
+bool attic_can_leave(void) { return scene < 0 && (phase == A_DEEP || phase == A_ROOM); }
+void attic_leave_now(void) { if (attic_can_leave()) { phase = A_LEAVING; phase_t = 0; } }
 
 static void to_room(float normal) {
   attic_env_set_arena(v3_(0, 0, 0), 4.f);
@@ -130,7 +133,7 @@ bool attic_update(float dt, const intent_t *in) {
       int arg = -1, ev = deep_update(dt, in, &arg);
       if (ev == DEEP_ENCOUNTER) play(deep_scene_for(arg), arg);
       else if (ev == DEEP_BOSS) play(SC_BOSS_SYSOP, 0);
-      if (in->back && phase_t > .5f) { phase = A_LEAVING; phase_t = 0; }
+      if (in->back && !in->pause && phase_t > .5f) { phase = A_LEAVING; phase_t = 0; }   /* Backspace or B; Esc is the pause menu */
       break;
     }
     case A_WAKE:
@@ -167,7 +170,7 @@ void attic_draw(void) {
   h.deep = deep;
   h.title = deep ? "THE ATTIC?" : "THE ATTIC";
   h.sub = deep ? deep_zone() : "AS IT REALLY IS";
-  h.objective = deep ? (deep_all_cleared() ? "The rack is at the back.  {BACK} climb down" : "Find the rack. Stay off the painted boards.  {BACK} climb down")
+  h.objective = deep ? (deep_all_cleared() ? "The rack is at the back.  {PAUSE} menu" : "Find the rack. Stay off the painted boards.  {PAUSE} menu")
                      : "Look around. The rack is still on.";
   h.prompt = deep ? NULL : hub_prompt();
   h.found = hub_found_count(found_mask); h.falls = deep_falls();

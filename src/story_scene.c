@@ -30,6 +30,14 @@ void story_scene_end(void) {
   busy = false;
 }
 
+/* quitting to the title in the middle of one: the scene's pieces go, the day is not given back (it is over) */
+void story_scene_abort(void) {
+  if (!busy) return;
+  memory_props_hide();
+  if (interior_current() >= 0) interior_exit();
+  grade_to = grade_amt = 0; present_memory(0, 0);
+  busy = false;
+}
 void story_scene_grade(bool memory, float t) { grade_to = memory ? 1.f : 0.f; grade_rate = t > 0 ? 1.f / t : 100.f; }
 void story_scene_tick(float dt) {
   grade_amt = grade_to > grade_amt ? fminf(grade_to, grade_amt + grade_rate * dt) : fmaxf(grade_to, grade_amt - grade_rate * dt);
