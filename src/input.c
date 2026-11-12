@@ -42,17 +42,17 @@ void input_frame(const wc_pad_t *pads, const uint8_t *keys) {
   o->my = (float)DOWN(kcur, WC_KEY_W) - (float)DOWN(kcur, WC_KEY_S);
   o->ax = (float)DOWN(kcur, WC_KEY_RIGHT) - (float)DOWN(kcur, WC_KEY_LEFT);
   o->ay = (float)DOWN(kcur, WC_KEY_UP) - (float)DOWN(kcur, WC_KEY_DOWN);
-  /* PC action layout (v2.1, like COFFEE & KILL): the fight sits under the left hand around WASD, Q light, F heavy,
-   * C guard, X special, Shift dodge, Space jump, so the right hand can stay on the mouse for the camera or off it
-   * altogether. The mouse buttons still attack and guard; left click fires on the press. */
+  /* PC action layout (v2.2): the fight sits under the left hand around WASD. E light (a fight has nothing to use;
+   * in a walk a drawn weapon only swings when no prompt is up, story.c), Q heavy, F special, C guard and tap to
+   * parry, Shift dodge, Space jump. Left click is light and right click guard too; left click fires on the press. */
   bool lmb = DOWN(kcur, KEY_MOUSE_L);
-  o->light = kp(WC_KEY_Q) || kp(WC_KEY_J) || kp(KEY_MOUSE_L);
-  o->light_held = DOWN(kcur, WC_KEY_Q) || DOWN(kcur, WC_KEY_J) || lmb;
-  o->heavy = kp(WC_KEY_F) || kp(WC_KEY_K); o->heavy_held = DOWN(kcur, WC_KEY_F) || DOWN(kcur, WC_KEY_K);
+  o->light = kp(WC_KEY_E) || kp(WC_KEY_J) || kp(KEY_MOUSE_L);
+  o->light_held = DOWN(kcur, WC_KEY_E) || DOWN(kcur, WC_KEY_J) || lmb;
+  o->heavy = kp(WC_KEY_Q) || kp(WC_KEY_K); o->heavy_held = DOWN(kcur, WC_KEY_Q) || DOWN(kcur, WC_KEY_K);
   o->guard = DOWN(kcur, WC_KEY_C) || DOWN(kcur, WC_KEY_L) || DOWN(kcur, KEY_MOUSE_R);
   o->jump = kp(WC_KEY_SPACE); o->jump_held = DOWN(kcur, WC_KEY_SPACE);
   o->dodge = kp(KEY_LSHIFT) || kp(KEY_RSHIFT);
-  o->special = kp(WC_KEY_X) || kp(WC_KEY_U);
+  o->special = kp(WC_KEY_F) || kp(WC_KEY_U);
   o->lock = kp(WC_KEY_TAB) || kp(KEY_MOUSE_M);
   o->wheel = kp(KEY_WHEEL_UP) ? 1 : kp(KEY_WHEEL_DOWN) ? -1 : 0;
   for (int k = 0; k < 5; k++) if (kp(WC_KEY_1 + k)) o->weapon_pick = k;

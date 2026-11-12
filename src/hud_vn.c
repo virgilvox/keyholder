@@ -541,15 +541,15 @@ void hud_pause_draw(int sel, bool music, int save) {
   cv *c = layer_begin(&L_menu, 1000, 560, 500u + (unsigned)sel * 7 + (music ? 1 : 0) + (unsigned)save * 2 + (in->used_pad ? 50 : 0));
   if (c) {
     p_text(c, F_DISPLAY, 50, 2, CV_LEFT, "PAUSED", 0, 54, PAPER, 1);
-    const char *sv = save == 2 ? "Saved. Continue starts here" : save == 1 ? "Save (while walking free, between scenes)" : "Save game";
+    const char *sv = save == 2 ? "Saved. Continue starts here" : save == 1 ? "Save (only between scenes)" : "Save game";
     const char *rows[4] = {"Back to the day", sv, music ? "Music on" : "Music off", "Leave (your last save stays)"};
     for (int i = 0; i < 4; i++) {
       bool s = i == sel;
       cv_fill_hex(c, s ? ORANGE : 0x24242e, 1); cv_fill_rect(c, 0, 84 + i * 56, 470, 48);
       p_text(c, F_TYPE, 19, 0, CV_LEFT, rows[i], 18, 115 + i * 56, s ? INK : (i == 1 && save == 1) ? DIMT : PAPER, 1);
     }
-    static const char *K[][2] = { {"Move", "WASD"}, {"Camera", "Mouse, arrows"}, {"Light attack", "Q (or left click)"}, {"Heavy attack", "F"},
-      {"Guard, parry", "C, tap to parry (or right click)"}, {"Dodge, sprint", "Shift tap; hold Shift to sprint"}, {"Jump", "Space"}, {"Special", "X"},
+    static const char *K[][2] = { {"Move", "WASD"}, {"Camera", "Mouse, arrows"}, {"Light attack", "E or left click"}, {"Heavy attack", "Q"},
+      {"Guard, parry", "C or right click (tap to parry)"}, {"Dodge, sprint", "Shift tap; hold Shift to sprint"}, {"Jump", "Space"}, {"Special", "F"},
       {"Lock on, switch", "Tab, middle click; wheel switches"}, {"Zoom", "Mouse wheel"}, {"Weapon", "1 to 5"}, {"Call a friend", "R"},
       {"Talk, use", "E"}, {"Draw, sheathe", "G"}, {"Bike (outdoors)", "B"}, {"Skip scene", "Hold Enter"} };
     static const char *P[] = {"Left stick", "Right stick", "X or RT", "Y", "LT (tap to parry)", "B; sprint L3 or full stick", "A", "RB", "LB or R3; flick right stick",

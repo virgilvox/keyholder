@@ -10,15 +10,15 @@ A PS2-style action visual novel for the HeatSync Labs game station (wasmcart, Ba
 |---|---|---|
 | Move | left stick | WASD |
 | Camera | right stick | mouse, arrows |
-| Talk, use | X | E |
+| Talk, use (outside fights) | X | E |
 | Pick, advance | A | Enter, Space, left click |
-| Light attack | X, RT | Q (or left click) |
-| Heavy attack | Y | F |
-| Guard, tap to parry | LT | C (or right click) |
+| Light attack | X, RT | E or left click |
+| Heavy attack | Y | Q |
+| Guard, tap to parry | LT | C or right click |
 | Dodge | B | Shift (tap) |
 | Sprint | L3, or the stick pushed all the way | Shift (hold), Left Alt |
 | Jump | A | Space |
-| Special (meter full) | RB | X |
+| Special (meter full) | RB | F |
 | Lock on | LB, R3 | Tab, middle click |
 | Next target (locked on) | flick the right stick | mouse wheel |
 | Camera zoom | LB or R3 in roams (three steps) | mouse wheel (not locked on) |
