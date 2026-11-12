@@ -24,8 +24,7 @@
 #define RZ   6.0f          /* half depth (z) */
 #define CEIL 3.6f
 static const v3 ENTRY = { 0.0f, 0.0f, 5.0f };   /* the stair head, by the south wall, facing in */
-static const v3 RACK  = { -3.3f, 0.0f, -5.2f };  /* the server rack, north-west */
-static const v3 TERM  = { -1.3f, 0.0f, -5.2f };  /* the pizza-box terminal, beside it */
+static const v3 RACK  = { -3.3f, 0.0f, -5.2f };  /* the server rack (and its terminal), north-west */
 
 /* the soft-floor grid: 1 is a board that gives (a red X). A sound path snakes entry->rack up the west side. */
 #define COLS 9
@@ -112,13 +111,16 @@ static void build_env(void) {
   for (int i = 0; i < 5; i++) fxp_box(v3_(-1.0f + i*0.55f, 0.28f, -5.4f), v3_(0.26f, 0.28f, 0.26f), 0x4a4a52);
   fxp_box(v3_(5.2f, 0.4f, -4.2f), v3_(0.6f, 0.4f, 0.6f), 0x6e5a3e);
   fxp_box(v3_(5.2f, 0.95f, -4.2f), v3_(0.42f, 0.32f, 0.5f), 0x2a2d33);      /* CRT body */
-  /* the server rack: a dark cabinet with a glass front */
-  fxp_box(v3_(RACK.x, 0.8f, RACK.z), v3_(0.6f, 1.6f, 0.5f), 0x2b2f35);
-  fxp_box(v3_(RACK.x, 0.8f, RACK.z+0.26f), v3_(0.5f, 1.4f, 0.02f), 0x14161a);
-  for (int i = 0; i < 6; i++) fxp_box(v3_(RACK.x, 0.3f+i*0.2f, RACK.z+0.25f), v3_(0.46f, 0.15f, 0.04f), 0x23262c);
-  /* the terminal crate and its little pizza-box server with a screen facing the approach (+z) */
-  fxp_box(v3_(TERM.x, 0.5f, TERM.z), v3_(0.5f, 0.5f, 0.4f), 0x6e5a3e);
-  fxp_box(v3_(TERM.x, 1.06f, TERM.z), v3_(0.46f, 0.08f, 0.44f), 0x3a3f46);  /* the 1U "pizza box" */
+  /* the server rack: a tall dark cabinet, a glass front over a stack of 1U servers (one is the
+   * "pizza box" that runs the terminal). A small monitor and keyboard sit on a shelf on top, tilted
+   * toward you: that is the terminal you use. */
+  fxp_box(v3_(RACK.x, 0.9f, RACK.z), v3_(0.62f, 1.8f, 0.52f), 0x2b2f35);
+  fxp_box(v3_(RACK.x, 0.95f, RACK.z+0.27f), v3_(0.52f, 1.5f, 0.02f), 0x14161a);        /* glass door */
+  for (int i = 0; i < 7; i++) fxp_box(v3_(RACK.x, 0.35f+i*0.2f, RACK.z+0.26f), v3_(0.48f, 0.15f, 0.04f), i==3 ? 0x3a3f46 : 0x23262c);  /* 1U servers; the pizza box lighter */
+  /* a shelf on top with the monitor and keyboard */
+  fxp_box(v3_(RACK.x, 1.82f, RACK.z), v3_(0.64f, 0.04f, 0.54f), 0x22262b);
+  fxp_box(v3_(RACK.x, 1.96f, RACK.z+0.02f), v3_(0.42f, 0.30f, 0.03f), 0x1a1d22);        /* the monitor, tilted up */
+  fxp_box(v3_(RACK.x, 1.86f, RACK.z+0.26f), v3_(0.40f, 0.03f, 0.16f), 0x2a2e34);        /* the keyboard */
   t3_object *g = fxp_end(); t3_object_add(&SC->base, g); env_grp = g; env_grp->visible = false;
 
   /* the glow layer (emissive, additive): the red X paint, a soft window, the terminal screen */
@@ -130,7 +132,7 @@ static void build_env(void) {
     fxp_bar(v3_(x-s,h,z+s), v3_(x+s,h,z-s), 0.055f, 0x7a1410);
   }
   fxp_quad(v3_(2.8f, 1.0f, -RZ+0.03f), v3_(4.8f, 1.0f, -RZ+0.03f), v3_(4.8f, 2.5f, -RZ+0.03f), v3_(2.8f, 2.5f, -RZ+0.03f), 0x4a3a1c);  /* a soft daylight window */
-  fxp_box(v3_(TERM.x, 1.11f, TERM.z+0.2f), v3_(0.34f, 0.02f, 0.14f), 0x2fd06a);  /* terminal screen */
+  fxp_box(v3_(RACK.x, 1.97f, RACK.z+0.055f), v3_(0.36f, 0.24f, 0.02f), 0x2fd06a);  /* the terminal monitor's green screen, on top of the rack */
   for (int i = 0; i < 6; i++)   /* the rack's status LEDs, live after the reboot */
     fxp_box(v3_(RACK.x-0.36f+0.02f, 0.35f+i*0.2f, RACK.z+0.27f), v3_(0.015f, 0.02f, 0.01f), (i%3) ? 0x30c050 : 0x40b0d0);
   t3_object *gg = fxp_end(); t3_object_add(g, gg);   /* reparent the glow under the room so it hides with it */
@@ -241,7 +243,7 @@ static int mem_id;                                 /* the memory now playing */
 enum { EX_MEMORY, EX_REPLAY, EX_TERMINAL };
 typedef struct { v3 pos; float r; int kind; int id; const char *label; } exam_t;
 static const exam_t EXAM[] = {
-  { { -1.3f, 0, -4.4f }, 1.5f, EX_TERMINAL, 0, "USE TERMINAL" },
+  { { -3.3f, 0, -3.9f }, 1.6f, EX_TERMINAL, 0, "USE TERMINAL" },   /* in front of the rack */
   { {  5.2f, 0, -3.3f }, 1.4f, EX_MEMORY, 0, "EXAMINE" },   /* the dead CRT */
   { { -6.0f, 0,  3.0f }, 1.4f, EX_MEMORY, 1, "EXAMINE" },   /* a tote on the west shelf */
   { {  4.2f, 0,  4.4f }, 1.6f, EX_REPLAY, 0, "RUN THE DRILL" },
@@ -403,6 +405,7 @@ static layer_t L_top, L_obj, L_banner, L_mem;
 
 void attic_draw(void) {
   if (phase == A_TERMINAL) { term_draw(); return; }
+  bool pad = input_get()->used_pad;   /* device-aware button glyphs, like the rest of the HUD */
   hg_begin();
   /* the tag and objective (not in the terminal or a memory) */
   if (phase != A_MEMORY) {
@@ -414,13 +417,13 @@ void attic_draw(void) {
     hg_tex(&L_top, 44, 36, 1);
 
     uint32_t key = (uint32_t)phase*16 + (near_use ? (uint32_t)use_kind+1 : 0)*4 + (uint32_t)(tries<<8);
-    cv *cc = layer_begin(&L_obj, 600, 40, 0xB00 ^ key);
+    cv *cc = layer_begin(&L_obj, 600, 40, 0xB00 ^ key ^ (pad?0x40000:0));
     if (cc) { p_plate(cc, 0, 0, 600, 40, 10, AT_INK, .82f);
       const char *s = "Reach the server rack. Keep off the red X.";
       if (phase == A_HUB) s = near_use
         ? (use_kind==EX_TERMINAL ? "USE THE TERMINAL  {USE}" : use_kind==EX_REPLAY ? "RUN THE DRILL  {USE}" : "EXAMINE  {USE}")
         : "The attic is yours. Look around.";
-      g_markup(cc, 16, 26, CV_LEFT, F_TYPE, 20, .1f, AT_PAPER, 20, true, s, true);
+      g_markup(cc, 16, 26, CV_LEFT, F_TYPE, 20, .1f, AT_PAPER, 20, pad, s, true);
       if (tries > 0 && phase == A_PLAY) { char t[24]; snprintf(t,sizeof t,"FELL: %d", tries); p_text(cc, F_MONO, 15, 1, CV_LEFT, t, 500, 25, AT_RED, 1); }
       layer_end(&L_obj, cc); }
     hg_tex(&L_obj, 44, 648, 1);
@@ -429,10 +432,10 @@ void attic_draw(void) {
   if (phase == A_FELL || phase == A_WON) {
     bool won = phase == A_WON; float a = hud_ease_out(phase_t*3);
     hg_rect(0, 280, 1280, 160, won ? 0x0b2414 : 0x2a0e0a, .68f*a);
-    cv *c = layer_begin(&L_banner, 920, 150, won ? 0xD01 : 0xD02);
+    cv *c = layer_begin(&L_banner, 920, 150, (won ? 0xD01u : 0xD02u) ^ (pad?0x40000u:0u));
     if (c) { p_text(c, F_DISPLAY, 58, 2, CV_CENTER, won ? "BACK ONLINE" : "THROUGH THE FLOOR", 460, 64, won ? AT_GREEN : AT_RED, 1);
       p_text(c, F_TYPE, 22, 0, CV_CENTER, won ? "Server up. The room settles. Members site, wiki, door controller." : "A boot through the ceiling.", 460, 102, AT_PAPER, 1);
-      if (!won) g_markup(c, 460, 132, CV_CENTER, F_MONO, 15, 1, AT_YEL, 16, true, "{USE} try again    {BACK} climb down", true);
+      if (!won) g_markup(c, 460, 132, CV_CENTER, F_MONO, 15, 1, AT_YEL, 16, pad, "{USE} try again    {BACK} climb down", true);
       layer_end(&L_banner, c); }
     hg_tex_m(&L_banner, (float[6]){1,0,0,1,640-460,300}, a, 0xffffff);
   }
@@ -441,12 +444,12 @@ void attic_draw(void) {
     float a = hud_ease_out(phase_t*2) * (phase_t > 6.0f ? hud_ease_out((7.0f-phase_t)*2) : 1);
     hg_rect(0, 0, 1280, 720, 0x140f08, .82f*a);
     hg_vignette(0x000000, .5f*a, .4f);
-    cv *c = layer_begin(&L_mem, 900, 220, 0xE00 + (uint32_t)mem_id);
+    cv *c = layer_begin(&L_mem, 900, 220, (0xE00u + (uint32_t)mem_id) ^ (pad?0x40000u:0u));
     if (c) { p_text(c, F_MONO, 15, 3, CV_CENTER, "A MEMORY", 450, 30, AT_YEL, 1);
       p_text(c, F_DISPLAY, 40, 1, CV_CENTER, MEM[mem_id].title, 450, 82, 0xf0e2c4, 1);
       p_text(c, F_TYPE, 22, 0, CV_CENTER, MEM[mem_id].l1, 450, 134, AT_PAPER, 1);
       p_text(c, F_TYPE, 22, 0, CV_CENTER, MEM[mem_id].l2, 450, 166, AT_PAPER, 1);
-      p_text(c, F_MONO, 14, 1, CV_CENTER, "{USE} let it go", 450, 206, 0x9a8f7a, 1);
+      g_markup(c, 450, 206, CV_CENTER, F_MONO, 14, 1, 0x9a8f7a, 15, pad, "{USE} let it go", true);
       layer_end(&L_mem, c); }
     hg_tex_m(&L_mem, (float[6]){1,0,0,1,640-450,250}, a, 0xffffff);
   }

@@ -106,19 +106,6 @@ void term_open(unsigned unlocked) {
 
 unsigned term_unlocked(void) { return g_unlocked; }
 
-/* the neighbour of cur that best faces the target: the default hover after a claim */
-static int toward_target(const prog_t *P, int cur) {
-  float tx = P->px[P->target] - P->px[cur], ty = P->py[P->target] - P->py[cur];
-  float tl = hypotf(tx, ty); if (tl > 1e-5f) { tx /= tl; ty /= tl; }
-  int best = cur; float bd = -2;
-  for (int nb = 0; nb < P->n; nb++) if (ADJ[h_prog][cur] & (1u << nb)) {
-    float dx = P->px[nb] - P->px[cur], dy = P->py[nb] - P->py[cur], l = hypotf(dx, dy);
-    if (l < 1e-5f) continue; dx /= l; dy /= l;
-    float dot = dx * tx + dy * ty;
-    if (dot > bd) { bd = dot; best = nb; }
-  }
-  return best;
-}
 /* the neighbour nearest the pressed direction, or -1 if none leans that way */
 static int pick_dir(const prog_t *P, int cur, int ix, int iy) {
   int best = -1; float bd = 0.30f;
@@ -135,7 +122,7 @@ static void launch(int prog) {
   const prog_t *P = &PROG[prog];
   h_prog = prog; h_cur = P->start; h_claimed = (uint16_t)(1u << P->start);
   h_path[0] = P->start; h_pathn = 1;
-  h_clock = P->secs; h_hov = toward_target(P, P->start);
+  h_clock = P->secs; h_hov = -1;   /* no auto-aim: the player steers each step, so you cannot spam confirm */
   phase = TP_HACK; phase_t = 0;
   sfx(SFX_UI_OK, 0, .9f);
 }
@@ -175,7 +162,7 @@ bool term_update(float dt, const intent_t *in) {
       if (h_cur == P->target) {
         h_won = true; g_cleared |= PROG[h_prog].bit; g_unlocked |= PROG[h_prog].grants;
         phase = TP_RESULT; phase_t = 0; sfx(SFX_PICKUP, 0, 1);
-      } else h_hov = toward_target(P, h_cur);
+      } else h_hov = -1;   /* must steer to the next node, not spam */
     }
     if (in->back) { phase = TP_MENU; phase_t = 0; sfx(SFX_UI, 0, .6f); }   /* abort to the menu, not log off */
     return true;
