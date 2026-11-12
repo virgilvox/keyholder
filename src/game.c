@@ -19,6 +19,7 @@ static t3_scene *scene; static t3_camera *cam;
 static enum { G_TITLE, G_PLAY, G_PAUSE, G_END, G_BATTLE, G_ATTIC } mode;
 static float mode_t;
 static int who, pause_sel, title_row, night_sel = 1; static bool music_on = true;
+static int pause_saved;   /* the pause menu: 1 once this pause saved */
 static actor_t *T_A[3];
 static const char *const NAMES[3] = {"VEE", "DEX", "RUTH"};
 static const char *const BLURB[3] = {"First to look up. Runs the printers.", "Electronics bench. Tells you how it broke.", "Laser corner. Has actually read the manual."};
@@ -81,7 +82,10 @@ void game_frame(float dt) {
       t3_object_look_at(cam, c.x + (who - 1) * .25f, c.y + 1.15f, c.z);
       if (cam->fov != 38) { cam->fov = 38; t3_camera_update_projection_matrix(cam); }
       world_update(dt, v3_(c.x, c.y + 1, c.z + 4));
-      const bool cont = title_row == 0 && story_has_save() && (input_key_down(0x06) || in->heavy);   /* C or Y */
+      /* v2.1: with a save, ENTER (A) continues it, so a habit press never starts over; N (X) starts a new day */
+      const bool has = story_has_save();
+      const bool cont = title_row == 0 && has && (in->ok || input_key_down(0x06) || in->heavy);   /* or C, Y */
+      const bool fresh = title_row == 0 && (has ? (input_key_down(0x11) || (in->used_pad && in->light)) : in->ok);
       if (in->ok && title_row == 1) {
         if (battle_available()) {
           sfx(SFX_UI_OK, 0, 1);
@@ -91,7 +95,7 @@ void game_frame(float dt) {
         } else sfx(SFX_CLASH, 0, .5f);
         break;
       }
-      if ((in->ok && title_row == 0) || cont) {
+      if (fresh || cont) {
         sfx(SFX_UI_OK, 0, 1);
         title_leave();
         if (cont) story_continue(); else story_new_game(who);
@@ -100,7 +104,7 @@ void game_frame(float dt) {
       break;
     }
     case G_PLAY:
-      if (in->pause) { mode = G_PAUSE; pause_sel = 0; mode_t = 0; sfx(SFX_UI, 0, 1); break; }
+      if (in->pause) { mode = G_PAUSE; pause_sel = 0; pause_saved = 0; mode_t = 0; sfx(SFX_UI, 0, 1); break; }
       story_update(dt, in);
       if (story_take_attic()) { attic_enter(); mode = G_ATTIC; mode_t = 0; break; }
       if (story_state() == SR_EPILOGUE) { mode = G_END; mode_t = 0; }
@@ -110,12 +114,12 @@ void game_frame(float dt) {
       break;
     case G_PAUSE:
       if (in->pause || in->back) { mode = G_PLAY; break; }
-      if (in->nav_y) { int n = pause_sel + in->nav_y; if (n >= 0 && n < 3) { pause_sel = n; sfx(SFX_UI, 0, 1); } }
+      if (in->nav_y) { int n = pause_sel + in->nav_y; if (n >= 0 && n < 4) { pause_sel = n; sfx(SFX_UI, 0, 1); } }
       if (in->ok) {
-        sfx(SFX_UI_OK, 0, 1);
-        if (pause_sel == 0) mode = G_PLAY;
-        else if (pause_sel == 1) { music_on = !music_on; audio_set_music(music_on); }
-        else { fight_end(); title_enter(); }
+        if (pause_sel == 0) { sfx(SFX_UI_OK, 0, 1); mode = G_PLAY; }
+        else if (pause_sel == 1) { if (story_save_here()) { pause_saved = 1; sfx(SFX_UI_OK, 0, 1); } else sfx(SFX_CLASH, 0, .5f); }
+        else if (pause_sel == 2) { sfx(SFX_UI_OK, 0, 1); music_on = !music_on; audio_set_music(music_on); }
+        else { sfx(SFX_UI_OK, 0, 1); fight_end(); title_enter(); }
       }
       break;
     case G_BATTLE:
@@ -149,7 +153,7 @@ void game_draw(void) {
       if (story_state() == SR_FIGHT && !STORY_UI.retry) fight_draw_hud();
       hud_vn_draw();
       break;
-    case G_PAUSE: hud_vn_draw(); hud_pause_draw(pause_sel, music_on); break;
+    case G_PAUSE: hud_vn_draw(); hud_pause_draw(pause_sel, music_on, pause_saved ? 2 : story_can_save() ? 0 : 1); break;
     case G_END: {
       const char *lines[16]; int n = story_end_lines(lines, 16);
       hud_end_draw(mode_t, story_end_title(), lines, n, STORY_UI.stats);

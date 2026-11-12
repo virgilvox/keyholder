@@ -154,11 +154,11 @@ kbd.m { background: #c9ccd1; box-shadow: inset 0 -3px 0 #8d9098; }
       <tr><td>Camera</td><td><kbd class="m">MOUSE</kbd> or arrows</td></tr>
       <tr><td>Talk, use</td><td><kbd>E</kbd></td></tr>
       <tr><td>Pick</td><td><kbd>ENTER</kbd> <kbd class="m">CLICK</kbd></td></tr>
-      <tr><td>Light / heavy attack</td><td><kbd class="m">LEFT CLICK</kbd> <kbd>F</kbd></td></tr>
-      <tr><td>Guard, tap to parry</td><td><kbd class="m">RIGHT CLICK</kbd></td></tr>
+      <tr><td>Light / heavy attack</td><td><kbd>Q</kbd> / <kbd>F</kbd> (or <kbd class="m">LEFT CLICK</kbd>)</td></tr>
+      <tr><td>Guard, tap to parry</td><td><kbd>C</kbd> (or <kbd class="m">RIGHT CLICK</kbd>)</td></tr>
       <tr><td>Dodge / sprint</td><td>tap / hold <kbd>SHIFT</kbd></td></tr>
       <tr><td>Jump</td><td><kbd>SPACE</kbd></td></tr>
-      <tr><td>Special</td><td><kbd>Q</kbd></td></tr>
+      <tr><td>Special</td><td><kbd>X</kbd></td></tr>
       <tr><td>Lock on, next target</td><td><kbd>TAB</kbd> <kbd class="m">MIDDLE CLICK</kbd>, <kbd class="m">WHEEL</kbd></td></tr>
       <tr><td>Weapon</td><td><kbd>1</kbd> to <kbd>5</kbd></td></tr>
       <tr><td>Call a friend</td><td><kbd>R</kbd></td></tr>
@@ -432,7 +432,7 @@ async function persist() {
   if (!b || !b.length || sameBytes(b, lastSave)) return;
   lastSave = b; await kvSet(cartKey, b);
 }
-setInterval(persist, 8000);
+setInterval(persist, 2000);   /* a pause menu save reaches the browser within two seconds */
 document.addEventListener('visibilitychange', () => { if (document.hidden) persist(); });
 window.addEventListener('pagehide', persist);
 

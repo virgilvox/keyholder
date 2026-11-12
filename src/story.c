@@ -496,6 +496,7 @@ typedef struct {
    * stays 300 and save_v3's memset-from-ver zeroes them on migration. */
   uint16_t attic_found, attic_games;
   uint8_t attic_state;      /* bit0 the minigame has been beaten */
+  uint8_t roam_k;           /* v2.1: a save made in the pause menu: resume at the chapter's roam_k-th free walk (0: the chapter's start) */
 } save_t;
 _Static_assert(sizeof(save_t) <= 520, "the day's save must stay under DS_SAVE.data[520]");
 _Static_assert(FLAG_COUNT <= 256, "flags are saved as 256 bits");
@@ -531,7 +532,26 @@ static void autosave(void) {
   s->chap = save_chap;
   s->attic_state = attic_done ? 1 : 0; s->attic_found = attic_found_m; s->attic_games = attic_games_m;
   s->ended = pc >= SCRIPT_COUNT || SCRIPT[pc].op == OP_END;
+  s->roam_k = 0;
   DS_SAVE.magic = DS_SAVE_MAGIC;
+}
+/* v2.1: saving from the pause menu, during a free walk (a roam). The save is the chapter's, plus which of
+ * its roams you were in and where you stood, so Continue puts you back in that walk with everything you have
+ * done up to it; work started inside the walk starts over. */
+static int chapter_beat(void) {
+  for (int i = 0; i < SCRIPT_COUNT; i++) if ((SCRIPT[i].op == OP_CHAPTER || SCRIPT[i].op == OP_NIGHT) && title_hash(SCRIPT[i].s) == save_chap) return i;
+  return -1;
+}
+bool story_can_save(void) { return block == B_ROAM && roam && !story_scene_busy() && save_chap && chapter_beat() >= 0 && !replay; }
+bool story_save_here(void) {
+  if (!story_can_save()) return false;
+  int c = chapter_beat(), at = (int)(roam - SCRIPT), k = 0;
+  for (int i = c; i <= at && i < SCRIPT_COUNT; i++) if (SCRIPT[i].op == OP_ROAM) k++;
+  if (k <= 0 || k > 255) return false;
+  int keep = pc; pc = at; autosave(); pc = keep;
+  save_t *sv = save_v3(); sv->roam_k = (uint8_t)k; sv->hour = hour;
+  { v3 p = player_pos(); sv->x = p.x; sv->y = p.y; sv->z = p.z; sv->yaw = player_yaw(); }
+  return true;
 }
 bool story_has_save(void) {
   const save_t *s = (const save_t *)DS_SAVE.data;
@@ -603,6 +623,7 @@ void story_new_game(int p) {
 #ifdef KH_ATTIC_PATH
   /* test build only: the day from its first roam, so a scripted run can walk to the back stairs */
   for (int i = 0; i < SCRIPT_COUNT; i++) if (SCRIPT[i].op == OP_ROAM) { pc = i; break; }
+  for (int i = pc; i >= 0; i--) if (SCRIPT[i].op == OP_CHAPTER) { save_chap = title_hash(SCRIPT[i].s); break; }   /* still in its chapter, for saves */
   fade_to = 0; STORY_UI.fade = 0;   /* the opening's fade in is skipped with it */
 #endif
 }
@@ -622,6 +643,8 @@ void story_continue(void) {
   save_t *s = (save_t *)DS_SAVE.data;
   memset(&STORY_UI, 0, sizeof STORY_UI);
   set_cast(s->me); pc = resume_pc(s); weapons = s->weapons; hour = hour_target = s->hour;
+  /* v2.1: a pause menu save resumes at its free walk, not the chapter's first scene */
+  if (s->ver == SAVE_V3 && s->roam_k) { int k = 0; for (int i = pc; i < SCRIPT_COUNT; i++) if (SCRIPT[i].op == OP_ROAM && ++k == s->roam_k) { pc = i; break; } }
   gear_bike_have = s->bike == GEAR_BIKE;   /* a save from before v1.2 holds no such byte */
   if (s->ver == SAVE_V3) { attic_done = (s->attic_state & 1) != 0; attic_found_m = s->attic_found; attic_games_m = s->attic_games; }
   memcpy(STORY_UI.stats, s->stats, sizeof s->stats);
@@ -664,16 +687,25 @@ bool story_resume(void) {
 void story_stop(void) { voice_stop(); props_hide(); bike_show(false); hide_all(); director_stop(); extras_reset(); tasks_end(); sub_clear(); }
 story_run story_state(void) { return block == B_ROAM ? SR_ROAM : block == B_FIGHT ? SR_FIGHT : block == B_EPILOGUE ? SR_EPILOGUE : block == B_DONE ? SR_DONE : SR_RUNNING; }
 bool story_take_attic(void) { bool w = attic_want; attic_want = false; return w; }
+/* v2.1: the attic's progress goes into the save the moment it changes (it used to wait for the next chapter's
+ * autosave, and a browser refresh lost a beaten boss). The rest of the save is left as it is. */
+static void attic_commit(void) {
+  if (!story_has_save()) { autosave(); return; }
+  save_t *sv = save_v3();
+  sv->attic_state = attic_done ? 1 : 0; sv->attic_found = attic_found_m; sv->attic_games = attic_games_m;
+  DS_SAVE.magic = DS_SAVE_MAGIC;
+}
 void story_attic_result(bool rebooted) {
   if (rebooted && !attic_done) {
     attic_done = true;
     STORY_UI.stats[ST_SAFETY]++;
     STORY_UI.toast = story_stat_name(ST_SAFETY); STORY_UI.toast_n = 1; STORY_UI.toast2 = NULL; STORY_UI.toast_t = 2.6f;
   }
+  attic_commit();
 }
 bool story_attic_beaten(void) { return attic_done; }
 void story_attic_masks(uint16_t *found, uint16_t *games) { if (found) *found = attic_found_m; if (games) *games = attic_games_m ? attic_games_m : 1; }
-void story_attic_set_masks(uint16_t found, uint16_t games) { attic_found_m = found; attic_games_m = games; }
+void story_attic_set_masks(uint16_t found, uint16_t games) { attic_found_m = found; attic_games_m = games; attic_commit(); }
 const char *story_player_name(void) { return CAST[me_id].name; }
 
 /* the people a chapter needs, made while its card is up rather than at their first line */

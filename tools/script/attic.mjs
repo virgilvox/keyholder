@@ -215,14 +215,14 @@ const scenes = {
   // the red-tagged boxes on the west wall: Root's, from the move into 108, 2018
   mem_move: [
     ...memory('JUNE 2018', '108 West Main, moving day', 'town', 15.0),
-    PROP('move_boxes', lab(28.6, 4.6)), PROP('rack_2018', lab(31.2, 4.4)),
-    P('root', lab(30.4, 5.2), 'me'), P('gordon', lab(31.2, 5.6), 'root'), P('june', lab(28.0, 6.0), 'root'), P('me', lab(29.2, 6.2), 'root'),
+    PROP('move_boxes', lab(27.4, 4.7)), PROP('rack_2018', lab(32.6, 4.6)),   // along the open hall behind the restrooms, clear of the machine shop's partitions
+    P('root', lab(31.2, 4.7), 'me'), P('gordon', lab(31.9, 4.9), 'root'), P('june', lab(28.6, 4.8), 'root'), P('me', lab(29.8, 4.7), 'root'),
     SHOT('wide', ['root', 'me'], { dur: 3 }),
     S('root', "The rack goes in the attic. Server rooms are for people with air conditioning."),
     S('gordon', "It weighs as much as the mill."),
     S('root', "Then lift with your knees, Gordon.", { emote: 'joy', amount: .4 }),
     ROAM(null, 0, null, { need: 1, indoors: true, tasks: [
-      TASK('carry', 'boxes', { at: lab(28.6, 5.3), to: lab(31.4, 3.9), n: 2, who: 'root', label: "Carry Root's boxes to the stairs", prompt: 'Take a box', where: 'The boxes', where2: 'The stairs',
+      TASK('carry', 'boxes', { at: lab(28.2, 4.7), to: lab(31.6, 3.4), n: 2, who: 'root', label: "Carry Root's boxes to the stairs", prompt: 'Take a box', where: 'The boxes', where2: 'The stairs',
         after: [S('root', "Careful. The one marked fragile is all screws.")] }),
     ] }),
     FX('fade_out', .6), WAIT(.7), STAGE('attic'), FX('fade_in', .6),

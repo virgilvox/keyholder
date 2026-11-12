@@ -3,13 +3,13 @@
  *                       Pad                Keyboard and mouse (web page)
  *   move                left stick         WASD
  *   camera              right stick        mouse (pointer lock), arrows
- *   light attack        X, RT              left click (fires on the press), J, Left Ctrl
+ *   light attack        X, RT              Q; left click (fires on the press), J
  *   heavy attack        Y                  F, K
- *   guard (held)        LT                 right click, L          (a tap as a blow lands parries)
+ *   guard (held)        LT                 C; right click, L       (a tap as a blow lands parries)
  *   dodge               B                  Shift (tap)
  *   sprint (held)       L3, or stick full  Shift (held), Left Alt
  *   jump                A                  Space
- *   special             RB                 Q, U
+ *   special             RB                 X, U
  *   lock on (toggle)    LB, R3             Tab, middle click       (in roams: a step through three zooms)
  *   switch target       right stick flick  mouse wheel while locked on
  *   zoom                LB, R3 in roams    mouse wheel (when not locked on)

@@ -505,7 +505,8 @@ void hud_title_draw(float t, int row, int who, bool has_save, const char *const 
   char m[120];
   if (row == 2) snprintf(m, sizeof m, "%s  pick a night     %s  play it     %s  back", in->used_pad ? "LEFT RIGHT" : "ARROWS", in->used_pad ? "A" : "ENTER", in->used_pad ? "UP" : "UP ARROW");
   else if (row == 1) snprintf(m, sizeof m, "%s  enter the Battle Zone     %s  back to the day", in->used_pad ? "A" : "ENTER", in->used_pad ? "UP" : "UP ARROW");
-  else snprintf(m, sizeof m, has_save ? "%s  start a new day     %s  continue" : "%s  start the day", in->used_pad ? "A" : "ENTER", in->used_pad ? "Y" : "C");
+  else if (has_save) snprintf(m, sizeof m, "%s  continue     %s  start a new day", in->used_pad ? "A" : "ENTER", in->used_pad ? "X" : "N");
+  else snprintf(m, sizeof m, "%s  start the day", in->used_pad ? "A" : "ENTER");
   c = layer_begin(&L_menu, 800, 40, hash_str(m, 1));
   if (c) { p_text(c, F_DISPLAY, 19, 1, CV_CENTER, m, 400, 28, PAPER, 1); layer_end(&L_menu, c); }
   hg_tex(&L_menu, 240, 642, .6f + .4f * sinf(t * 3));
@@ -533,21 +534,22 @@ void hud_nights_title(float t, bool sel, int night, int open_mask, int count, co
   hg_end();
 }
 
-void hud_pause_draw(int sel, bool music) {
+void hud_pause_draw(int sel, bool music, int save) {
   hg_begin();
   hg_rect(0, 0, DS_W, DS_H, INK, .72f);
   const intent_t *in = input_get();
-  cv *c = layer_begin(&L_menu, 1000, 560, 500u + (unsigned)sel * 3 + (music ? 1 : 0) + (in->used_pad ? 50 : 0));
+  cv *c = layer_begin(&L_menu, 1000, 560, 500u + (unsigned)sel * 7 + (music ? 1 : 0) + (unsigned)save * 2 + (in->used_pad ? 50 : 0));
   if (c) {
     p_text(c, F_DISPLAY, 50, 2, CV_LEFT, "PAUSED", 0, 54, PAPER, 1);
-    const char *rows[3] = {"Back to the day", music ? "Music on" : "Music off", "Leave (the day saves at each chapter)"};
-    for (int i = 0; i < 3; i++) {
+    const char *sv = save == 2 ? "Saved. Continue starts here" : save == 1 ? "Save (while walking free, between scenes)" : "Save game";
+    const char *rows[4] = {"Back to the day", sv, music ? "Music on" : "Music off", "Leave (your last save stays)"};
+    for (int i = 0; i < 4; i++) {
       bool s = i == sel;
       cv_fill_hex(c, s ? ORANGE : 0x24242e, 1); cv_fill_rect(c, 0, 84 + i * 56, 470, 48);
-      p_text(c, F_TYPE, 19, 0, CV_LEFT, rows[i], 18, 115 + i * 56, s ? INK : PAPER, 1);
+      p_text(c, F_TYPE, 19, 0, CV_LEFT, rows[i], 18, 115 + i * 56, s ? INK : (i == 1 && save == 1) ? DIMT : PAPER, 1);
     }
-    static const char *K[][2] = { {"Move", "WASD"}, {"Camera", "Mouse, arrows"}, {"Light attack", "Left click"}, {"Heavy attack", "F"},
-      {"Guard, parry", "Right click (tap to parry)"}, {"Dodge, sprint", "Shift tap; hold Shift to sprint"}, {"Jump", "Space"}, {"Special", "Q"},
+    static const char *K[][2] = { {"Move", "WASD"}, {"Camera", "Mouse, arrows"}, {"Light attack", "Q (or left click)"}, {"Heavy attack", "F"},
+      {"Guard, parry", "C, tap to parry (or right click)"}, {"Dodge, sprint", "Shift tap; hold Shift to sprint"}, {"Jump", "Space"}, {"Special", "X"},
       {"Lock on, switch", "Tab, middle click; wheel switches"}, {"Zoom", "Mouse wheel"}, {"Weapon", "1 to 5"}, {"Call a friend", "R"},
       {"Talk, use", "E"}, {"Draw, sheathe", "G"}, {"Bike (outdoors)", "B"}, {"Skip scene", "Hold Enter"} };
     static const char *P[] = {"Left stick", "Right stick", "X or RT", "Y", "LT (tap to parry)", "B; sprint L3 or full stick", "A", "RB", "LB or R3; flick right stick",

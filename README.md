@@ -12,13 +12,13 @@ A PS2-style action visual novel for the HeatSync Labs game station (wasmcart, Ba
 | Camera | right stick | mouse, arrows |
 | Talk, use | X | E |
 | Pick, advance | A | Enter, Space, left click |
-| Light attack | X, RT | left click |
+| Light attack | X, RT | Q (or left click) |
 | Heavy attack | Y | F |
-| Guard, tap to parry | LT | right click |
+| Guard, tap to parry | LT | C (or right click) |
 | Dodge | B | Shift (tap) |
 | Sprint | L3, or the stick pushed all the way | Shift (hold), Left Alt |
 | Jump | A | Space |
-| Special (meter full) | RB | Q |
+| Special (meter full) | RB | X |
 | Lock on | LB, R3 | Tab, middle click |
 | Next target (locked on) | flick the right stick | mouse wheel |
 | Camera zoom | LB or R3 in roams (three steps) | mouse wheel (not locked on) |

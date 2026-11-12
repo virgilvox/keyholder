@@ -63,6 +63,9 @@ extern story_ui_t STORY_UI;
 void story_init(t3_scene *scene, t3_camera *cam);
 void story_new_game(int playable);       /* 0 Vee, 1 Dex, 2 Ruth */
 bool story_has_save(void);
+/* v2.1: the pause menu's save: only during a free walk (a roam), where Continue can put you back */
+bool story_can_save(void);
+bool story_save_here(void);
 void story_continue(void);
 void story_stop(void);                   /* off the stage, back to the title */
 void story_update(float dt, const intent_t *in);
