@@ -401,6 +401,11 @@ void world_set_stage(world_stage s) {
   apply_lights();
 }
 world_stage world_get_stage(void) { return stage; }
+void world_add_prop(t3_object *o) {
+  /* fxp_end parents it to the scene root; t3_object_add re-parents it under the town group on its own
+   * (it retains first, then drops the old parent), so it shows in the lab and hides in the arenas */
+  if (o) t3_object_add(town, o);
+}
 void world_stage_floor(world_stage s, v3 *center, float *radius) {
   if (s == STAGE_TOWN) { city_place("mid_block", center, NULL); if (radius) *radius = 5.5f; return; }
   arena_floor(s, center, radius);
@@ -667,6 +672,17 @@ static float ground_under(v3 p, float r, float up) {
   }
   return best;
 }
+/* the attic stairs are roped off: an invisible wall across their foot keeps you from climbing the
+ * treads (and from clipping onto the roof). The attic minigame warps you up above it, so it never traps
+ * anyone on the stairs. Only blocks below head height, so a body up on the attic floor is free. */
+static void stair_block(v3 *p, float r, v3 *n, bool *hit) {
+  if (p->y > 2.4f) return;
+  const float zw = -32.0f;                 /* just south of the bottom tread (z -32.27) */
+  if (p->x > -0.55f && p->x < 1.45f && fabsf(p->z - zw) < r + 0.06f) {
+    float s = p->z > zw ? 1 : -1;
+    p->z = zw + s * (r + 0.06f); *n = v3_(0, 0, s); *hit = true;
+  }
+}
 /* the closed front door blocks the doorway */
 static void door_push(v3 *p, float r, v3 *n, bool *hit) {
   /* only a door that is shut and staying shut blocks: one that has begun to open lets people through,
@@ -714,6 +730,7 @@ void world_move(v3 *p, v3 *vel, float r, float h, float dt, bool *grounded) {
       }
       city_push(p, r, h, &nn, &hit);
       door_push(p, r, &nn, &hit);
+      stair_block(p, r, &nn, &hit);
       moved:
       /* the edge of the map */
       p->x = ds_clamp(p->x, CITY_X0, CITY_X1); p->z = ds_clamp(p->z, CITY_Z0, CITY_Z1);

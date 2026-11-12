@@ -42,6 +42,7 @@ typedef struct {
   const char *marker_label; bool marker_corner;   /* v1.3: what it points at; aiming at a corner of the route */
   float letterbox, fade, flash, dim;
   float skip;
+  bool skip_hint;     /* v1.4: a skippable stretch (the orientation tutorial): show "hold START to skip" */
   /* retry */
   bool retry; int retry_sel; bool retry_allow_skip;
   /* hosting: the task list, grey pins on the other open tasks */
@@ -66,6 +67,11 @@ void story_continue(void);
 void story_stop(void);                   /* off the stage, back to the title */
 void story_update(float dt, const intent_t *in);
 story_run story_state(void);
+/* v1.4: the attic. During a roam, stepping up to the roped-off stairs offers the climb; game.c polls
+ * story_take_attic (clears the request), runs the minigame, then reports the outcome back so the day
+ * gets the toast and the stat. */
+bool story_take_attic(void);
+void story_attic_result(bool rebooted);
 const char *story_player_name(void);
 /* the epilogue's text */
 /* v1.3: the nights. The epilogue's screen done, story_resume goes on into the next night (false: the story is

@@ -21,6 +21,9 @@ typedef enum {
 } world_stage;
 
 void world_init(t3_scene *scene);
+/* hang a prop under the town group, so it shows in the lab and the street and hides in the arenas
+ * (the attic's danger sign across the stairs uses this) */
+void world_add_prop(t3_object *o);
 void world_set_stage(world_stage s);
 world_stage world_get_stage(void);
 /* per frame: which chunks draw (focus: the camera or the player) */

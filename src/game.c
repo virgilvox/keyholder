@@ -1,5 +1,5 @@
 /* game.c: the title, the day, the pause menu, the ending and the Battle Zone. */
-#if !defined(KH_TEST_WORLD) && !defined(KH_TEST_FIGHT)
+#if !defined(KH_TEST_WORLD) && !defined(KH_TEST_FIGHT) && !defined(KH_TEST_ATTIC)
 #include "game.h"
 #include "actor.h"
 #include "audio.h"
@@ -12,10 +12,11 @@
 #include "world.h"
 #include "hud_int.h"
 #include "battle.h"
+#include "attic.h"
 #include <string.h>
 
 static t3_scene *scene; static t3_camera *cam;
-static enum { G_TITLE, G_PLAY, G_PAUSE, G_END, G_BATTLE } mode;
+static enum { G_TITLE, G_PLAY, G_PAUSE, G_END, G_BATTLE, G_ATTIC } mode;
 static float mode_t;
 static int who, pause_sel, title_row, night_sel = 1; static bool music_on = true;
 static actor_t *T_A[3];
@@ -49,6 +50,7 @@ void game_init(void) {
   story_init(scene, cam);
   actor_preload_all();   /* every body parsed now, so nobody stalls a frame when they walk in */
   battle_init(scene, cam);
+  attic_init(scene, cam);
   title_enter();
 }
 void game_frame(float dt) {
@@ -100,7 +102,11 @@ void game_frame(float dt) {
     case G_PLAY:
       if (in->pause) { mode = G_PAUSE; pause_sel = 0; mode_t = 0; sfx(SFX_UI, 0, 1); break; }
       story_update(dt, in);
+      if (story_take_attic()) { attic_enter(); mode = G_ATTIC; mode_t = 0; break; }
       if (story_state() == SR_EPILOGUE) { mode = G_END; mode_t = 0; }
+      break;
+    case G_ATTIC:
+      if (!attic_update(dt, in)) { story_attic_result(attic_won()); mode = G_PLAY; mode_t = 0; }
       break;
     case G_PAUSE:
       if (in->pause || in->back) { mode = G_PLAY; break; }
@@ -138,6 +144,7 @@ void game_draw(void) {
     case G_TITLE: hud_title_draw(mode_t, title_row, who, story_has_save(), NAMES, BLURB); hud_battle_title(mode_t, title_row == 1);
       hud_nights_title(mode_t, title_row == 2, night_sel, story_nights_open(), story_night_count(), story_night_title(night_sel)); break;
     case G_BATTLE: battle_draw(); break;
+    case G_ATTIC: attic_draw(); break;
     case G_PLAY:
       if (story_state() == SR_FIGHT && !STORY_UI.retry) fight_draw_hud();
       hud_vn_draw();

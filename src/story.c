@@ -50,6 +50,7 @@ static int choice_first;
 static const sc_beat *roam;
 static v3 roam_pos; static bool roam_has_place; static bool side_done[8]; static int side_near = -1;
 static int roam_follow = -1; static float roam_t, roam_h0, follow_path_t;
+static bool attic_want, attic_warned, attic_done;   /* v1.4: the attic minigame off the back stairs */
 /* fight */
 static int fight_flags, fight_id;
 static const sc_beat *fight_beat;
@@ -644,6 +645,14 @@ bool story_resume(void) {
 }
 void story_stop(void) { voice_stop(); props_hide(); bike_show(false); hide_all(); director_stop(); extras_reset(); tasks_end(); sub_clear(); }
 story_run story_state(void) { return block == B_ROAM ? SR_ROAM : block == B_FIGHT ? SR_FIGHT : block == B_EPILOGUE ? SR_EPILOGUE : block == B_DONE ? SR_DONE : SR_RUNNING; }
+bool story_take_attic(void) { bool w = attic_want; attic_want = false; return w; }
+void story_attic_result(bool rebooted) {
+  if (rebooted && !attic_done) {
+    attic_done = true;
+    STORY_UI.stats[ST_SAFETY]++;
+    STORY_UI.toast = story_stat_name(ST_SAFETY); STORY_UI.toast_n = 1; STORY_UI.toast2 = NULL; STORY_UI.toast_t = 2.6f;
+  }
+}
 const char *story_player_name(void) { return CAST[me_id].name; }
 
 /* the people a chapter needs, made while its card is up rather than at their first line */
@@ -1502,6 +1511,7 @@ static void step(void) {
         }
         tasks_begin(b);
         memset(banter_done, 0, sizeof banter_done);
+        attic_warned = false;   /* re-arm the stairs warning for this roam */
         WF.task = -1; WF.n = 0; WF.t = 0; gate_t = 0;
         bike_with = -1; bike_scene = false;   /* a bike a scene parked stays parked; the gear takes it from here */
         director_stop();
@@ -2077,6 +2087,20 @@ static void roam_frame(float dt, const intent_t *in) {
     face_now(W_ME, sd->who); face_now(sd->who, W_ME);
     return;
   }
+  /* the roped-off attic stairs: a member warns you off going up alone, but you can go up anyway (world.c
+   * blocks the climb; the minigame warps you up). Only when nothing else is in reach. */
+  if (near_task < 0 && side_near < 0 && tcur < 0 && world_get_stage() == STAGE_TOWN) {
+    float sd = flat_dist(player_pos(), v3_(0.35f, 0, -31.4f));
+    if (sd < 4.0f && !attic_warned) {
+      attic_warned = true;
+      int w = roam_follow >= 0 ? roam_follow : canon(W_M1);
+      sub_say(w, "Hey, don't go up there alone. That floor's soft as cake since the leak.");
+    }
+    if (sd < 2.0f) {
+      U->prompt_use = "GO UPSTAIRS";
+      if (in->interact) { attic_want = true; return; }
+    }
+  }
   /* pointing a station out: the nearest open tour stop in range, aimed at with the camera */
   U->mg_anchor = false; U->mg_aim = false;
   if (U->mg == MG_POINT) U->mg = MG_NONE;
@@ -2358,10 +2382,21 @@ void story_update(float dt, const intent_t *in) {
   if (bark_t > 0) bark_t -= dt;
   U->marker_on = false; U->prompt_use = NULL;
 
-  /* hold START: skip to the next choice, fight or walk */
-  if (U->cine && !U->choosing && input_start_held()) {
-    U->skip += dt / .8f;
-    if (U->skip >= 1) { U->skip = 0; skip_scene = true; voice_stop(); sub_clear(); if (block == B_SAY || block == B_WAIT || block == B_WALK) block = B_NONE; U->talking = false; }
+  /* hold START: skip to the next choice, fight or walk; and skip the orientation tutorial fight outright */
+  bool skip_fight = block == B_FIGHT && FD.tutorial && !U->retry;
+  U->skip_hint = skip_fight;
+  if ((U->cine || skip_fight) && !U->choosing && input_start_held()) {
+    U->skip += dt / (skip_fight ? 1.1f : .8f);
+    if (U->skip >= 1) {
+      U->skip = 0;
+      if (skip_fight) {
+        /* count the orientation as passed (it cannot be lost anyway) and get on with the day */
+        fight_won(); fight_end();
+        for (int k = 0; k < WHO_COUNT; k++) A[k].in_fight = false;
+        actor_t *me = actor_of(W_ME); actor_play(me, "Idle_Loop", 1, true, .3f); A[canon(W_ME)].base = "Idle_Loop";
+        block = B_NONE;
+      } else { skip_scene = true; voice_stop(); sub_clear(); if (block == B_SAY || block == B_WAIT || block == B_WALK) block = B_NONE; U->talking = false; }
+    }
   } else U->skip = 0;
 
   switch (block) {

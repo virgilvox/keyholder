@@ -458,7 +458,16 @@ void hud_vn_draw(void) {
   if (U->talking && U->line) draw_dialogue(U);
   if (U->choosing) draw_choice(U);
   draw_toasts(U);
-  if (U->skip > 0) { hg_rect(DS_W - 160, DS_H - 40, 130 * U->skip, 5, ORANGE, 1); }
+  if (U->skip_hint || U->skip > 0) {
+    hg_rect(DS_W - 160, DS_H - 40, 130, 5, 0x000000, .45f);
+    if (U->skip > 0) hg_rect(DS_W - 160, DS_H - 40, 130 * U->skip, 5, ORANGE, 1);
+    if (U->skip_hint) {
+      static layer_t L_skip;
+      cv *c = layer_begin(&L_skip, 320, 26, 0x5C1);
+      if (c) { g_markup(c, 318, 18, CV_RIGHT, F_MONO, 15, 1, PAPER, 15, true, "HOLD {PAUSE}  SKIP ORIENTATION", true); layer_end(&L_skip, c); }
+      hg_tex(&L_skip, DS_W - 30 - 320, DS_H - 68, 1);
+    }
+  }
   if (U->card) draw_card(U);
   if (U->retry) draw_retry(U);
   if (U->flash > .01f) hg_rect(0, 0, DS_W, DS_H, 0xffffff, U->flash);
