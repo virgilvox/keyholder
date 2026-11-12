@@ -76,6 +76,15 @@ void story_attic_result(bool rebooted);
 bool story_attic_beaten(void);
 void story_attic_masks(uint16_t *found, uint16_t *games);
 void story_attic_set_masks(uint16_t found, uint16_t games);
+/* v2.0: the attic's scenes (tools/script/attic.mjs, by SC_*), played through the story VM from attic.c. The
+ * day's place (where the script is, the roam and its tasks, the clock, the HUD, where everyone stands) is kept
+ * and put back when the scene ends; flags it sets stay set. While story_scene_busy, game.c runs story_update and
+ * draws the story HUD as in the day. attic.c puts the player and the attic's stage back after. */
+bool story_scene_play(int scene);
+bool story_scene_busy(void);
+bool story_scene_fight_won(void);   /* the last scene had a fight and it was won */
+/* the attic between scenes: keeps the town's people out of sight up there and eases the flashback grade */
+void story_attic_tick(float dt);
 const char *story_player_name(void);
 /* the epilogue's text */
 /* v1.3: the nights. The epilogue's screen done, story_resume goes on into the next night (false: the story is

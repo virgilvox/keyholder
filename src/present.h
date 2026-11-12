@@ -26,5 +26,7 @@ void present_scale(GLuint tex, int rw, int rh, int ow, int oh);
 /* The PS1 pass: tex (lw x lh, the scene) into framebuffer dst at dw x dh,
  * nearest sampled, ordered dither, 15 bit colour. */
 void present_retro(GLuint tex, int lw, int lh, GLuint dst, int dw, int dh);
+/* the attic's flashback grade over present_retro: 0 off .. 1 full, t drives its slow flicker */
+void present_memory(float amount, float t);
 
 #endif

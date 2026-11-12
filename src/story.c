@@ -9,6 +9,8 @@
 #include "bike.h"
 #include "fx.h"
 #include "street.h"   /* street */
+#include "story_int.h"     /* v2.0: the attic's scenes (story_scene.c) */
+#include "memory_props.h"  /* v2.0: the flashbacks' set pieces */
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -103,6 +105,7 @@ static actor_t *actor_of(int w) {
       actor_palette p = { {250, .35f, .28f}, {250, .4f, .26f}, {250, .4f, .22f}, {250, .4f, .2f} };
       s->a = actor_new(m->model, &p, m->scale, scene);
     } else s->a = actor_new(c->model < AM_COUNT ? c->model : AM_B, &c->pal, c->scale, scene);
+    if (w != W_SHADOW && c->dress) enemy_dress(s->a, c->dress);   /* v2.0: SYSOP wears its CRT in scenes too */
     s->base = "Idle_Loop"; s->weapon = -1;
     actor_visible(s->a, false);
   }
@@ -155,6 +158,8 @@ static bool lab_place(const char *n, v3 *p, float *y) {
 }
 static bool place_of(const char *n, v3 *p, float *y) {
   if (!n) return false;
+  /* v2.0: on the attic's stage, its layout's named spots (the desert's table, truck, fill line) */
+  if (world_get_stage() == STAGE_ATTIC && attic_env_anchor(n, p, y)) return true;
   return lab_place(n, p, y) || world_place(n, p, y);
 }
 static bool nav_free(int ix, int iz);
@@ -595,6 +600,11 @@ void story_new_game(int p) {
   gear_bike_have = false;
   pc = 0; part_now = 0; save_chap = 0; replay = false;
   boot();
+#ifdef KH_ATTIC_PATH
+  /* test build only: the day from its first roam, so a scripted run can walk to the back stairs */
+  for (int i = 0; i < SCRIPT_COUNT; i++) if (SCRIPT[i].op == OP_ROAM) { pc = i; break; }
+  fade_to = 0; STORY_UI.fade = 0;   /* the opening's fade in is skipped with it */
+#endif
 }
 /* the beat a save resumes at: its chapter or night by title, else (v1.2) the day's chapter at its hour */
 static bool first_chapter(int at) { for (int i = 0; i < at; i++) if (SCRIPT[i].op == OP_CHAPTER) return false; return true; }
@@ -726,13 +736,15 @@ static void begin_fight(const sc_beat *b, int start_phase) {
     fighter_def *d = &FD.foes[i];
     bool shadow = e->palette && !strcmp(e->palette, "shadow");
     bool alt = e->palette && !strcmp(e->palette, "alt");
+    bool pool = alt || (e->palette && !strcmp(e->palette, "pool"));   /* v2.0: a crowd of one cast entry, each from fight.c's pool */
     int w = shadow ? W_SHADOW : canon(e->who);
     const sc_cast *cc = w == W_SHADOW ? &CAST[me_id] : &CAST[w];
     d->model = cc->model < AM_COUNT ? cc->model : AM_B; d->pal = cc->pal; d->scale = cc->scale;
     d->name = e->name ? e->name : cc->name;
     d->weapon = (weapon_id)e->weapon; d->ai = (ai_kind)e->ai;
     d->hp = e->hp; d->power = e->power; d->speed = e->speed; d->place_x = e->x; d->place_z = e->z;
-    if (alt) { d->pal.top.hue += 40; d->pal.hair.hue += 40; d->actor = NULL; }
+    d->dress = e->dress;   /* v2.0: the attic's foes wear enemy.h props */
+    if (pool) { if (alt) { d->pal.top.hue += 40; d->pal.hair.hue += 40; } d->actor = NULL; }
     else { d->actor = actor_of(w); actor_visible(d->actor, true); A[w].in_fight = true; }
   }
   /* the story's numbers lean on the fight */
@@ -778,6 +790,7 @@ static void begin_fight(const sc_beat *b, int start_phase) {
 }
 static void fight_won(void) {
   if (fight_beat->flag >= 0) flags[fight_beat->flag] = true;
+  story_scene_won();   /* v2.0: attic.c asks whether an attic scene's fight was won */
   battle_unlock_fight(fight_id);
 }
 
@@ -1367,6 +1380,8 @@ static void prop_solid(int k) {
 }
 static void props_hide(void) { for (int k = 0; k < PROP_N; k++) if (PR[k].o) { PR[k].o->visible = false; PR[k].mode = 0; prop_solid(k); } }
 static void prop_op(const sc_beat *b) {
+  { sc_mark m = b->mark; float y = 0; bool hy = false; v3 p = m.kind != MK_NONE ? resolve(&m, &y, &hy) : v3_(0, 0, 0);
+    if (memory_prop(b->s, b->i, p, hy ? y : 0)) return; }   /* v2.0: a flashback's set piece (memory_props.c) */
   int k = !b->s ? PROP_GERALD : !strcmp(b->s, "table") ? PROP_TABLE : !strcmp(b->s, "weld_table") ? PROP_WELD : !strcmp(b->s, "van") ? PROP_VAN : PROP_GERALD;
   if (!PR[k].o) PR[k].o = prop_build(k);
   if (b->i == 0) { PR[k].o->visible = false; PR[k].mode = 0; prop_solid(k); return; }
@@ -1576,7 +1591,14 @@ static void step(void) {
         director_set_mood(b->i == MOOD_FIGHT || b->i == MOOD_BOSS || b->i == MOOD_FINAL || b->i == MOOD_TENSION ? DM_TENSE
                         : b->i == MOOD_CINE || b->i == MOOD_NIGHT ? DM_EMOTIONAL : DM_CALM);
         break;
-      case OP_STAGE: world_set_stage((world_stage)b->i); last_speaker = -1; break;
+      case OP_STAGE:
+        if (b->i == STAGE_ATTIC) attic_env_layout(b->i2);
+        world_set_stage((world_stage)b->i); last_speaker = -1;
+        /* v2.0: a flashback in a memory room (one forty), or out of it again */
+        if (b->s) interior_enter(interior_find(b->s)); else if (story_scene_busy() && interior_current() >= 0) interior_exit();
+        break;
+      case OP_GRADE: story_scene_grade(b->i != 0, b->f); break;
+      case OP_SCENE_END: story_scene_end(); break;
       case OP_GIVE: weapons |= 1u << b->i; STORY_UI.got = b->s; STORY_UI.got_t = 3; battle_unlock_weapon(b->i); break;
       case OP_DRAW: {
         actor_t *a = actor_of(b->who);
@@ -1778,7 +1800,7 @@ static void spot_put(extra_t *e, const spot_t *s, int i) {
 static void extras_update(float dt) {
   if (!X[0].a) return;
   v3 cp = v3_(((t3_object *)cam)->position.x, 0, ((t3_object *)cam)->position.z);
-  int mode = world_get_stage() != STAGE_TOWN || block == B_FIGHT ? 3 : hour < 18.9f ? 0 : hour < 21.8f ? 1 : 2;
+  int mode = world_get_stage() != STAGE_TOWN || block == B_FIGHT || story_scene_busy() ? 3 : hour < 18.9f ? 0 : hour < 21.8f ? 1 : 2;
   /* which side of the storefront the camera is on, with some give at the door; a venue's room is its own */
   int zone = extras_zone;
   if (interior_current() >= 0) zone = 2;
@@ -2017,6 +2039,13 @@ static int wf_frame(bool open, float dt) {
 /* the roam: free walking, side talks, tasks, the way on */
 static void roam_frame(float dt, const intent_t *in) {
   story_ui_t *U = &STORY_UI;
+#ifdef KH_ATTIC_PATH
+  { static bool once; if (!once) { once = true; player_teleport(v3_(0.35f, 0, -29.0f), DS_PI); player_camera_snap();
+#ifdef KH_AUTO
+      attic_want = true; return;   /* and straight up them */
+#endif
+  } }   /* the foot of the back stairs */
+#endif
   gear_use_first(in);
   if (tcur >= 0 && tphase == TP_PRE) { tphase = TP_PLAY; mg_setup(tcur); if (block != B_ROAM) return; }
   if (tcur >= 0 && tphase == TP_POST) { tcur = -1; tphase = TP_NONE; }
@@ -2100,7 +2129,7 @@ static void roam_frame(float dt, const intent_t *in) {
   }
   /* the roped-off attic stairs: a member warns you off going up alone, but you can go up anyway (world.c
    * blocks the climb; the minigame warps you up). Only when nothing else is in reach. */
-  if (near_task < 0 && side_near < 0 && tcur < 0 && world_get_stage() == STAGE_TOWN) {
+  if (near_task < 0 && side_near < 0 && tcur < 0 && world_get_stage() == STAGE_TOWN && !story_scene_busy()) {
     float sd = flat_dist(player_pos(), v3_(0.35f, 0, -31.4f));
     if (sd < 4.0f && !attic_warned && !attic_done) {
       attic_warned = true;
@@ -2308,6 +2337,64 @@ static void gear_frame(float dt, const intent_t *in) {
   gear_prompt_was = U->prompt_use != NULL;
 }
 
+/* ---- v2.0: the day held while an attic scene plays (story_int.h; story_scene.c runs the scenes) ----
+ * The day's place is kept whole: where the script is, the roam with its tasks and talks, the clock, the HUD,
+ * and where everyone stands. Everyone but the player goes out of sight for the scene (a flashback must not have
+ * today's visitors in it), and all of it comes back at release. Flags a scene sets stay set; the stats are kept
+ * as they are at release (a fight may tire you). */
+typedef struct { v3 pos; float yaw; bool vis; const char *base; } held_slot;
+static struct {
+  int pc, call_ret, block; float hour, hour_target;
+  const sc_beat *roam; v3 roam_pos; bool roam_has_place, side_done[8]; int side_near, roam_follow; float roam_t, roam_h0, follow_path_t;
+  task_t T[TMAX]; int tn, tcur, tphase;
+  char goal[160], obj[160]; float gate_t; bool banter_done[48];
+  story_ui_t ui;
+  held_slot slot[WHO_COUNT]; bool vis[NVIS];
+} HELD;
+void story_day_hold(int start) {
+  HELD.pc = pc; HELD.call_ret = call_ret; HELD.block = block; HELD.hour = hour; HELD.hour_target = hour_target;
+  HELD.roam = roam; HELD.roam_pos = roam_pos; HELD.roam_has_place = roam_has_place; memcpy(HELD.side_done, side_done, sizeof side_done);
+  HELD.side_near = side_near; HELD.roam_follow = roam_follow; HELD.roam_t = roam_t; HELD.roam_h0 = roam_h0; HELD.follow_path_t = follow_path_t;
+  memcpy(HELD.T, T, sizeof T); HELD.tn = tn; HELD.tcur = tcur; HELD.tphase = tphase;
+  memcpy(HELD.goal, goal_buf, sizeof goal_buf); memcpy(HELD.obj, obj_buf, sizeof obj_buf); HELD.gate_t = gate_t; memcpy(HELD.banter_done, banter_done, sizeof banter_done);
+  HELD.ui = STORY_UI;
+  for (int i = 0; i < WHO_COUNT; i++) {
+    if (!A[i].a) { HELD.slot[i].vis = false; continue; }
+    HELD.slot[i] = (held_slot){ actor_pos(A[i].a), actor_yaw(A[i].a), actor_is_visible(A[i].a), A[i].base };
+    A[i].w.on = false;
+    if (i != canon(W_ME)) actor_visible(A[i].a, false);
+  }
+  for (int v = 0; v < NVIS; v++) { HELD.vis[v] = VIS[v].a && actor_is_visible(VIS[v].a); if (VIS[v].a) actor_visible(VIS[v].a, false); }
+  if (sub_who >= 0) { voice_stop(); sub_clear(); }
+  STORY_UI.prompt_use = NULL; STORY_UI.ntask = 0; STORY_UI.mg = MG_NONE; STORY_UI.npin = 0; STORY_UI.objective = NULL;
+  tn = 0; tcur = -1; tphase = TP_NONE; roam_follow = -1;
+  call_ret = -1; pc = start; block = B_NONE;
+}
+void story_day_release(void) {
+  int stats[ST_COUNT]; memcpy(stats, STORY_UI.stats, sizeof stats);
+  for (int i = 0; i < WHO_COUNT; i++) {
+    if (!A[i].a) continue;
+    A[i].w.on = false; A[i].in_fight = false;
+    if (i == canon(W_ME)) continue;   /* attic.c puts the player back where they stood */
+    weapon_equip(A[i].a, -1); A[i].weapon = -1;
+    actor_visible(A[i].a, HELD.slot[i].vis);
+    if (HELD.slot[i].vis) { actor_place(A[i].a, HELD.slot[i].pos, HELD.slot[i].yaw); A[i].base = HELD.slot[i].base; actor_play(A[i].a, A[i].base ? A[i].base : "Idle_Loop", 1, true, 0); }
+  }
+  for (int v = 0; v < NVIS; v++) if (VIS[v].a) actor_visible(VIS[v].a, HELD.vis[v]);
+  props_hide();
+  pc = HELD.pc - 1; call_ret = HELD.call_ret; block = HELD.block;   /* step() adds one */
+  hour = HELD.hour; hour_target = HELD.hour_target; world_set_time(hour);
+  roam = HELD.roam; roam_pos = HELD.roam_pos; roam_has_place = HELD.roam_has_place; memcpy(side_done, HELD.side_done, sizeof side_done);
+  side_near = HELD.side_near; roam_follow = HELD.roam_follow; roam_t = HELD.roam_t; roam_h0 = HELD.roam_h0; follow_path_t = HELD.follow_path_t;
+  memcpy(T, HELD.T, sizeof T); tn = HELD.tn; tcur = HELD.tcur; tphase = HELD.tphase;
+  memcpy(goal_buf, HELD.goal, sizeof goal_buf); memcpy(obj_buf, HELD.obj, sizeof obj_buf); gate_t = HELD.gate_t; memcpy(banter_done, HELD.banter_done, sizeof banter_done);
+  STORY_UI = HELD.ui; memcpy(STORY_UI.stats, stats, sizeof stats);
+  STORY_UI.retry = false; STORY_UI.cine = false; STORY_UI.talking = false; STORY_UI.prompt_use = NULL;
+  director_stop(); skip_scene = false; last_speaker = -1;
+  if (sub_who >= 0) { voice_stop(); sub_clear(); }
+}
+void story_extras_tick(float dt) { extras_update(dt); }
+
 void story_update(float dt, const intent_t *in) {
   story_ui_t *U = &STORY_UI;
 #ifdef KH_AUTO
@@ -2376,7 +2463,9 @@ void story_update(float dt, const intent_t *in) {
     world_set_time(hour);
   }
   U->hour = hour;
+  bool in_scene = story_scene_busy();
   step();
+  if (in_scene && !story_scene_busy()) { U->roam = false; U->cine = false; return; }   /* v2.0: back to attic.c, not the roam */
   U->roam = block == B_ROAM;
   U->cine = !(block == B_ROAM || block == B_FIGHT || block == B_EPILOGUE);
   U->letterbox = ds_damp(U->letterbox, U->cine ? 1 : 0, 7, dt);
@@ -2463,8 +2552,9 @@ void story_update(float dt, const intent_t *in) {
           if (U->retry_sel == 0) { int ph = fight_phase(); fight_end(); begin_fight(fight_beat, ph >= 1 ? 1 : 0); }   /* a checkpoint at phase two */
           else {
             /* talk it down: you lose face, the day goes on */
-            fight_end(); for (int k = 0; k < WHO_COUNT; k++) A[k].in_fight = false; U->stats[ST_VIBE] -= 1; U->stats[ST_ENERGY] -= 1;
-            U->note = "It took longer than a sword would have. You lost some of the day."; U->note_t = 4;
+            fight_end(); for (int k = 0; k < WHO_COUNT; k++) A[k].in_fight = false;
+            if (story_scene_busy()) { U->note = "You back off to the last safe board."; U->note_t = 3; }   /* v2.0: the attic: no win flag, attic.c sends you back */
+            else { U->stats[ST_VIBE] -= 1; U->stats[ST_ENERGY] -= 1; U->note = "It took longer than a sword would have. You lost some of the day."; U->note_t = 4; }
             block = B_NONE;
           }
         }
@@ -2492,6 +2582,7 @@ void story_update(float dt, const intent_t *in) {
   }
   gear_frame(dt, in);
   extras_update(dt);
+  story_scene_tick(dt);
   /* the light rail: its bell, and the people out on Main turn to look */
   { v3 bp; if (world_train_bell(&bp)) { sfx_at(SFX_TRAIN_BELL, bp.x, bp.y, bp.z, 1); extras_look(bp); } }
   /* cars stop for cutscenes framed across Main, and run while you walk */

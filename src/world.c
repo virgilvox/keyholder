@@ -768,7 +768,7 @@ bool world_seat(int i, v3 *pos, float *yaw, bool *soft) {
 void world_door(float open) { door_auto = false; door_target = ds_clamp(open, 0, 1); }
 void world_door_auto(bool on) { door_auto = on; }
 float world_debug_door(void) { return door_open; }   /* for the world test */
-void world_arena_phase(int phase) { arena_set_phase(phase); }
+void world_arena_phase(int phase) { if (stage == STAGE_ATTIC) attic_env_phase(phase); else arena_set_phase(phase); }   /* the attic's boss chamber has its own phase two */
 void world_traffic(bool on) { city_traffic(on); }
 void world_train_hold(bool on) { city_train_hold(on); }
 void world_crew_truck(bool on) { city_crew_truck(on); }

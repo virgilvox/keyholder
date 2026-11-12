@@ -8,6 +8,7 @@
 #include "fx.h"
 #include "audio.h"
 #include "voice.h"
+#include "enemy.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -2573,7 +2574,7 @@ static void ally_call(void) {
   memset(A, 0, sizeof *A);
   A->d = *d;
   if (d->actor) { A->a = d->actor; A->story = true; FG.ally_vis = actor_is_visible(A->a); FG.ally_was = actor_pos(A->a); FG.ally_was_yaw = actor_yaw(A->a); }
-  else { A->a = pool_take(d->model, &d->pal, d->scale > 0 ? d->scale : 1); A->pooled = true; }
+  else { A->a = pool_take(d->model, &d->pal, d->scale > 0 ? d->scale : 1); A->pooled = true; enemy_dress(A->a, d->dress); }
   v3 f = facing(P), s = v3_(f.z, 0, -f.x);
   A->pos = v3_add(P->pos, v3_add(v3_scale(s, 1.4f), v3_scale(f, -.5f)));
   A->pos.y = floor_at(A->pos);
@@ -2602,7 +2603,7 @@ static void ally_leave(void) {
   if (A->story) {
     actor_place(A->a, FG.ally_was, FG.ally_was_yaw); actor_visible(A->a, FG.ally_vis);
     actor_play(A->a, "Idle_Loop", 1, true, 0);
-  } else actor_visible(A->a, false);
+  } else { enemy_undress(A->a); actor_visible(A->a, false); }
   FG.ally_on = false; FG.ally_cd = ALLY_COOL;
 }
 static void ally_think(fighter_t *f, float dt) {
@@ -2715,6 +2716,7 @@ void fight_start(const fight_def *def, actor_t *player) {
     if (f->d.actor) { f->a = f->d.actor; f->story = true; f->pos = actor_pos(f->a); }
     else {
       f->a = pool_take(f->d.model, &f->d.pal, f->d.scale > 0 ? f->d.scale : 1); f->pooled = true;
+      enemy_dress(f->a, f->d.dress);   /* the props, the stiff steps, the size; fight_end takes them off */
       f->pos = v3_add(def->center, v3_(f->d.place_x, 0, f->d.place_z));
       float fy = world_floor_y(v3_(f->pos.x, def->center.y + 1.5f, f->pos.z));
       if (fy > -1e8f) f->pos.y = fy;
@@ -2912,6 +2914,7 @@ void fight_end(void) {
       continue;
     }
     weapon_equip(f->a, -1);
+    if (f->pooled) enemy_undress(f->a);
     actor_hands_up(f->a, 0); actor_visible(f->a, false);
   }
   memset(POOL_USED, 0, sizeof POOL_USED);

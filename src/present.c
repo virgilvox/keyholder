@@ -112,10 +112,13 @@ void present_scale(GLuint tex, int rw, int rh, int ow, int oh) {
  * output), a wide bloom off the highlights (every PS2 game's glow pass), a touch of
  * saturation and a faint field line. */
 static GLuint rprog, rvao;
-static GLint ru_size, ru_out;
+static GLint ru_size, ru_out, ru_mem;
+static float mem_amt, mem_t;
+/* the flashback look (the attic's memories): faded warm colour, lifted blacks, soft edges, a slow flicker */
+void present_memory(float amount, float t) { mem_amt = amount; mem_t = t; }
 static const char *RFS =
   "#version 300 es\nprecision highp float;\n"
-  "uniform sampler2D tex; uniform vec2 size; uniform vec2 outsz;\n"
+  "uniform sampler2D tex; uniform vec2 size; uniform vec2 outsz; uniform vec2 mem;\n"
   "in vec2 uv; out vec4 o;\n"
   "vec3 hi(vec2 p){ vec3 c = texture(tex, p).rgb; float l = max(c.r, max(c.g, c.b)); return c * smoothstep(0.72, 1.0, l); }\n"
   "void main(){\n"
@@ -128,6 +131,15 @@ static const char *RFS =
   "  c = mix(vec3(l), c, 1.12);\n"
   "  c *= 1.0 - 0.018 * step(0.5, fract(uv.y * size.y));\n"
   "  vec2 v = uv - 0.5; c *= 1.0 - dot(v, v) * 0.22;\n"
+  "  if (mem.x > 0.0) {\n"
+  "    float e = smoothstep(0.12, 0.5, length(v));\n"
+  "    vec3 b = vec3(0.0); for (int a = 0; a < 8; a++) { float t = float(a) * 0.785; b += texture(tex, uv + vec2(cos(t), sin(t)) * r * 4.0 * e).rgb; }\n"
+  "    vec3 m = mix(c, b / 8.0, e * 0.85);\n"
+  "    float ml = dot(m, vec3(0.299, 0.587, 0.114));\n"
+  "    m = mix(m, ml * vec3(1.08, 0.97, 0.80), 0.62) * (0.93 + 0.03 * sin(mem.y * 9.0)) + vec3(0.07, 0.055, 0.04);\n"
+  "    m = mix(m, vec3(0.93, 0.88, 0.78), e * e * 0.55);\n"
+  "    c = mix(c, m, mem.x);\n"
+  "  }\n"
   "  o = vec4(clamp(c, 0.0, 1.0), 1.0); }\n";
 
 void present_retro(GLuint tex, int lw, int lh, GLuint dst, int dw, int dh) {
@@ -142,6 +154,7 @@ void present_retro(GLuint tex, int lw, int lh, GLuint dst, int dw, int dh) {
     glUniform1i(glGetUniformLocation(rprog, "tex"), 0);
     ru_size = glGetUniformLocation(rprog, "size");
     ru_out = glGetUniformLocation(rprog, "outsz");
+    ru_mem = glGetUniformLocation(rprog, "mem");
     glGenVertexArrays(1, &rvao);
   }
   glBindFramebuffer(GL_FRAMEBUFFER, dst);
@@ -151,6 +164,7 @@ void present_retro(GLuint tex, int lw, int lh, GLuint dst, int dw, int dh) {
   glUseProgram(rprog);
   glUniform2f(ru_size, (float)lw, (float)lh);
   glUniform2f(ru_out, (float)dw, (float)dh);
+  glUniform2f(ru_mem, mem_amt, mem_t);
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, tex);
   glBindVertexArray(rvao);

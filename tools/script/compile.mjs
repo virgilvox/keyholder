@@ -15,7 +15,11 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const NIGHTS = [];
 if (!process.env.DAY_ONLY) for (const f of readdirSync(HERE).filter((f) => /^night.*\.mjs$/.test(f)).sort()) NIGHTS.push((await import('./' + f)).NIGHT);
 NIGHTS.sort((a, b) => a.n - b.n);
+// v2.0: the attic (tools/script/attic.mjs): scenes attic.c plays through the story VM (encounters, the boss, the
+// flashbacks), each ending in a scene_end beat that puts the day back where it was, and the attic's fights.
+const ATTIC = process.env.DAY_ONLY ? { scenes: {}, fights: {} } : (await import('./attic.mjs')).ATTIC;
 const FIGHTS = { ...DAYMOD.FIGHTS };
+for (const [k, v] of Object.entries(ATTIC.fights || {})) { if (FIGHTS[k]) throw new Error('fight id twice: ' + k); FIGHTS[k] = v; }
 for (const N of NIGHTS) for (const [k, v] of Object.entries(N.fights || {})) { if (FIGHTS[k]) throw new Error('fight id twice: ' + k); FIGHTS[k] = v; }
 const ENDINGS = [...DAYMOD.ENDINGS.map((e) => ({ part: 0, ...e })), ...NIGHTS.flatMap((N) => (N.endings || []).map((e) => ({ part: N.n, ...e })))];
 const STAT_LINES = [...DAYMOD.STAT_LINES.map((e) => ({ part: 0, ...e })), ...NIGHTS.flatMap((N) => (N.stat_lines || []).map((e) => ({ part: N.n, ...e })))];
@@ -34,7 +38,7 @@ const whoId = (w) => { const i = WHO.indexOf(w); if (i < 0) throw new Error('unk
 const cstr = (s) => (s === null || s === undefined ? 'NULL' : JSON.stringify(s));
 const STATS = ['trust', 'safety', 'vibe', 'dues', 'energy', 'aff_sam', 'aff_kai', 'aff_morgan', 'aff_m1', 'aff_m2'];
 const WEAP = { ARC: 0, MAUL: 1, TWIN: 2, SPEAR: 3, STAFF: 4 };
-const OPS = ['chapter', 'clock', 'place', 'hide', 'walk', 'waitwalk', 'say', 'shot', 'wait', 'face', 'look', 'clip', 'emote', 'objective', 'roam', 'fight', 'choice', 'option', 'jump', 'jump_not', 'flag', 'add', 'card', 'music', 'stage', 'give', 'draw', 'door', 'fx', 'note', 'epilogue', 'end', 'ret', 'bark', 'night', 'bike', 'prop'];
+const OPS = ['chapter', 'clock', 'place', 'hide', 'walk', 'waitwalk', 'say', 'shot', 'wait', 'face', 'look', 'clip', 'emote', 'objective', 'roam', 'fight', 'choice', 'option', 'jump', 'jump_not', 'flag', 'add', 'card', 'music', 'stage', 'give', 'draw', 'door', 'fx', 'note', 'epilogue', 'end', 'ret', 'bark', 'night', 'bike', 'prop', 'scene_end', 'grade'];
 const FIGHT_IDS = Object.keys(FIGHTS);
 // a defend twist's object (fight.h obj_kind): the welding table on casters, the fix-it table and its bins
 const OBJ_PROPS = { welding_table: 1, fixit_bins: 2 };
@@ -122,6 +126,8 @@ function one(b) {
   }
 }
 flat(DAY);
+const scenes = [];
+for (const [name, list] of Object.entries(ATTIC.scenes || {})) { const start = beats.length; flat(list); emit({ op: 'scene_end' }); scenes.push({ name, start }); }
 if (longLabels.length) { console.log('task labels over 34 characters:\n  ' + longLabels.join('\n  ')); if (!process.env.LABELS_OK) process.exit(1); }
 for (const F of Object.values(FIGHTS)) for (const a of F.assists || []) if (a.flag) flags.add(a.flag);
 for (const e of ENDINGS) flags.add(e.flag);
@@ -168,7 +174,7 @@ beats.forEach((b, i) => {
     case 'night': f.i = b.n; f.f = b.hour || 19; f.s = cstr(b.title); f.s2 = cstr(b.sub); break;
     case 'epilogue': f.i = b.part || 0; break;
     case 'bike': f.i = b.mode; f.who = b.who ? whoId(b.who) : -1; f.mark = markC(b.mark); break;
-    case 'prop': if (!['gerald', 'table', 'weld_table', 'van'].includes(b.name)) throw new Error('no prop ' + b.name); f.s = cstr(b.name); f.i = { hide: 0, still: 1, circle: 2, straight: 3 }[b.mode]; f.mark = markC(b.mark); if (f.i === undefined) throw new Error('prop mode ' + b.mode); break;
+    case 'prop': if (!['gerald', 'table', 'weld_table', 'van', 'balloon', 'pink_front', 'laser_crate', 'stage_robot', 'move_boxes', 'haxmas', 'rack_2018'].includes(b.name)) throw new Error('no prop ' + b.name); f.s = cstr(b.name); f.i = { hide: 0, still: 1, circle: 2, straight: 3 }[b.mode]; f.mark = markC(b.mark); if (f.i === undefined) throw new Error('prop mode ' + b.mode); break;
     case 'bark': f.who = whoId(b.who); f.s = cstr(b.text); break;
     case 'fight': f.i = 'FI_' + b.id.toUpperCase(); f.i2 = (b.tutorial ? 1 : 0) | (b.cant_lose ? 2 : 0) | (b.lose_ok ? 4 : 0); f.flag = flagId(b.win_flag); f.target = flagId(b.easier_flag); break;
     case 'choice': f.s = cstr(b.prompt); f.i = b.n; break;
@@ -179,7 +185,16 @@ beats.forEach((b, i) => {
     case 'add': f.i = STATS.indexOf(b.stat); f.i2 = b.n; if (f.i < 0) throw new Error('stat ' + b.stat); break;
     case 'card': f.s = cstr(b.title); f.s2 = cstr(b.sub); f.f = b.dur; break;
     case 'music': f.i = 'MOOD_' + b.mood.toUpperCase(); break;
-    case 'stage': f.i = { town: 'STAGE_TOWN', bench: 'STAGE_ARENA_BENCH', laser: 'STAGE_ARENA_LASER', fridge: 'STAGE_ARENA_FRIDGE', shop: 'STAGE_ARENA_SHOP', unfold: 'STAGE_ARENA_UNFOLD' }[b.name]; break;
+    case 'stage': {
+      const LAYOUT = { attic: 'ATTIC_LAYOUT_ROOM', attic_deep: 'ATTIC_LAYOUT_DEEP', desert: 'ATTIC_LAYOUT_DESERT' };
+      const ROOM = { one_forty: 'atomic' };   // a memory room in the town (interior.c), entered for a flashback
+      if (ROOM[b.name]) { f.i = 'STAGE_TOWN'; f.s = cstr(ROOM[b.name]); break; }
+      f.i = LAYOUT[b.name] ? 'STAGE_ATTIC' : { town: 'STAGE_TOWN', bench: 'STAGE_ARENA_BENCH', laser: 'STAGE_ARENA_LASER', fridge: 'STAGE_ARENA_FRIDGE', shop: 'STAGE_ARENA_SHOP', unfold: 'STAGE_ARENA_UNFOLD' }[b.name];
+      if (!f.i) throw new Error('no stage ' + b.name);
+      if (LAYOUT[b.name]) f.i2 = LAYOUT[b.name];
+      break;
+    }
+    case 'grade': f.i = { none: 0, memory: 1 }[b.look]; f.f = b.t ?? 1.2; if (f.i === undefined) throw new Error('grade ' + b.look); break;
     case 'give': f.i = WEAP[b.weapon]; f.s = cstr(b.line); break;
     case 'draw': f.who = whoId(b.who); f.i = b.weapon === -1 ? -1 : WEAP[b.weapon]; break;
     case 'door': f.f = b.open; break;
@@ -196,12 +211,12 @@ out += 'const sc_banter BANTER[] = {\n' + banter.map((k) => `  {${whoId(k.who)},
 out += 'const sc_side SIDES[] = {\n' + sides.map((s) => `  {${cstr(s.name)}, ${whoId(s.who)}, ${markC(s.mark)}, ${cstr(s.prompt)}, ${s.start}},`).join('\n') + '\n  {0}\n};\n\n';
 // cast
 const hue = (h) => `{${h.hue}, ${h.sat}, ${h.val}}`;
-const pal = (p) => `{${hue(p.hair)}, ${hue(p.top)}, ${hue(p.bottom)}, ${hue(p.shoes)}}`;
+const pal = (p) => `{${hue(p.hair)}, ${hue(p.top)}, ${hue(p.bottom)}, ${hue(p.shoes)}${p.wash ? ', 0x' + p.wash.toString(16) : ''}}`;
 out += 'const sc_cast CAST[WHO_COUNT] = {\n';
 for (const w of WHO) {
   const c = CAST[w];
-  if (!c) { out += `  {${cstr(w)}, NULL, AM_B, ${pal({ hair: { hue: 0, sat: 1, val: 1 }, top: { hue: 0, sat: 1, val: 1 }, bottom: { hue: 0, sat: 1, val: 1 }, shoes: { hue: 0, sat: 1, val: 1 } })}, 1, 0xffffff},\n`; continue; }
-  out += `  {${cstr(w)}, ${cstr(c.name)}, AM_${c.model}, ${pal(c.pal)}, ${(+c.scale).toFixed(3)}f, 0x${c.color.toString(16)}},\n`;
+  if (!c) { out += `  {${cstr(w)}, NULL, AM_B, ${pal({ hair: { hue: 0, sat: 1, val: 1 }, top: { hue: 0, sat: 1, val: 1 }, bottom: { hue: 0, sat: 1, val: 1 }, shoes: { hue: 0, sat: 1, val: 1 } })}, 1, 0xffffff, 0},\n`; continue; }
+  out += `  {${cstr(w)}, ${cstr(c.name)}, AM_${c.model}, ${pal(c.pal)}, ${(+c.scale).toFixed(3)}f, 0x${c.color.toString(16)}, ${c.dress ? 'EK_' + c.dress.toUpperCase() : 0}},\n`;
 }
 out += '};\n\n';
 // fights
@@ -209,7 +224,7 @@ out += 'const sc_fight FIGHT_TABLE[FI_COUNT] = {\n';
 for (const id of FIGHT_IDS) {
   const F = FIGHTS[id];
   out += `  {${cstr(F.title)}, ${cstr(F.sub)}, ${cstr(F.where)}, ${(+F.radius).toFixed(2)}f, ${F.foes.length}, {`;
-  out += F.foes.map((e) => `{${whoId(e.who)}, ${WEAP[e.weapon]}, AI_${e.ai}, ${(+e.hp).toFixed(1)}f, ${(+e.power).toFixed(3)}f, ${(+e.speed).toFixed(3)}f, ${(+e.at[0]).toFixed(2)}f, ${(+e.at[1]).toFixed(2)}f, ${cstr(e.palette || null)}, ${cstr(e.name || null)}}`).join(', ');
+  out += F.foes.map((e) => `{${whoId(e.who)}, ${WEAP[e.weapon]}, AI_${e.ai}, ${(+e.hp).toFixed(1)}f, ${(+e.power).toFixed(3)}f, ${(+e.speed).toFixed(3)}f, ${(+e.at[0]).toFixed(2)}f, ${(+e.at[1]).toFixed(2)}f, ${cstr(e.palette || null)}, ${cstr(e.name || null)}, ${e.dress ? 'EK_' + e.dress.toUpperCase() : 0}}`).join(', ');
   const barks = F.barks || [], as = F.assists || [];
   if (barks.length > 10 || as.length > 3) throw new Error('fight ' + id + ': at most 10 barks and 3 assists');
   for (const k of barks) if (!BARK_ON.includes(k.on)) throw new Error('bark trigger ' + k.on);
@@ -222,6 +237,7 @@ out += '};\n\n';
 out += 'const sc_ending ENDINGS[] = {\n' + ENDINGS.map((e) => `  {${flagId(e.flag)}, ${cstr(e.title)}, {${e.lines.map(cstr).join(', ')}}, ${e.part}},`).join('\n') + '\n  {-1}\n};\n';
 out += 'const sc_statline STAT_LINES[] = {\n' + STAT_LINES.map((s) => `  {${flagId(s.flag)}, ${flagId(s.not)}, ${cstr(s.text)}, ${s.part}},`).join('\n') + '\n  {-1}\n};\n';
 out += `const int NIGHT_COUNT = ${NIGHTS.length};\n`;
+out += 'const sc_scene SCENES[SC_COUNT] = {\n' + scenes.map((c) => `  {${cstr(c.name)}, ${c.start}},`).join('\n') + (scenes.length ? '' : '  {0}') + '\n};\n';
 const GEN = process.env.GEN ? join(process.cwd(), process.env.GEN) : join(ROOT, 'src/gen');
 mkdirSync(GEN, { recursive: true });
 writeFileSync(join(GEN, 'script.c'), process.env.GEN ? out.replace('#include "script.h"', '#include "script.h"') : out);
@@ -229,7 +245,9 @@ let hdr = `/* GENERATED by tools/script/compile.mjs. */\n#ifndef SCRIPT_GEN_H\n#
 hdr += `enum { ${WHO.map((w, i) => `W_${w.toUpperCase()} = ${i}`).join(', ')}, WHO_COUNT = ${WHO.length} };\n`;
 hdr += `enum { FLAG_COUNT = ${flagList.length}, FLAG_V12 = 38 };\n`;
 hdr += `enum { ${FIGHT_IDS.map((f) => 'FI_' + f.toUpperCase()).join(', ')}, FI_COUNT };\n`;
+hdr += `enum { FI_BZ_COUNT = ${FIGHT_IDS.length - Object.keys(ATTIC.fights || {}).length} };   /* the Battle Zone's: the attic's fights come after */\n`;
 hdr += `enum { ${OPS.map((o) => 'OP_' + o.toUpperCase()).join(', ')} };\n`;
+hdr += `enum { ${scenes.map((c) => 'SC_' + c.name.toUpperCase() + ', ').join('')}SC_COUNT };\n`;
 hdr += `enum { ${TASK_KINDS.map((k) => 'TK_' + k.toUpperCase()).join(', ')}, TK_COUNT };\n`;
 hdr += `enum { FIX_TIMING, FIX_MASH, FIX_HOLD, FIX_STICK };\n`;
 hdr += `enum { ${STATS.map((s) => 'ST_' + s.toUpperCase()).join(', ')}, ST_COUNT };\n#endif\n`;
@@ -263,4 +281,4 @@ const chars = [...lines.values()].reduce((a, l) => a + l.text.length, 0);
 const words = (t) => t.split(/\s+/).filter(Boolean).length;
 const long = [...lines.values()].filter((l) => words(l.text) > 18);
 if (long.length) console.log(`note: ${long.length} lines over 18 words` + (process.env.LONG ? '\n' + long.map((l) => '  ' + l.speaker + ': ' + l.text).join('\n') : ' (LONG=1 lists them)'));
-console.log(`${beats.length} beats, ${sides.length} side talks, ${tasks.length} tasks, ${banter.length} banter, ${flagList.length} flags, ${FIGHT_IDS.length} fights, ${lines.size} voiced takes, ${chars} characters`);
+console.log(`${beats.length} beats, ${scenes.length} attic scenes, ${sides.length} side talks, ${tasks.length} tasks, ${banter.length} banter, ${flagList.length} flags, ${FIGHT_IDS.length} fights, ${lines.size} voiced takes, ${chars} characters`);

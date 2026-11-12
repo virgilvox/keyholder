@@ -402,7 +402,7 @@ void street_after(float dt) {
     U->letterbox = fmaxf(U->letterbox, letterbox);
   } else letterbox = U->letterbox;
   /* a room left open while the story moved you elsewhere closes behind you */
-  if (!roaming() && !DR.phase && interior_current() >= 0 && !interior_contains(player_pos())) interior_exit();
+  if (!roaming() && !DR.phase && !story_scene_busy() && interior_current() >= 0 && !interior_contains(player_pos())) interior_exit();   /* a flashback holds its room */
   /* no riding indoors */
   if (interior_current() >= 0 && player_riding()) { player_ride(false); U->note = "The bike waits outside."; U->note_t = 2.5f; }
   cameo_frame(dt);

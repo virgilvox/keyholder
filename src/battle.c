@@ -20,7 +20,7 @@
 
 bz_ui_t BZ;
 static uint32_t hash_title(int e) {
-  const char *s = e < FI_COUNT ? FIGHT_TABLE[e].title : "SPARRING NIGHT";
+  const char *s = e < FI_BZ_COUNT ? FIGHT_TABLE[e].title : "SPARRING NIGHT";
   uint32_t h = 2166136261u; for (; *s; s++) h = (h ^ (uint8_t)*s) * 16777619u;
   return h ^ (h >> 16);
 }
@@ -63,7 +63,7 @@ typedef struct {
   uint32_t sum;
 } bz_save_t;
 _Static_assert(sizeof(bz_save_t) <= 1020 - BZ_OFF, "the Battle Zone save is 500 bytes at most");
-_Static_assert(FI_COUNT + 1 <= BZ_MAXE, "too many fights for the Battle Zone");
+_Static_assert(FI_BZ_COUNT + 1 <= BZ_MAXE, "too many fights for the Battle Zone");
 static bz_save_t SV;
 static int SLOT[BZ_MAXE];    /* entry to its slot in SV.best, or -1 */
 static uint16_t entry_id(int e) { uint16_t h = (uint16_t)(hash_title(e) & 0xffff); return h ? h : 1; }
@@ -74,7 +74,7 @@ static uint32_t sv_sum(const bz_save_t *s) {
 }
 static void sv_write(void) { SV.magic = BZ_MAGIC; SV.ver = 1; SV.sum = sv_sum(&SV); memcpy(DS_SAVE.data + BZ_OFF, &SV, sizeof SV); }
 static void slots_map(void) {
-  for (int e = 0; e <= FI_COUNT; e++) {
+  for (int e = 0; e <= FI_BZ_COUNT; e++) {
     uint16_t id = entry_id(e); SLOT[e] = -1;
     for (int k = 0; k < BZ_MAXE; k++) if (SV.best[k].id == id) { SLOT[e] = k; break; }
     if (SLOT[e] < 0) for (int k = 0; k < BZ_MAXE; k++) if (!SV.best[k].id) { memset(&SV.best[k], 0, sizeof SV.best[k]); SV.best[k].id = id; SLOT[e] = k; break; }
@@ -85,7 +85,7 @@ static void sv_read(void) {
   if (SV.magic != BZ_MAGIC || SV.sum != sv_sum(&SV)) { memset(&SV, 0, sizeof SV); }
   slots_map();
 #ifdef KH_UNLOCK_ALL
-  for (int e = 0; e <= FI_COUNT; e++) if (SLOT[e] >= 0) SV.best[SLOT[e]].open = 1;
+  for (int e = 0; e <= FI_BZ_COUNT; e++) if (SLOT[e] >= 0) SV.best[SLOT[e]].open = 1;
   SV.weapons = (1u << WP_COUNT) - 1; SV.mods = 0xff;
 #endif
 }
@@ -106,7 +106,7 @@ static const char *town_name(const char *w) {
   return "DOWNTOWN MESA";
 }
 static void places_scan(void) {
-  for (int fi = 0; fi < FI_COUNT; fi++) {
+  for (int fi = 0; fi < FI_BZ_COUNT; fi++) {
     world_stage st = STAGE_TOWN; float hour = 12; bool found = false;
     for (int k = 0; k < SCRIPT_COUNT && !found; k++) {
       const sc_beat *b = &SCRIPT[k];
@@ -125,7 +125,7 @@ static void places_scan(void) {
       else if (!world_place(F->where, &P->c, &y)) world_stage_floor(STAGE_TOWN, &P->c, NULL);
     }
   }
-  bz_place *S = &AR[FI_COUNT];
+  bz_place *S = &AR[FI_BZ_COUNT];
   S->stage = STAGE_ARENA_UNFOLD; world_stage_floor(S->stage, &S->c, &S->r); S->hour = 23.9f; S->arena = stage_name(S->stage);
 }
 
@@ -148,6 +148,7 @@ static void foe_from(fighter_def *d, const sc_foe *e) {
   d->name = e->name ? e->name : cc->name;
   d->weapon = (weapon_id)e->weapon; d->ai = (ai_kind)e->ai;
   d->hp = e->hp; d->power = e->power; d->speed = e->speed; d->place_x = e->x; d->place_z = e->z;
+  d->dress = e->dress;
   if (alt) { d->pal.top.hue += 40; d->pal.hair.hue += 40; }
 }
 static uint32_t foe_col(const sc_foe *e) { bool shadow = e->palette && !strcmp(e->palette, "shadow"); return shadow ? 0x8a7aff : CAST[canon(e->who)].color; }
@@ -160,20 +161,20 @@ static void secret_build(void) {
   SECRET[0] = s0; SECRET[1] = s1; SECRET[2] = s2;
 }
 static const sc_foe *entry_foes(int e, int *n) {
-  if (e == FI_COUNT) { *n = 3; return SECRET; }
+  if (e == FI_BZ_COUNT) { *n = 3; return SECRET; }
   *n = FIGHT_TABLE[e].count; return FIGHT_TABLE[e].foes;
 }
 
-static bool open_e(int e) { return e >= 0 && e <= FI_COUNT && SLOT[e] >= 0 && SV.best[SLOT[e]].open; }
-static void open_set(int e) { if (e >= 0 && e <= FI_COUNT && SLOT[e] >= 0) SV.best[SLOT[e]].open = 1; }
+static bool open_e(int e) { return e >= 0 && e <= FI_BZ_COUNT && SLOT[e] >= 0 && SV.best[SLOT[e]].open; }
+static void open_set(int e) { if (e >= 0 && e <= FI_BZ_COUNT && SLOT[e] >= 0) SV.best[SLOT[e]].open = 1; }
 static void refresh(void) {
-  BZ.ne = FI_COUNT + 1; BZ.nopen = 0;
+  BZ.ne = FI_BZ_COUNT + 1; BZ.nopen = 0;
   BZ.weapons = SV.weapons | 1u;
   BZ.mods_open = SV.mods | MOD_BASE;
-  BZ.secret_open = open_e(FI_COUNT);
+  BZ.secret_open = open_e(FI_BZ_COUNT);
   for (int e = 0; e < BZ.ne; e++) {
     bz_entry *E = &BZ.e[e];
-    bool sec = e == FI_COUNT;
+    bool sec = e == FI_BZ_COUNT;
     E->secret = sec; E->unlocked = open_e(e);
     if (E->unlocked && !sec) BZ.nopen++;
     E->title = sec ? "SPARRING NIGHT" : FIGHT_TABLE[e].title;
@@ -195,14 +196,14 @@ static void refresh(void) {
 }
 
 /* a win in the story opens its fight here: the menu's table follows at once (the title counts from it) */
-void battle_unlock_fight(int fi) { if (fi < 0 || fi >= FI_COUNT || open_e(fi)) return; open_set(fi); sv_write(); refresh(); }
+void battle_unlock_fight(int fi) { if (fi < 0 || fi >= FI_BZ_COUNT || open_e(fi)) return; open_set(fi); sv_write(); refresh(); }
 void battle_unlock_weapon(int w) {
   if (w < 0 || w >= WP_COUNT || (SV.weapons >> w & 1)) return;
   SV.weapons |= (uint8_t)(1u << w);
   if ((SV.weapons & 31) == 31) SV.mods |= MOD_ONE_WEAPON;
   sv_write(); refresh();
 }
-bool battle_available(void) { for (int e = 0; e < FI_COUNT; e++) if (open_e(e)) return true; return false; }
+bool battle_available(void) { for (int e = 0; e < FI_BZ_COUNT; e++) if (open_e(e)) return true; return false; }
 
 /* ---- the stage behind the menus: the next foe posed in its arena ---- */
 #define PV_PER 2
@@ -290,7 +291,7 @@ static void fd_entry(int e, float scale) {
   for (int i = 0; i < FD.count; i++) foe_from(&FD.foes[i], &f[i]);
   FD.center = AR[e].c; FD.radius = AR[e].r;
   FD.foe_scale = scale;
-  if (e < FI_COUNT) {
+  if (e < FI_BZ_COUNT) {
     const sc_fight *F = &FIGHT_TABLE[e];
     FD.twist = F->twist; FD.twist_a = F->twist_a; FD.twist_b = F->twist_b;
     if (F->obj_x != 0 || F->obj_z != 0) FD.obj_pos = v3_add(AR[e].c, v3_(F->obj_x, 0, F->obj_z));
@@ -304,7 +305,7 @@ static void fd_entry(int e, float scale) {
 static sc_foe POOLF[48]; static int npool, POOLE[48];
 static void pool_build(void) {
   npool = 0;
-  for (int e = 0; e < FI_COUNT + 1; e++) {
+  for (int e = 0; e < FI_BZ_COUNT + 1; e++) {
     if (!open_e(e)) continue;
     int n; const sc_foe *f = entry_foes(e, &n);
     for (int i = 0; i < n && npool < 48; i++) { POOLF[npool] = f[i]; POOLE[npool] = e; npool++; }
@@ -389,9 +390,9 @@ static void run_begin(void) {
   BZ.run_over = false; BZ.run_cleared = false; BZ.nunlocked = 0;
   if (BZ.mode == BZM_LADDER) {
     BZ.nrungs = 0;
-    for (int e = 0; e < FI_COUNT; e++) if (open_e(e)) BZ.order[BZ.nrungs++] = e;
+    for (int e = 0; e < FI_BZ_COUNT; e++) if (open_e(e)) BZ.order[BZ.nrungs++] = e;
     for (int i = 1; i < BZ.nrungs; i++) for (int j = i; j > 0 && BZ.e[BZ.order[j]].tier < BZ.e[BZ.order[j - 1]].tier; j--) { int t = BZ.order[j]; BZ.order[j] = BZ.order[j - 1]; BZ.order[j - 1] = t; }
-    if (BZ.secret_open) BZ.order[BZ.nrungs++] = FI_COUNT;
+    if (BZ.secret_open) BZ.order[BZ.nrungs++] = FI_BZ_COUNT;
   }
   if (BZ.mode == BZM_SURVIVAL) pool_build();
   ladder_pts = 0;
@@ -419,7 +420,7 @@ static void check_unlocks(char rank, bool ladder_clear, char run_rank) {
   if (rank_pts(rank) >= 3 && !(SV.mods & MOD_HAZARD_PLUS)) { SV.mods |= MOD_HAZARD_PLUS; unlock_note("MODIFIER  HAZARDS PLUS"); }
   if (rank == 'S' && !(SV.mods & MOD_SUDDEN)) { SV.mods |= MOD_SUDDEN; unlock_note("MODIFIER  SUDDEN DEATH"); }
   if (ladder_clear && !(SV.mods & MOD_VAMPIRE)) { SV.mods |= MOD_VAMPIRE; unlock_note("MODIFIER  VAMPIRE"); }
-  if (ladder_clear && rank_pts(run_rank) >= 3 && !open_e(FI_COUNT)) { open_set(FI_COUNT); unlock_note("SECRET RUNG  SPARRING NIGHT"); }
+  if (ladder_clear && rank_pts(run_rank) >= 3 && !open_e(FI_BZ_COUNT)) { open_set(FI_BZ_COUNT); unlock_note("SECRET RUNG  SPARRING NIGHT"); }
 }
 static void fight_over(bool won, const fight_result *r, float hp) {
   BZ.r = *r; BZ.won = won;
@@ -492,8 +493,8 @@ void battle_enter(void) {
   sv_read(); refresh();
   BZ.weapon = SV.weapon < WP_COUNT && (BZ.weapons >> SV.weapon & 1) ? SV.weapon : WP_ARC;
   BZ.mods = SV.last_mods & BZ.mods_open;
-  BZ.fight = SV.fight <= FI_COUNT && open_e(SV.fight) ? SV.fight : 0;
-  if (!open_e(BZ.fight)) for (int e = 0; e <= FI_COUNT; e++) if (open_e(e)) { BZ.fight = e; break; }
+  BZ.fight = SV.fight <= FI_BZ_COUNT && open_e(SV.fight) ? SV.fight : 0;
+  if (!open_e(BZ.fight)) for (int e = 0; e <= FI_BZ_COUNT; e++) if (open_e(e)) { BZ.fight = e; break; }
   BZ.hub_sel = 0; BZ.mode = BZM_LADDER; st_key = -1;
   set_screen(BZ_HUB);
   music_mood(MOOD_ZONE);
@@ -539,13 +540,13 @@ static void stage_update(float dt) {
  * its fight, the ladder its first rung, records the row */
 static int first_rung(void) {
   int best = -1;
-  for (int e = 0; e < FI_COUNT; e++) if (open_e(e) && (best < 0 || BZ.e[e].tier < BZ.e[best].tier)) best = e;
+  for (int e = 0; e < FI_BZ_COUNT; e++) if (open_e(e) && (best < 0 || BZ.e[e].tier < BZ.e[best].tier)) best = e;
   return best < 0 ? BZ.fight : best;
 }
 static void menu_stage(void) {
   int e = BZ.fight; bool wp = false;
   int k = (int)(ds_now() / 6), n = 0, list[BZ_MAXE];
-  for (int i = 0; i <= FI_COUNT; i++) if (open_e(i)) list[n++] = i;
+  for (int i = 0; i <= FI_BZ_COUNT; i++) if (open_e(i)) list[n++] = i;
   int cyc = n ? list[k % n] : BZ.fight;
   switch (BZ.screen) {
     case BZ_HUB: e = BZ.hub_sel == BZM_CHALLENGE ? BZ.fight : cyc; break;

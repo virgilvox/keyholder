@@ -27,6 +27,7 @@ typedef struct {
   float glaze;                    /* how much of the front is window (0 none .. 1 all but the door) */
   furnish_fn furnish;
   const spot_t *spots;
+  bool memory;                    /* v2.0: only the attic's flashbacks go in (no street door): one forty, years ago */
 } room_def;
 
 /* ── the builder: sinks per material, boxes in room space, colliders ── */
@@ -127,13 +128,14 @@ static t3_color rgb(float r, float g, float b) { return (t3_color){r * r, g * g,
 static uint32_t rhash(uint32_t x) { x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; return x ^ (x >> 16); }
 
 /* ── the looks: walls, floor, ceiling, and how bright the room's light is ── */
-enum { LOOK_BAKERY, LOOK_TAPROOM, LOOK_ARCADE, LOOK_THEATER, LOOK_GALLERY };
+enum { LOOK_BAKERY, LOOK_TAPROOM, LOOK_ARCADE, LOOK_THEATER, LOOK_GALLERY, LOOK_GLITTER };
 static const struct { float wall[3], floor[3], ceil[3], trim[3]; bool brick; float light; } LOOKS[] = {
   [LOOK_BAKERY] = {{.93f, .9f, .82f}, {.72f, .55f, .38f}, {.9f, .88f, .84f}, {.3f, .24f, .18f}, false, 1.0f},
   [LOOK_TAPROOM] = {{1, 1, 1}, {.52f, .52f, .5f}, {.42f, .3f, .2f}, {.2f, .16f, .12f}, true, .85f},
   [LOOK_ARCADE] = {{.16f, .15f, .2f}, {.2f, .14f, .3f}, {.08f, .08f, .1f}, {.05f, .05f, .06f}, false, .55f},
   [LOOK_THEATER] = {{.14f, .13f, .13f}, {.25f, .22f, .21f}, {.07f, .07f, .07f}, {.45f, .12f, .1f}, false, .68f},
   [LOOK_GALLERY] = {{.95f, .95f, .94f}, {.78f, .78f, .76f}, {.96f, .96f, .95f}, {.55f, .55f, .54f}, false, 1.05f},
+  [LOOK_GLITTER] = {{.93f, .6f, .74f}, {.56f, .55f, .52f}, {.9f, .88f, .86f}, {.3f, .22f, .26f}, false, .95f},
 };
 /* walls, floor and ceiling facing in; the front wall with its windows (the daylight) and the door */
 static void rb_shell(room_t *R) {
@@ -476,6 +478,73 @@ static const spot_t SPOTS_MAC[] = {
   {NULL, 0, 0, 0, 0}};
 
 /* id, sign, (free placement), door x, w, d, h, back, look, glaze, furnish, spots */
+
+/* v2.0: the lab's old storefront at one forty West Main, as the attic's flashbacks remember it (2011 to 2018):
+ * the walls the work party painted pink, workbenches down both sides, a couch and folding tables up front,
+ * shelving and the kitchenette at the back, and a square of tape on the floor where the laser was to go */
+static void furnish_glitter(room_t *R) {
+  const room_def *D = R->def; const float W = D->w * .5f, Z0 = -D->back - D->d;
+  t3_color bench = rgb(.62f, .5f, .34f), top = rgb(.74f, .66f, .5f), steel = rgb(.6f, .62f, .64f), dark = rgb(.2f, .19f, .2f);
+  t3_color tote[4] = { rgb(.25f, .45f, .8f), rgb(.8f, .25f, .22f), rgb(.3f, .62f, .35f), rgb(.85f, .75f, .25f) };
+  /* workbenches down both walls, with pegboard over them */
+  for (int sd = -1; sd <= 1; sd += 2) {
+    float x0 = sd < 0 ? -W + .1f : W - .85f, x1 = sd < 0 ? -W + .85f : W - .1f;
+    for (float z = -4.0f; z > Z0 + 5.5f; z -= 2.6f) {
+      rb_box(R, RM_LIT, x0, .88f, z - 2.3f, x1, .94f, z, top, 0);
+      rb_box(R, RM_LIT, x0 + .05f, 0, z - 2.25f, x0 + .12f, .88f, z - 2.15f, bench, RB_SOLID);
+      rb_box(R, RM_LIT, x0 + .05f, 0, z - .15f, x0 + .12f, .88f, z - .05f, bench, RB_SOLID);
+      rb_box(R, RM_LIT, x1 - .12f, 0, z - 2.25f, x1 - .05f, .88f, z - 2.15f, bench, RB_SOLID);
+      rb_box(R, RM_LIT, x1 - .12f, 0, z - .15f, x1 - .05f, .88f, z - .05f, bench, RB_SOLID);
+      rb_box(R, RM_LIT, x0, 0, z - 2.3f, x1, .9f, z, bench, RB_SOLID | RB_NOBOTTOM);
+      float wx = sd < 0 ? -W + .02f : W - .04f;
+      rb_box(R, RM_LIT, wx, 1.1f, z - 2.2f, wx + .02f, 2.1f, z - .1f, rgb(.75f, .62f, .45f), 0);   /* pegboard */
+      for (int k = 0; k < 5; k++) rb_cbox(R, RM_LIT, wx + sd * -.04f, 1.3f + (k % 2) * .4f, z - .4f - k * .38f, .03f, .22f, .05f, k % 2 ? steel : dark, 0);
+      /* what is on the bench: a vice, a box of parts, a soldering station's glow */
+      rb_cbox(R, RM_LIT, (x0 + x1) * .5f, .94f, z - .5f, .2f, .14f, .14f, steel, 0);
+      rb_cbox(R, RM_LIT, (x0 + x1) * .5f, .94f, z - 1.4f, .35f, .12f, .25f, tote[((int)-z) & 3], 0);
+      rb_cbox(R, RM_GLOW, (x0 + x1) * .5f, .94f, z - 1.9f, .12f, .05f, .1f, rgb(1, .35f, .25f), 0);
+    }
+  }
+  /* up front: a thrift store couch and a coffee table, folding tables with laptops */
+  rb_box(R, RM_LIT, -W + .5f, 0, -3.4f, -W + 1.4f, .45f, -1.2f, rgb(.42f, .32f, .5f), RB_SOLID);
+  rb_box(R, RM_LIT, -W + .5f, .45f, -3.4f, -W + .75f, .95f, -1.2f, rgb(.38f, .28f, .46f), 0);
+  rb_cbox(R, RM_LIT, -W + 2.0f, 0, -2.3f, .6f, .4f, 1.0f, bench, RB_SOLID);
+  for (int k = 0; k < 2; k++) {
+    float z = -5.2f - k * 2.2f;
+    rb_box(R, RM_LIT, -1.3f, .72f, z - .45f, 1.3f, .76f, z + .45f, rgb(.85f, .85f, .82f), 0);
+    for (int l = 0; l < 4; l++) rb_cbox(R, RM_LIT, l & 1 ? 1.2f : -1.2f, 0, z + (l & 2 ? .38f : -.38f), .04f, .72f, .04f, steel, l == 0 ? RB_SOLID : 0);
+    rb_box(R, RM_LIT, -1.3f, 0, z - .45f, 1.3f, .72f, z + .45f, dark, RB_SOLID | RB_NOBOTTOM);
+    for (int l = 0; l < 2; l++) { float x = l ? .55f : -.6f; rb_cbox(R, RM_LIT, x, .76f, z, .34f, .02f, .24f, dark, 0); rb_box(R, RM_GLOW, x - .16f, .78f, z - .13f, x + .16f, .98f, z - .11f, rgb(.55f, .7f, .9f), 0); }
+  }
+  /* the laser's square, taped on the floor in the middle of the room */
+  float lz = -11.0f;
+  rb_box(R, RM_LIT, -1.0f, 0, lz - .7f, 1.0f, .006f, lz - .64f, rgb(.95f, .8f, .2f), 0);
+  rb_box(R, RM_LIT, -1.0f, 0, lz + .64f, 1.0f, .006f, lz + .7f, rgb(.95f, .8f, .2f), 0);
+  rb_box(R, RM_LIT, -1.0f, 0, lz - .7f, -.94f, .006f, lz + .7f, rgb(.95f, .8f, .2f), 0);
+  rb_box(R, RM_LIT, .94f, 0, lz - .7f, 1.0f, .006f, lz + .7f, rgb(.95f, .8f, .2f), 0);
+  /* the back: steel shelving full of totes, and the kitchenette */
+  for (float x = -W + .3f; x < W - 2.5f; x += 1.3f) {
+    rb_box(R, RM_LIT, x, 0, Z0 + .1f, x + 1.2f, 2.2f, Z0 + .6f, steel, RB_SOLID | RB_NOBOTTOM);
+    for (int sh = 0; sh < 4; sh++) for (int k = 0; k < 2; k++) rb_cbox(R, RM_LIT, x + .3f + k * .6f, .1f + sh * .55f, Z0 + .37f, .5f, .32f, .42f, tote[(sh + k + (int)(x * 3)) & 3], 0);
+  }
+  rb_box(R, RM_LIT, W - 2.2f, 0, Z0 + .1f, W - .1f, .9f, Z0 + .75f, rgb(.88f, .86f, .82f), RB_SOLID);
+  rb_box(R, RM_LIT, W - 1.0f, 0, Z0 + .1f, W - .1f, 1.75f, Z0 + .8f, rgb(.9f, .9f, .9f), RB_SOLID);
+  /* bare fluorescent tubes, and a string of party lights along the left wall that nobody took down */
+  for (float z = -3.0f; z > Z0 + 1.0f; z -= 3.0f) for (int sd = -1; sd <= 1; sd += 2) rb_cbox(R, RM_GLOW, sd * 1.6f, D->h - .08f, z, .12f, .05f, 1.4f, rgb(.95f, .97f, 1), 0);
+  for (float z = -1.5f; z > Z0 + 1.0f; z -= .5f) rb_cbox(R, RM_GLOW, -W + .06f, 2.45f + .06f * sinf(z * 2.f), z, .05f, .05f, .05f, ((int)(-z * 2)) % 3 == 0 ? rgb(1, .3f, .4f) : ((int)(-z * 2)) % 3 == 1 ? rgb(.3f, .9f, .4f) : rgb(.4f, .6f, 1), 0);
+}
+static const spot_t SPOTS_GLITTER[] = {
+  {"glitter_inside", 0, 0, -1.6f, 3.14159f},        /* just inside the door, facing in */
+  {"glitter_couch", -2.4f, 0, -2.3f, 1.5708f},       /* by the couch, facing the room's middle */
+  {"glitter_table", 0, 0, -6.3f, 3.14159f},          /* at the folding tables */
+  {"glitter_laser", 0, 0, -11.0f, 0},                /* the laser's taped square */
+  {"glitter_laser_n", 0, 0, -13.0f, 0},              /* beyond it, facing the front */
+  {"glitter_bench_l", -2.7f, 0, -8.0f, -1.5708f},    /* at the left benches, facing them */
+  {"glitter_bench_r", 2.7f, 0, -8.0f, 1.5708f},      /* at the right benches, facing them */
+  {"glitter_back", 0, 0, -16.0f, 0},                 /* in front of the back shelving, facing the front */
+  {NULL}
+};
+
 static const room_def ROOMS[] = {
   {"proof", "Proof Bread", 0, 0, 0, 0, 7.2f, 13.f, 4.2f, .3f, LOOK_BAKERY, .9f, furnish_proof, SPOTS_PROOF},
   {"chupacabra", "Chupacabra Taproom", 0, 0, 0, .6f, 7.0f, 11.f, 4.3f, .35f, LOOK_TAPROOM, .8f, furnish_chupacabra, SPOTS_CHUPA},
@@ -483,6 +552,8 @@ static const room_def ROOMS[] = {
   {"nile", "The Nile Theater", 0, 0, 0, 0, 13.2f, 36.f, 9.f, .4f, LOOK_THEATER, .5f, furnish_nile, SPOTS_NILE},
   /* the Ikeda Theater's glass lobby on the plaza: its north east face, (370.7, 58.8) to (391.4, 66.5) */
   {"arts_center", "Mesa Arts Center", 381.07f, 62.63f, 2.786f, 0, 17.f, 13.f, 7.f, .3f, LOOK_GALLERY, 1.f, furnish_mac, SPOTS_MAC},
+  /* v2.0: one forty West Main behind today's shopfront there, for the flashbacks only */
+  {"atomic", "One Forty", 0, 0, 0, 0, 7.6f, 18.f, 4.0f, .3f, LOOK_GLITTER, .85f, furnish_glitter, SPOTS_GLITTER, true},
 };
 #define NROOM (int)(sizeof ROOMS / sizeof ROOMS[0])
 /* the lot wall a placed room's front stands on (the Arts Center lobby): city.c glazes that wall whatever its
@@ -528,7 +599,7 @@ const char *interior_name(int i) { return i >= 0 && i < NROOM ? ROOMS[i].name : 
 const char *interior_id(int i) { return i >= 0 && i < NROOM ? ROOMS[i].id : ""; }
 int interior_find(const char *id) { for (int i = 0; i < NROOM; i++) if (!strcmp(ROOMS[i].id, id)) return i; return -1; }
 bool interior_door(int i, v3 *outside, float *yaw_out, v3 *inside, float *yaw_in) {
-  if (i < 0 || i >= NROOM) return false;
+  if (i < 0 || i >= NROOM || ROOMS[i].memory) return false;   /* a memory has no door from today's street */
   room_t *R = &RM[i]; const room_def *D = R->def;
   /* outside: on the street in front of the door, a step clear of whatever stands at the facade, and far
    * enough out that the follow camera behind someone coming out has room before the shopfront. The town

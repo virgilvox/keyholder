@@ -64,6 +64,25 @@ export const CAST = {
             pal: { hair: hue(0, .4, .75), top: hue(200, .6, .7), bottom: hue(0), shoes: hue(0) } },
   del:    { name: 'Del', model: 'W', voice: 'af_sky', speed: 1.0, scale: .98, color: 0xe8b060,       // first night, a board that won't take solder
             pal: { hair: hue(20, 1.1, .8), top: hue(150, .8, .9), bottom: hue(220, .6, .7), shoes: hue(0) } },
+  // v2.0: the attic. The nightmare's foes (pool bodies, washed one colour all over by actor.h's palette wash, dressed
+  // by enemy.c), and the people in the flashbacks: years-younger Root, June and Gordon, and members of those years.
+  mannequin: { name: 'Mannequin', model: 'D2', voice: 'am_echo', speed: .9, scale: 1.0, color: 0xe8e0d4, pal: { ...NONE, wash: 0xe8e0d4 } },
+  mannequin_f: { name: 'Mannequin', model: 'X', voice: 'am_echo', speed: .9, scale: .98, color: 0xe8e0d4, pal: { ...NONE, wash: 0xe4dcd0 } },
+  unclaimed: { name: 'Unclaimed', model: 'N2', voice: 'am_echo', speed: .85, scale: 1.02, color: 0x8a8e94, pal: { ...NONE, wash: 0x8a8e94 } },
+  junkbot: { name: 'Junkbot', model: 'Y', voice: 'am_echo', speed: 1.0, scale: 1.0, color: 0xa8b0b8, pal: { ...NONE, wash: 0xa8b0b8 } },
+  sysop:  { name: 'SYSOP', model: 'E2', voice: 'am_onyx', speed: .84, scale: 1.06, color: 0x40ff8a, pal: { ...NONE, wash: 0x26302a }, dress: 'sysop' },
+  root_y: { name: 'Root', model: 'O', voice: 'bm_george', speed: 1.0, scale: 1.04, color: 0x88a0a8,
+            pal: { hair: hue(20, .7, .42), top: hue(0), bottom: hue(0), shoes: hue(0) } },
+  june_y: { name: 'June', model: 'R', voice: 'bf_lily', speed: .98, scale: .97, color: 0xb0c8a0,
+            pal: { hair: hue(25, 1.4, .5), top: hue(330, .5, .8), bottom: hue(0, .35, .55), shoes: hue(0) } },
+  gordon_y: { name: 'Gordon', model: 'M', voice: 'bm_lewis', speed: 1.02, scale: 1.03, color: 0x9090c0,
+            pal: { hair: hue(0, .6, .45), top: hue(30, .6, .7), bottom: hue(0), shoes: hue(0) } },
+  tamsin: { name: 'Tamsin', model: 'I2', voice: 'af_river', speed: 1.08, scale: 1.0, color: 0xe0a050, pal: NONE },   // radio, the balloon
+  ozzie:  { name: 'Ozzie', model: 'J2', voice: 'am_puck', speed: 1.02, scale: 1.0, color: 0xd05050, pal: NONE },    // the laser's champion
+  bea:    { name: 'Bea', model: 'O2', voice: 'af_kore', speed: 1.07, scale: .99, color: 0xe070a0, pal: NONE },      // ran the work parties
+  nico:   { name: 'Nico', model: 'P2', voice: 'am_liam', speed: 1.0, scale: 1.0, color: 0x60b070, pal: NONE },      // the theatre robots
+  pip:    { name: 'Pip', model: 'E', voice: 'af_sky', speed: 1.16, scale: .9, color: 0xf0c040, pal: NONE },        // a kid at the first Tear Apart
+  lena:   { name: 'Lena', model: 'K2', voice: 'af_nicole', speed: 1.06, scale: .99, color: 0xf09040, pal: NONE },   // first Arduino Night
 };
 // who the three playable members are. Choosing one makes the other two m1 and m2.
 export const PLAYABLE = ['vee', 'dex', 'ruth'];

@@ -7,6 +7,8 @@
 #include "world.h"
 #include "fight.h"
 #include "director.h"
+#include "attic_env.h"   /* v2.0: ATTIC_LAYOUT_* for the attic's stages */
+#include "enemy.h"       /* v2.0: DRESS_* for the attic's foes */
 #ifdef KH_GEN_ENUM
 #include KH_GEN_ENUM      /* a private compiled script: -DKH_GEN_ENUM='"../build-x/gen/script_enum.h"' */
 #else
@@ -43,8 +45,8 @@ typedef struct {
 /* ambient lines while walking: who says text when the roam has run delay seconds (or when near mark, if set) */
 typedef struct { int who; const char *text; float delay; sc_mark mark; } sc_banter;
 typedef struct { const char *name; int who; sc_mark mark; const char *prompt; int start; } sc_side;
-typedef struct { const char *id, *name; actor_model model; actor_palette pal; float scale; uint32_t color; } sc_cast;
-typedef struct { int who, weapon, ai; float hp, power, speed, x, z; const char *palette, *name; } sc_foe;
+typedef struct { const char *id, *name; actor_model model; actor_palette pal; float scale; uint32_t color; int dress; } sc_cast;   /* dress: enemy.h DRESS_* (SYSOP), 0 none */
+typedef struct { int who, weapon, ai; float hp, power, speed, x, z; const char *palette, *name; int dress; } sc_foe;   /* dress: enemy.h DRESS_*, 0 none */
 typedef struct { int on, who; const char *text; } sc_bark;
 typedef struct { int who, flag; float trust; } sc_assist;
 typedef struct { const char *title, *sub, *where; float radius; int count; sc_foe foes[4];
@@ -69,4 +71,7 @@ extern const sc_statline STAT_LINES[];
 extern const char *const WHO_ID[WHO_COUNT];
 extern const char *const FLAG_NAMES[FLAG_COUNT];
 extern const int NIGHT_COUNT;   /* v1.3: the nights after the day (OP_NIGHT beats) */
+/* v2.0: the attic's scenes, by SC_* (story_scene_play) */
+typedef struct { const char *name; int start; } sc_scene;
+extern const sc_scene SCENES[];
 #endif

@@ -10,10 +10,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-const actor_palette ACTOR_PAL_NONE = {{0, 1, 1}, {0, 1, 1}, {0, 1, 1}, {0, 1, 1}};
+const actor_palette ACTOR_PAL_NONE = {{0, 1, 1}, {0, 1, 1}, {0, 1, 1}, {0, 1, 1}, 0};
 
 #define MAX_JOINTS 96
 #define MAX_COLLIDERS 24
+#define MAX_SOCKETS 6
+#define HEAD_HIDE .001f   /* actor_hide_head: the head bone's scale (not 0, so skinned normals stay finite) */
 typedef struct {
   t3_object *bone, *parent;
   float axis[3], len;
@@ -30,12 +32,19 @@ struct actor {
   t3_mesh *face, *body, *outline, *shadow;
   t3_material *m_body, *m_face;
   t3_texture *tex;                    /* the body atlas in this actor's palette (shared through PALC) */
+  t3_texture *ftex;                   /* the face washed flat, for a palette with a wash (shared through FACEC) */
+  actor_palette pal;                  /* as last set: actor_get_palette */
   ck_mixer mixer;
   ck_action *cur;
   int cur_clip;
   v3 pos; float yaw;
   t3_object *b_neck, *b_head, *b_chest, *b_rhand, *b_lhand;
   t3_object *s_rhand, *s_lhand;
+  struct { t3_object *bone, *s; float k; } sock[MAX_SOCKETS]; int nsock;   /* actor_socket; k its rest scale */
+  t3_vec3 head_rest; bool head_hidden;
+  /* stop motion (actor_set_step): the pose kept between steps */
+  float step_fps, step_acc; bool step_held;
+  float hold_q[RIG_MAX_BONES][4], hold_p[3];
   /* look */
   v3 look_at; float look_tgt, look_w, look_yaw, look_pitch;
   /* face */
@@ -66,10 +75,15 @@ typedef struct {
   int live;                           /* actors of this model alive */
 } model_tpl;
 static model_tpl TPL[AM_COUNT];
-/* body atlases by palette: actors in the same clothes share one texture (and one upload) */
+/* body atlases by palette: actors in the same clothes share one texture (and one upload). The key is
+ * the whole actor_palette, its wash included */
 #define PALC_N 48
 static struct { actor_model m; actor_palette p; t3_texture *T; } PALC[PALC_N];
+/* washed faces by model and wash: a group of mannequins shares one */
+#define FACEC_N 8
+static struct { actor_model m; uint32_t wash; t3_texture *T; } FACEC[FACEC_N];
 static float LOD_BIAS = 1;
+static void (*ON_FREE)(actor_t *);   /* actor_on_free */
 static const t3_camera *LOD_CAM;
 #define LOD_NEAR 5.f     /* full body, face morphs and the outline hull inside this */
 #define LOD_FAR 10.f     /* the far body with a hull inside this, without beyond */
@@ -136,6 +150,47 @@ static void apply_palette(t3_texture *T, actor_model model, const actor_palette 
   T->version++;
 }
 
+/* ---- the wash: one colour over the whole atlas, a share of the painted shading kept ---- */
+static float luma(const uint8_t *px) { return (px[0] * .299f + px[1] * .587f + px[2] * .114f) / 255.f; }
+/* mid grey paint gives the wash colour itself; black and white paint go darker and lighter by the share kept */
+static void wash_px(uint8_t *px, uint32_t w, float L) {
+  float keep = (w >> 24) ? (w >> 24) / 255.f : .35f, k = 1 + keep * (2 * L - 1);
+  float c[3] = { (float)((w >> 16) & 255), (float)((w >> 8) & 255), (float)(w & 255) };
+  for (int i = 0; i < 3; i++) px[i] = (uint8_t)ds_clamp(c[i] * k + .5f, 0, 255);
+}
+static void apply_wash(t3_texture *T, uint32_t w) {
+  if (!T || !T->pixels || !w) return;
+  size_t n = (size_t)T->width * T->height;
+  for (size_t i = 0; i < n; i++) { uint8_t *p = T->pixels + i * 4; wash_px(p, w, luma(p)); }
+  T->version++;
+}
+/* the face washed flat: a quarter size copy (only its alpha has shape left), every texel the colour the
+ * skin washes to, so no painted eye or mouth remains. The skin is the commonest opaque luma of the atlas.
+ * The template's face has dropped its pixels once drawn, so this decodes the glb's PNG again. */
+#define FACE_DOWN 4
+static t3_texture *flat_face(const uint8_t *png, size_t n, uint32_t w) {
+  t3_texture *F = t3_texture_load_memory(png, n);
+  if (!F || !F->pixels) { if (F) t3_release(F); return NULL; }
+  int W = F->width / FACE_DOWN, H = F->height / FACE_DOWN, hist[64] = {0};
+  for (size_t i = 0; i < (size_t)F->width * F->height; i++) { const uint8_t *p = F->pixels + i * 4; if (p[3] > 200) hist[(int)(luma(p) * 63.99f)]++; }
+  int mode = 0;
+  for (int i = 1; i < 64; i++) if (hist[i] > hist[mode]) mode = i;
+  uint8_t flat[4] = {0};
+  wash_px(flat, w, (mode + .5f) / 64);
+  uint8_t *px = malloc((size_t)W * H * 4);
+  if (!px) { t3_release(F); return NULL; }
+  for (int y = 0; y < H; y++) for (int x = 0; x < W; x++) {
+    int a = 0;   /* the block's mean alpha keeps the cut outs (lashes, the mouth's inside) where they were */
+    for (int j = 0; j < FACE_DOWN; j++) for (int i = 0; i < FACE_DOWN; i++) a += F->pixels[((size_t)(y * FACE_DOWN + j) * F->width + x * FACE_DOWN + i) * 4 + 3];
+    uint8_t *o = px + ((size_t)y * W + x) * 4;
+    o[0] = flat[0]; o[1] = flat[1]; o[2] = flat[2]; o[3] = (uint8_t)(a / (FACE_DOWN * FACE_DOWN));
+  }
+  t3_release(F);
+  t3_texture *T = t3_texture_new(W, H, px);
+  free(px);
+  return T;
+}
+
 /* ---- models: parsed once, cloned per actor ---- */
 static t3_texture *find_map(t3_object *root, const char *mesh) {
   t3_object *o = t3_object_get_by_name(root, mesh);
@@ -194,6 +249,7 @@ void actor_unload(actor_model model) {
   model_tpl *P = &TPL[model];
   if (P->live > 0 || !P->gltf) return;
   for (int i = 0; i < PALC_N; i++) if (PALC[i].T && PALC[i].m == model) { t3_release(PALC[i].T); PALC[i].T = NULL; }
+  for (int i = 0; i < FACEC_N; i++) if (FACEC[i].T && FACEC[i].m == model) { t3_release(FACEC[i].T); FACEC[i].T = NULL; }
   if (P->face_tex) t3_release(P->face_tex);
   t3_release(P->gltf);
   free(P->png[0]); free(P->png[1]); free(P->spr);
@@ -218,12 +274,32 @@ static t3_texture *body_tex(actor_model model, const actor_palette *pal) {
   t3_texture *T = t3_texture_load_memory(P->png[0], P->png_n[0]);
   if (!T) return NULL;
   apply_palette(T, model, pal);
+  apply_wash(T, pal->wash);
   atlas_setup(T);
   if (slot >= 0) {
     if (PALC[slot].T) t3_release(PALC[slot].T);
     PALC[slot].m = model; PALC[slot].p = *pal; PALC[slot].T = T; t3_retain(T);
   }
   return T;   /* the caller's reference */
+}
+/* the face for a washed palette (NULL for none: the model's shared face stands), shared like body_tex */
+static t3_texture *face_tex(actor_model model, const actor_palette *pal) {
+  model_tpl *P = &TPL[model];
+  uint32_t w = pal ? pal->wash : 0;
+  if (!w || !P->png[1]) return NULL;
+  int slot = -1;
+  for (int i = 0; i < FACEC_N; i++) {
+    if (FACEC[i].T && FACEC[i].m == model && FACEC[i].wash == w) { t3_retain(FACEC[i].T); return FACEC[i].T; }
+    if (slot < 0 && (!FACEC[i].T || FACEC[i].T->_refs <= 1)) slot = i;
+  }
+  t3_texture *T = flat_face(P->png[1], P->png_n[1], w);
+  if (!T) return NULL;
+  atlas_setup(T);
+  if (slot >= 0) {
+    if (FACEC[slot].T) t3_release(FACEC[slot].T);
+    FACEC[slot].m = model; FACEC[slot].wash = w; FACEC[slot].T = T; t3_retain(T);
+  }
+  return T;
 }
 
 /* a copy of the template's node tree: bones are new objects, meshes share geometry */
@@ -407,8 +483,10 @@ actor_t *actor_new(actor_model model, const actor_palette *pal, float scale, t3_
   free(M);
   t3_object_add(a->root, a->gltf_scene);
   /* the levels: near (body, face, hull), mid (far body, its hull), far (far body alone); the renderer picks by camera distance */
+  a->pal = pal ? *pal : ACTOR_PAL_NONE;
   a->tex = body_tex(model, pal);
-  a->m_body = cel_mat(a->tex); a->m_face = cel_mat(P->face_tex);
+  a->ftex = face_tex(model, pal);
+  a->m_body = cel_mat(a->tex); a->m_face = cel_mat(a->ftex ? a->ftex : P->face_tex);
   static const char *MESH[6] = {"body", "face", "outline", "far", "farface", "faroutline"};
   t3_object *mo[6] = {0};
   for (int i = 0; i < 6; i++) {
@@ -438,6 +516,7 @@ actor_t *actor_new(actor_model model, const actor_palette *pal, float scale, t3_
   if (RIG) { mixer_init(&a->mixer, RIG, a->gltf_scene); a->mixer.hips_scale = CAST_META[model].hips_h; }
   a->b_neck = t3_object_get_by_name(a->gltf_scene, "neck");
   a->b_head = t3_object_get_by_name(a->gltf_scene, "head");
+  if (a->b_head) a->head_rest = a->b_head->scale;
   a->b_chest = t3_object_get_by_name(a->gltf_scene, "upperChest");
   a->b_rhand = t3_object_get_by_name(a->gltf_scene, "rightHand");
   a->b_lhand = t3_object_get_by_name(a->gltf_scene, "leftHand");
@@ -479,17 +558,20 @@ actor_t *actor_new(actor_model model, const actor_palette *pal, float scale, t3_
  * go of its props first (weapon_equip(a, -1)) */
 void actor_free(actor_t *a) {
   if (!a) return;
+  if (ON_FREE) ON_FREE(a);   /* while its sockets still stand */
   if (a->root) {
     if (a->root->parent) t3_object_remove(a->root->parent, a->root);
     if (a->gltf_scene) t3_release(a->gltf_scene);
     if (a->s_rhand) t3_release(a->s_rhand);
     if (a->s_lhand) t3_release(a->s_lhand);
+    for (int i = 0; i < a->nsock; i++) t3_release(a->sock[i].s);
     t3_release(a->root);
   }
   if (a->shadow) { if (a->shadow->base.parent) t3_object_remove(a->shadow->base.parent, &a->shadow->base); t3_release(a->shadow); }
   if (a->m_body) t3_release(a->m_body);
   if (a->m_face) t3_release(a->m_face);
   if (a->tex) t3_release(a->tex);
+  if (a->ftex) t3_release(a->ftex);
   if (a->gltf_scene && (unsigned)a->model < AM_COUNT && TPL[a->model].live > 0) TPL[a->model].live--;
   free(a);
 }
@@ -569,9 +651,15 @@ void actor_repalette(actor_t *a, const actor_palette *pal) {
   if (!a->m_body) return;
   t3_texture *T = body_tex(a->model, pal);
   if (!T) return;
+  a->pal = pal ? *pal : ACTOR_PAL_NONE;
   t3_material_set_map(a->m_body, T);
   if (a->tex) t3_release(a->tex);
   a->tex = T;
+  /* the face follows: washed flat, or back to the model's own */
+  t3_texture *F = face_tex(a->model, pal);
+  if (a->m_face) t3_material_set_map(a->m_face, F ? F : TPL[a->model].face_tex);
+  if (a->ftex) t3_release(a->ftex);
+  a->ftex = F;
 }
 void actor_lod_bias(float bias) { LOD_BIAS = bias > 0 ? bias : 1; }
 void actor_lod_camera(const t3_camera *cam) { LOD_CAM = cam; }
@@ -649,16 +737,51 @@ static void apply_reach(actor_t *a, float dt) {
   }
 }
 
+/* ---- stop motion: the pose the mixer and the look made at the last step, kept between steps ---- */
+static void hold_pose(actor_t *a, bool save) {
+  ck_mixer *m = &a->mixer;
+  if (!m->rig) return;
+  for (int i = 0; i < m->rig->nb && i < RIG_MAX_BONES; i++) {
+    t3_object *b = m->bone[i];
+    if (!b) continue;
+    float *q = a->hold_q[i];
+    if (save) { q[0] = b->quaternion.x; q[1] = b->quaternion.y; q[2] = b->quaternion.z; q[3] = b->quaternion.w; }
+    else t3_object_set_quaternion(b, (t3_quat){ q[0], q[1], q[2], q[3] });
+  }
+  if (m->hips) {
+    if (save) { a->hold_p[0] = m->hips->position.x; a->hold_p[1] = m->hips->position.y; a->hold_p[2] = m->hips->position.z; }
+    else t3_object_set_position(m->hips, a->hold_p[0], a->hold_p[1], a->hold_p[2]);
+  }
+}
+void actor_set_step(actor_t *a, float fps) {
+  a->step_fps = fps > 0 ? fps : 0;
+  a->step_held = false;
+  a->step_acc = fps > 0 ? ds_rr(0, 1 / fps) : 0;   /* a group does not step in unison */
+}
+
 void actor_update(actor_t *a, float dt) {
   drop_pixels(a->tex);
+  drop_pixels(a->ftex);
   if ((unsigned)a->model < AM_COUNT) drop_pixels(TPL[a->model].face_tex);
   if (!a->gltf_scene || !a->root->visible) return;
   if (a->lod && a->lod->level_count == 3) { float k = lod_scale(); a->lod->levels[1].distance = LOD_NEAR * k; a->lod->levels[2].distance = LOD_FAR * k; }
+  /* the clip's clock runs every frame, stepping or not: fight.c times hits and move ends by it */
   mixer_update(&a->mixer, dt);
-  if (a->mixer.bound) {}
-  apply_hands(a, dt);
-  apply_reach(a, dt);
-  apply_look(a, dt);
+  /* stop motion: between steps the last step's pose goes back over what the mixer just wrote; at a
+   * step the look, hands and springs catch up by the whole time since the last one */
+  float sdt = dt;
+  bool held = false;
+  if (a->step_fps > 0) {
+    a->step_acc += dt;
+    if (a->step_held && a->step_acc < 1 / a->step_fps) held = true;
+    else { sdt = a->step_held ? a->step_acc : dt; a->step_acc = 0; }
+  }
+  if (held) hold_pose(a, false);
+  else {
+    apply_hands(a, sdt);
+    apply_reach(a, sdt);
+    apply_look(a, sdt);
+  }
   /* the face */
   a->blink_t -= dt;
   if (a->blink_t < 0) { a->blink_v = 1; a->blink_t = ds_rr(2, 5.5f); }
@@ -679,15 +802,66 @@ void actor_update(actor_t *a, float dt) {
     }
   }
   t3_object_update_world_matrix(a->root, true, true);
+  if (held) return;   /* the springs hold too: plaster hair does not sway between steps */
   /* no hair physics on the far body (the last render's level): the springs start over when it comes near */
   if (a->spring_reset) { spring_seed(a); a->spring_reset = false; }
   else if (actor_lod_level(a) >= 2) a->spring_reset = true;
-  else if (dt > 0) spring_step(a, dt);
+  else if (sdt > 0) {
+    /* a stop motion step's whole gap in frame sized pieces, so the springs feel the same */
+    int n = a->step_fps > 0 ? (int)ceilf(sdt * 60 - .01f) : 1;
+    if (n < 1) n = 1;
+    if (n > 12) n = 12;
+    for (int i = 0; i < n; i++) spring_step(a, sdt / n);
+  }
   t3_object_update_world_matrix(a->root, true, true);
+  if (a->step_fps > 0) { hold_pose(a, true); a->step_held = true; }
 }
 
 t3_object *actor_socket_rhand(actor_t *a) { return a->s_rhand; }
 t3_object *actor_socket_lhand(actor_t *a) { return a->s_lhand; }
+t3_object *actor_socket(actor_t *a, const char *bone) {
+  if (!a->gltf_scene || !bone) return NULL;
+  t3_object *b = t3_object_get_by_name(a->gltf_scene, bone);
+  if (!b) return NULL;
+  for (int i = 0; i < a->nsock; i++) if (a->sock[i].bone == b) return a->sock[i].s;
+  if (a->nsock >= MAX_SOCKETS) { ds_log("actor: no socket left for %s", bone); return NULL; }
+  /* square to the body: undo the bone's rest turn and scale, read off the template (it never animates) */
+  t3_object *s = t3_object_new();
+  float k = 1;
+  t3_object *tb = TPL[a->model].gltf ? t3_object_get_by_name(TPL[a->model].gltf->scene, bone) : NULL;
+  if (tb) {
+    t3_object_update_world_matrix(TPL[a->model].gltf->scene, true, true);
+    float q[4], qi[4];
+    wquat(tb, q); qinv(qi, q);
+    t3_object_set_quaternion(s, (t3_quat){ qi[0], qi[1], qi[2], qi[3] });
+    const float *m = tb->matrix_world.e;
+    float sc = sqrtf(m[0]*m[0] + m[1]*m[1] + m[2]*m[2]);
+    if (sc > 1e-6f) k = 1 / sc;
+  }
+  float kk = b == a->b_head && a->head_hidden ? k / HEAD_HIDE : k;
+  t3_object_set_scale(s, kk, kk, kk);
+  t3_object_add(b, s);   /* the actor keeps its own reference, as for the hands */
+  a->sock[a->nsock].bone = b; a->sock[a->nsock].s = s; a->sock[a->nsock].k = k; a->nsock++;
+  return s;
+}
+t3_object *actor_socket_head(actor_t *a) { return actor_socket(a, "head"); }
+void actor_hide_head(actor_t *a, bool hide) {
+  if (!a->b_head || a->head_hidden == hide) return;
+  a->head_hidden = hide;
+  float k = hide ? HEAD_HIDE : 1;
+  t3_object_set_scale(a->b_head, a->head_rest.x * k, a->head_rest.y * k, a->head_rest.z * k);
+  /* the head socket grows back by as much, so what sits on it keeps its size */
+  for (int i = 0; i < a->nsock; i++) if (a->sock[i].bone == a->b_head) { float s = a->sock[i].k / k; t3_object_set_scale(a->sock[i].s, s, s, s); }
+  a->spring_reset = true;
+}
+void actor_set_scale(actor_t *a, float scale) {
+  a->scale = scale > 0 ? scale : 1;
+  actor_move(a, a->pos, a->yaw);
+  a->spring_reset = true;
+}
+float actor_scale(const actor_t *a) { return a->scale; }
+actor_palette actor_get_palette(const actor_t *a) { return a->pal; }
+void actor_on_free(void (*fn)(actor_t *a)) { ON_FREE = fn; }
 v3 actor_bone_pos(actor_t *a, const char *bone) {
   t3_object *b = a->gltf_scene ? t3_object_get_by_name(a->gltf_scene, bone) : NULL;
   if (!b) return a->pos;

@@ -29,9 +29,12 @@
 typedef enum { AM_B, AM_C, AM_D, AM_S, AM_F, AM_H, AM_M, AM_O, AM_P, AM_U, AM_K, AM_E, AM_V, AM_G, AM_W, AM_R, AM_A, AM_I, AM_J, AM_L, AM_N, AM_Q, AM_T, AM_X, AM_Y, AM_Z, AM_A2, AM_B2, AM_C2, AM_D2, AM_E2, AM_F2, AM_G2, AM_H2, AM_I2, AM_J2, AM_K2, AM_L2, AM_M2, AM_N2, AM_O2, AM_P2, AM_COUNT } actor_model;
 typedef enum { EX_BLINK, EX_A, EX_I, EX_U, EX_E, EX_O, EX_JOY, EX_ANGRY, EX_SORROW, EX_FUN, EX_COUNT } actor_expr;
 
-/* a palette swap: a hue turn (degrees) and saturation and value scales per part */
+/* a palette swap: a hue turn (degrees) and saturation and value scales per part.
+ * wash (0 none, else 0xSSRRGGBB): the whole body atlas turns toward colour RRGGBB, keeping a share SS/255
+ * of its painted light and dark (SS 0 keeps the default, about 0.35), and the face goes flat in that colour,
+ * its painted eyes and mouth gone: plaster, plastic, metal. Initializers that stop at shoes leave it 0. */
 typedef struct { float hue, sat, val; } actor_swatch;
-typedef struct { actor_swatch hair, top, bottom, shoes; } actor_palette;
+typedef struct { actor_swatch hair, top, bottom, shoes; uint32_t wash; } actor_palette;
 extern const actor_palette ACTOR_PAL_NONE;
 
 typedef struct actor actor_t;
@@ -87,14 +90,33 @@ void actor_update(actor_t *a, float dt);             /* after actor_move / actor
  * for the right hand; add a prop with t3_object_add. */
 t3_object *actor_socket_rhand(actor_t *a);
 t3_object *actor_socket_lhand(actor_t *a);
+/* a group that follows a bone (by its name in the rig, e.g. "upperChest", "leftUpperArm"), made on first
+ * ask (at most 6 an actor). Its frame is the body's own at rest: origin at the bone's pivot, +y up, +z the
+ * way the actor faces, +x to its left, in the model's metres (the actor's scale applies). So a prop built
+ * standing up in front of the bone sits there in the T pose and rides the bone through every clip. */
+t3_object *actor_socket(actor_t *a, const char *bone);
+t3_object *actor_socket_head(actor_t *a);            /* actor_socket(a, "head"): the pivot is the top of the neck */
+/* the head, its hair and face shrunk away (a prop on the head socket stands in: a box or a monitor for
+ * a head); the head socket keeps its size. false puts it back */
+void actor_hide_head(actor_t *a, bool hide);
+/* stop motion: the skeleton takes a new pose only fps times a second (0 every frame, the default).
+ * The clip's clock still runs every frame, so moves time and hit as usual; only the look jerks */
+void actor_set_step(actor_t *a, float fps);
+/* a new size (actor_new's scale) on a body already made: a pooled fighter is made at 1 */
+void actor_set_scale(actor_t *a, float scale);
+float actor_scale(const actor_t *a);
 v3 actor_bone_pos(actor_t *a, const char *bone);     /* world position, after actor_update */
 v3 actor_head_pos(actor_t *a);
 /* a flat colour flash over the whole model (hit flash): colour multiplier 0..n, 1 = normal */
 void actor_flash(actor_t *a, float r, float g, float b);
 /* the blob shadow is drawn by the actor at floor_y */
 void actor_set_floor(actor_t *a, float floor_y);
-/* a new palette on a model already made (reuses the actor, so no glTF parse); uploads the atlas again */
+/* a new palette on a model already made (reuses the actor, so no glTF parse); uploads the atlas again,
+ * and the face's too when the wash changes */
 void actor_repalette(actor_t *a, const actor_palette *pal);
+actor_palette actor_get_palette(const actor_t *a);   /* as actor_new or actor_repalette last set it */
+/* one listener told by actor_free before an actor goes (enemy.c: a dressed actor is undressed first) */
+void actor_on_free(void (*fn)(actor_t *a));
 /* both forearms up, open handed, over whatever clip plays: 0..1, eases (a beaten fighter yielding) */
 void actor_hands_up(actor_t *a, float amount);
 /* both hands onto world points (right, left) over the clip, the arms bent to reach: 0..1, eases (the bike's grips) */

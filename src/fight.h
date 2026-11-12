@@ -32,6 +32,9 @@ typedef struct {
   actor_t *actor;      /* optional: a story actor to use as it stands (palette, place, any weapon already
                         * equipped). NULL takes one from the fight's pool. A story actor is left visible, on
                         * one knee, after the fight: fight_end neither hides nor frees it. */
+  int dress;           /* an enemy_kind (enemy.h), 0 none: a pool fighter is dressed as it while the fight runs.
+                        * fight.c never dresses or undresses a story actor in .actor: the story calls
+                        * enemy_dress on it itself, and the dress stays on after fight_end */
 } fighter_def;
 
 typedef enum { FIGHT_RUNNING, FIGHT_WON, FIGHT_LOST } fight_state;

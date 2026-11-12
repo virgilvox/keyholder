@@ -74,6 +74,11 @@
   "dobbs_rides",
   "intern_stays",
   "ending_keyholders",
-  "ending_handoff"
+  "ending_handoff",
+  "attic_holiday",
+  "attic_members",
+  "attic_robots",
+  "attic_parts",
+  "attic_sysop"
  ]
 }

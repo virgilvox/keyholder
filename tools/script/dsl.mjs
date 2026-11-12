@@ -83,3 +83,12 @@ export const EPILOGUE = () => ({ op: 'epilogue' });
 // (stand it where a FIGHT with obj_prop 'welding_table' puts its object, and hide it for the fight). 'van': Copper
 // Cal's work van, its back doors open toward the mark's facing. Each is 'still' or 'hide'.
 export const PROP = (name, mark, mode = 'still') => ({ op: 'prop', name, mark, mode });
+
+// ---- v2.0: the attic (tools/script/attic.mjs)
+// Its scenes are played by attic.c through the story VM and end by putting the day back as it was.
+// STAGE('attic') the blueprint room, STAGE('attic_deep') the nightmare, STAGE('desert') the balloon launch's set.
+// GRADE(look, t): 'memory' fades the flashback look in over t seconds, 'none' fades it out.
+export const GRADE = (look, t = 1.2) => ({ op: 'grade', look, t });
+// PROP names for the flashbacks: 'balloon' (the desert set's balloon: mode 'still' on the ground, 'circle' fills it,
+// 'straight' lets it go), 'pink_front' (one forty's storefront in its pink coat), 'laser_crate', 'stage_robot',
+// 'move_boxes' (the move into 108), 'haxmas' (lights and a tree in the lab), 'rack_2018' (the rack on a dolly).
