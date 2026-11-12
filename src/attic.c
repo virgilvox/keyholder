@@ -84,14 +84,23 @@ static void build_env(void) {
     uint32_t c = (i & 1) ? WOOD_A : WOOD_B;
     fxp_quad(v3_(x0, 0, -RZ), v3_(x1, 0, -RZ), v3_(x1, 0, RZ), v3_(x0, 0, RZ), c);
   }
-  /* the walls (inner faces) and a ceiling */
-  fxp_quad(v3_(-RX,0,RZ), v3_(RX,0,RZ), v3_(RX,CEIL,RZ), v3_(-RX,CEIL,RZ), WALL);          /* south */
-  fxp_quad(v3_(RX,0,-RZ), v3_(-RX,0,-RZ), v3_(-RX,CEIL,-RZ), v3_(RX,CEIL,-RZ), WALL);      /* north */
-  fxp_quad(v3_(-RX,0,-RZ), v3_(-RX,0,RZ), v3_(-RX,CEIL,RZ), v3_(-RX,CEIL,-RZ), WALL);      /* west */
-  fxp_quad(v3_(RX,0,RZ), v3_(RX,0,-RZ), v3_(RX,CEIL,-RZ), v3_(RX,CEIL,RZ), WALL);          /* east */
-  fxp_quad(v3_(-RX,CEIL,-RZ), v3_(RX,CEIL,-RZ), v3_(RX,CEIL,RZ), v3_(-RX,CEIL,RZ), BEAM);  /* ceiling */
-  for (float x = -RX+1.4f; x < RX; x += 2.1f)                                              /* rafters */
-    fxp_box(v3_(x, CEIL-0.12f, 0), v3_(0.14f, 0.2f, 2*RZ), BEAM);
+  /* a real attic: low knee walls at the eaves, gable ends, a peaked roof along the ridge (z axis) */
+  const float EAVE = 2.15f, ROOF = 0x2a2218;
+  (void)ROOF;
+  fxp_quad(v3_(-RX,0,-RZ), v3_(-RX,0,RZ), v3_(-RX,EAVE,RZ), v3_(-RX,EAVE,-RZ), WALL);      /* west knee wall */
+  fxp_quad(v3_(RX,0,RZ), v3_(RX,0,-RZ), v3_(RX,EAVE,-RZ), v3_(RX,EAVE,RZ), WALL);          /* east knee wall */
+  fxp_quad(v3_(-RX,0,RZ), v3_(RX,0,RZ), v3_(RX,EAVE,RZ), v3_(-RX,EAVE,RZ), WALL);          /* south wall, lower */
+  fxp_quad(v3_(-RX,EAVE,RZ), v3_(RX,EAVE,RZ), v3_(0,CEIL,RZ), v3_(0,CEIL,RZ), WALL);       /* south gable */
+  fxp_quad(v3_(RX,0,-RZ), v3_(-RX,0,-RZ), v3_(-RX,EAVE,-RZ), v3_(RX,EAVE,-RZ), WALL);      /* north wall, lower */
+  fxp_quad(v3_(RX,EAVE,-RZ), v3_(-RX,EAVE,-RZ), v3_(0,CEIL,-RZ), v3_(0,CEIL,-RZ), WALL);   /* north gable */
+  fxp_quad(v3_(-RX,EAVE,-RZ), v3_(-RX,EAVE,RZ), v3_(0,CEIL,RZ), v3_(0,CEIL,-RZ), 0x3a2f24);/* west roof slope */
+  fxp_quad(v3_(0,CEIL,-RZ), v3_(0,CEIL,RZ), v3_(RX,EAVE,RZ), v3_(RX,EAVE,-RZ), 0x342a20);  /* east roof slope */
+  fxp_box(v3_(0, CEIL-0.12f, 0), v3_(0.2f, 0.24f, 2*RZ), 0x241c14);                        /* the ridge beam */
+  for (float z = -RZ+1.1f; z < RZ; z += 2.0f) {                                            /* angled rafters */
+    fxp_bar(v3_(-RX+0.1f, EAVE, z), v3_(0, CEIL-0.1f, z), 0.08f, BEAM);
+    fxp_bar(v3_(RX-0.1f, EAVE, z), v3_(0, CEIL-0.1f, z), 0.08f, BEAM);
+  }
+  for (float z = -RZ+2.2f; z < RZ; z += 3.2f) fxp_bar(v3_(-RX+0.2f, EAVE+0.05f, z), v3_(RX-0.2f, EAVE+0.05f, z), 0.07f, BEAM);  /* collar ties */
   /* the scorched patches under the red X paint (the X itself is emissive, built in the glow pass) */
   (void)TAPE;
   for (int r = 0; r < ROWS; r++) for (int c = 0; c < COLS; c++) {
@@ -207,8 +216,8 @@ void attic_env_mood(arena_mood *m) {
   /* wrong: dim, cold, green cast, close fog, flicker. normal: warm dusty attic. */
   arena_mood wrong = { t3_color_hex(0x0a1210), t3_color_hex(0x10201a), t3_color_hex(0x0c1a14),
     t3_color_hex(0x244c3e), t3_color_hex(0x10160f), t3_color_hex(0x40ff8a), 0.85f*env_flick, 0.7f*env_flick, 3.f, 22.f, v3_norm(v3_(0.2f,0.7f,-0.6f)), 0 };
-  arena_mood norm = { t3_color_hex(0x2e2619), t3_color_hex(0x34291b), t3_color_hex(0x33271a),
-    t3_color_hex(0xe6d2a6), t3_color_hex(0x4a3c2c), t3_color_hex(0xffe3ad), 1.35f, 1.55f, 8.f, 55.f, v3_norm(v3_(0.5f,0.55f,-0.6f)), 0 };
+  arena_mood norm = { t3_color_hex(0x3a301f), t3_color_hex(0x40321f), t3_color_hex(0x3c2e1c),
+    t3_color_hex(0xece0b8), t3_color_hex(0x564634), t3_color_hex(0xffe8b8), 1.75f, 1.7f, 10.f, 60.f, v3_norm(v3_(0.5f,0.55f,-0.6f)), 0 };
 #define CM(f) (t3_color){ wrong.f.r+(norm.f.r-wrong.f.r)*t, wrong.f.g+(norm.f.g-wrong.f.g)*t, wrong.f.b+(norm.f.b-wrong.f.b)*t }
   m->zenith = CM(zenith); m->horizon = CM(horizon); m->fog = CM(fog);
   m->hemi_sky = CM(hemi_sky); m->hemi_ground = CM(hemi_ground); m->sun = CM(sun);
@@ -238,6 +247,8 @@ static v3 ret_pos; static float ret_yaw;
 static unsigned games_mask;                        /* hacking minigames unlocked (persisted) */
 static uint16_t found_mask;                        /* examinables whose memory has played (persisted) */
 static int mem_id;                                 /* the memory now playing */
+static actor_t *ghost;                             /* the figure from the past in a memory */
+static v3 mem_eye, mem_look;                        /* the memory's camera */
 
 /* examinables in the hub: old things that hold a memory, the replay spot, the terminal */
 enum { EX_MEMORY, EX_REPLAY, EX_TERMINAL };
@@ -250,10 +261,26 @@ static const exam_t EXAM[] = {
 };
 #define NEXAM ((int)(sizeof EXAM / sizeof EXAM[0]))
 
-/* the memories, keyed by id */
-static const struct { const char *title, *l1, *l2; } MEM[] = {
-  { "THE OLD RENDER NODE", "This CRT ran the first wiki, back when the space was one room.", "Somebody soldered the power switch on. It never turned off." },
-  { "A BOX OF BADGES", "Laminated member badges, a few names you still see on the calendar.", "Most of them learned to solder at that bench downstairs." },
+/* a memory sequence: examining the object dims the room to a warm past, a figure acts the moment out
+ * while the camera eases in, and the narration plays line by line. */
+typedef struct {
+  const char *title; const char *line[3]; int nline;
+  actor_model model; v3 at; float yaw; const char *clip;   /* the figure from the past */
+  v3 eye0, look0, eye1, look1; float dur;                  /* the camera's slow push */
+} mem_t;
+static const mem_t MEM[] = {
+  { "THE OLD RENDER NODE",
+    { "This box ran the first wiki, back when the whole space was one room.",
+      "Somebody soldered the power switch on. It never got turned off.",
+      "Put a hand on the case. It is still warm." }, 3,
+    AM_O, { 5.0f, 0, -3.0f }, -2.2f, "Fixing_Kneeling",
+    { 3.2f, 1.55f, -0.8f }, { 5.0f, 0.65f, -3.0f }, { 4.1f, 1.1f, -1.8f }, { 5.0f, 0.6f, -3.0f }, 9.0f },
+  { "A BOX OF BADGES",
+    { "Laminated member badges. Names you still see on the sign-in sheet.",
+      "Most of them learned to solder at the bench downstairs.",
+      "" }, 2,
+    AM_L, { -5.6f, 0, 2.9f }, 1.1f, "Idle_Loop",
+    { -3.3f, 1.6f, 3.7f }, { -5.6f, 1.05f, 2.9f }, { -4.4f, 1.3f, 3.3f }, { -5.6f, 1.0f, 2.9f }, 8.5f },
 };
 #define NMEM ((int)(sizeof MEM / sizeof MEM[0]))
 
@@ -306,6 +333,7 @@ void attic_enter(void) {
 }
 
 static void leave(void) {
+  if (ghost) { actor_visible(ghost, false); actor_free(ghost); ghost = NULL; }
   story_attic_set_masks(found_mask, games_mask);
   attic_env_show(false);
   world_set_stage(STAGE_TOWN);          /* apply_lights repaints the town from the (unchanged) story clock */
@@ -339,8 +367,17 @@ bool attic_update(float dt, const intent_t *in) {
     return true;
   }
   if (phase == A_MEMORY) {
-    world_update(dt, player_pos());
-    if (phase_t > 1.0f && (in->ok || in->interact || in->back || phase_t > 7.0f)) { phase = A_HUB; phase_t = 0; }
+    const mem_t *M = &MEM[mem_id];
+    world_update(dt, M->at);
+    if (ghost) actor_update(ghost, dt);
+    float t = ds_clamp((phase_t - 0.6f) / (M->dur - 1.8f), 0, 1), e = t*t*(3-2*t);   /* the slow push */
+    mem_eye = v3_lerp(M->eye0, M->eye1, e); mem_look = v3_lerp(M->look0, M->look1, e);
+    t3_object_set_position(CAM, mem_eye.x, mem_eye.y, mem_eye.z);
+    t3_object_look_at(CAM, mem_look.x, mem_look.y, mem_look.z);
+    if (phase_t > M->dur || (phase_t > 1.4f && (in->interact || in->ok || in->back))) {
+      if (ghost) { actor_visible(ghost, false); actor_free(ghost); ghost = NULL; }
+      phase = A_HUB; phase_t = 0; player_camera_snap();
+    }
     return true;
   }
 
@@ -386,7 +423,14 @@ bool attic_update(float dt, const intent_t *in) {
     if (near_use && in->interact) {
       if (use_kind == EX_TERMINAL) { phase = A_TERMINAL; phase_t = 0; term_open(games_mask); sfx(SFX_UI_OK,0,1); }
       else if (use_kind == EX_REPLAY) { ramp_to = 1; dodge_arm(); player_teleport(ENTRY, DS_PI); sfx(SFX_UI_OK,0,1); }
-      else if (use_kind == EX_MEMORY) { mem_id = use_id % NMEM; found_mask |= (uint16_t)(1u << use_id); phase = A_MEMORY; phase_t = 0; sfx(SFX_UI,0,1); }
+      else if (use_kind == EX_MEMORY) {
+        mem_id = use_id % NMEM; found_mask |= (uint16_t)(1u << use_id);
+        const mem_t *M = &MEM[mem_id];
+        ghost = actor_new(M->model, &ACTOR_PAL_NONE, 1, SC);
+        actor_place(ghost, M->at, M->yaw); actor_play(ghost, M->clip, 1, true, 0); actor_visible(ghost, true);
+        mem_eye = M->eye0; mem_look = M->look0;
+        phase = A_MEMORY; phase_t = 0; sfx(SFX_UI, 0, 1);
+      }
     }
     if (in->back) { leave(); return false; }
   }
@@ -439,19 +483,30 @@ void attic_draw(void) {
       layer_end(&L_banner, c); }
     hg_tex_m(&L_banner, (float[6]){1,0,0,1,640-460,300}, a, 0xffffff);
   }
-  /* a memory sequence: a sepia card over a dim frame */
+  /* a memory sequence: the room shows through a warm sepia wash and a cinematic frame while the figure
+   * acts it out; the title fades in and out up top, the narration plays one line at a time */
   if (phase == A_MEMORY && mem_id >= 0) {
-    float a = hud_ease_out(phase_t*2) * (phase_t > 6.0f ? hud_ease_out((7.0f-phase_t)*2) : 1);
-    hg_rect(0, 0, 1280, 720, 0x140f08, .82f*a);
-    hg_vignette(0x000000, .5f*a, .4f);
-    cv *c = layer_begin(&L_mem, 900, 220, (0xE00u + (uint32_t)mem_id) ^ (pad?0x40000u:0u));
-    if (c) { p_text(c, F_MONO, 15, 3, CV_CENTER, "A MEMORY", 450, 30, AT_YEL, 1);
-      p_text(c, F_DISPLAY, 40, 1, CV_CENTER, MEM[mem_id].title, 450, 82, 0xf0e2c4, 1);
-      p_text(c, F_TYPE, 22, 0, CV_CENTER, MEM[mem_id].l1, 450, 134, AT_PAPER, 1);
-      p_text(c, F_TYPE, 22, 0, CV_CENTER, MEM[mem_id].l2, 450, 166, AT_PAPER, 1);
-      g_markup(c, 450, 206, CV_CENTER, F_MONO, 14, 1, 0x9a8f7a, 15, pad, "{USE} let it go", true);
-      layer_end(&L_mem, c); }
-    hg_tex_m(&L_mem, (float[6]){1,0,0,1,640-450,250}, a, 0xffffff);
+    const mem_t *M = &MEM[mem_id];
+    float fin = hud_ease_out(phase_t*1.5f), fout = ds_clamp(M->dur - phase_t, 0, 1), a = fin * fout;
+    hg_rect(0, 0, 1280, 720, 0x3a2614, 0.26f*a);
+    hg_vignette(0x1a0f04, 0.5f*a, 0.4f);
+    float lb = 72*a; hg_rect(0, 0, 1280, lb, 0x000000, a); hg_rect(0, 720-lb, 1280, lb, 0x000000, a);
+    float ta = hud_ease_out(phase_t*1.4f) * ds_clamp((3.6f - phase_t)*0.9f, 0, 1);
+    if (ta > 0.01f) {
+      cv *c = layer_begin(&L_mem, 760, 92, 0xE10u + (uint32_t)mem_id);
+      if (c) { p_text(c, F_MONO, 14, 4, CV_CENTER, "A MEMORY", 380, 26, AT_YEL, 1);
+        p_text(c, F_DISPLAY, 36, 1, CV_CENTER, M->title, 380, 72, 0xf0e2c4, 1); layer_end(&L_mem, c); }
+      hg_tex_m(&L_mem, (float[6]){1,0,0,1,640-380,92}, ta, 0xffffff);
+    }
+    int beat = (int)((phase_t - 1.2f) / ((M->dur - 1.6f) / (float)M->nline));
+    if (beat >= 0 && beat < M->nline && M->line[beat][0]) {
+      cv *c = layer_begin(&L_banner, 1040, 44, 0xF00u + (uint32_t)beat + (uint32_t)mem_id*8u);
+      if (c) { p_text(c, F_TYPE, 23, 0, CV_CENTER, M->line[beat], 520, 30, 0xf4ecda, 1); layer_end(&L_banner, c); }
+      hg_tex(&L_banner, 120, 632, a);
+    }
+    cv *sc = layer_begin(&L_top, 240, 26, 0xE99u ^ (pad?0x40000u:0u));
+    if (sc) { g_markup(sc, 236, 18, CV_RIGHT, F_MONO, 13, 1, 0x9a8f7a, 14, pad, "{USE} let it go", true); layer_end(&L_top, sc); }
+    hg_tex(&L_top, 1010, 690, a*0.9f);
   }
   hg_end();
 }
